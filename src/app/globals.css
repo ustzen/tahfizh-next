@@ -1,0 +1,339 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ==================================================================
+   TAHFIZH — Modern theme
+   Crisp neutrals (slate), refined blue accent, soft layered cards.
+   ================================================================== */
+
+@theme inline {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* Warna identitas per role — di-set lewat [data-role] pada pembungkus dashboard. */
+  --color-role: var(--role);
+  --color-role-soft: var(--role-soft);
+  --color-role-strong: var(--role-strong);
+  --color-role-ink: var(--role-ink);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.985 0.003 247.86);
+  --foreground: oklch(0.208 0.042 265.75);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.208 0.042 265.75);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.208 0.042 265.75);
+  --primary: oklch(0.546 0.245 262.88);
+  --primary-foreground: oklch(0.985 0.003 247.86);
+  --secondary: oklch(0.968 0.007 247.9);
+  --secondary-foreground: oklch(0.372 0.044 257.29);
+  --muted: oklch(0.968 0.007 247.9);
+  --muted-foreground: oklch(0.554 0.046 257.42);
+  --accent: oklch(0.962 0.062 97);
+  --accent-foreground: oklch(0.40 0.09 75);
+  --destructive: oklch(0.577 0.245 27.33);
+  --border: oklch(0.929 0.013 255.51);
+  --input: oklch(0.929 0.013 255.51);
+  --ring: oklch(0.623 0.214 259.82);
+  --chart-1: oklch(0.546 0.245 262.88);
+  --chart-2: oklch(0.83 0.165 92);
+  --chart-3: oklch(0.746 0.16 232.66);
+  --chart-4: oklch(0.705 0.213 47.6);
+  --chart-5: oklch(0.696 0.17 162.48);
+  --sidebar: oklch(0.985 0.003 247.86);
+  --sidebar-foreground: oklch(0.208 0.042 265.75);
+  --sidebar-primary: oklch(0.546 0.245 262.88);
+  --sidebar-primary-foreground: oklch(0.985 0.003 247.86);
+  --sidebar-accent: oklch(0.962 0.062 97);
+  --sidebar-accent-foreground: oklch(0.40 0.09 75);
+  --sidebar-border: oklch(0.929 0.013 255.51);
+  --sidebar-ring: oklch(0.623 0.214 259.82);
+}
+
+.dark {
+  --background: oklch(0.19 0.03 265);
+  --foreground: oklch(0.967 0.003 264.54);
+  --card: oklch(0.23 0.035 265);
+  --card-foreground: oklch(0.967 0.003 264.54);
+  --popover: oklch(0.23 0.035 265);
+  --popover-foreground: oklch(0.967 0.003 264.54);
+  --primary: oklch(0.623 0.214 259.82);
+  --primary-foreground: oklch(0.985 0.003 247.86);
+  --secondary: oklch(0.28 0.04 265);
+  --secondary-foreground: oklch(0.967 0.003 264.54);
+  --muted: oklch(0.28 0.04 265);
+  --muted-foreground: oklch(0.704 0.04 256.79);
+  --accent: oklch(0.33 0.07 95);
+  --accent-foreground: oklch(0.93 0.09 95);
+  --destructive: oklch(0.704 0.191 22.22);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.623 0.214 259.82);
+  --chart-1: oklch(0.623 0.214 259.82);
+  --chart-2: oklch(0.83 0.165 92);
+  --chart-3: oklch(0.746 0.16 232.66);
+  --chart-4: oklch(0.705 0.213 47.6);
+  --chart-5: oklch(0.696 0.17 162.48);
+  --sidebar: oklch(0.21 0.03 265);
+  --sidebar-foreground: oklch(0.967 0.003 264.54);
+  --sidebar-primary: oklch(0.623 0.214 259.82);
+  --sidebar-primary-foreground: oklch(0.985 0.003 247.86);
+  --sidebar-accent: oklch(0.33 0.07 95);
+  --sidebar-accent-foreground: oklch(0.93 0.09 95);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.623 0.214 259.82);
+}
+
+/* ==================================================================
+   Identitas warna per role — dipakai banner halaman, kepala tabel,
+   dan aksen. Diaktifkan via <div data-role="admin"> di DashboardShell.
+     --role         warna utama (solid)
+     --role-strong  varian lebih pekat (teks di atas soft, hover)
+     --role-soft    latar lembut untuk chip/kepala tabel
+     --role-ink     teks di atas warna utama
+   ================================================================== */
+:root,
+[data-role="admin"] {
+  --role: oklch(0.546 0.245 262.88);
+  --role-strong: oklch(0.45 0.21 264);
+  --role-soft: oklch(0.955 0.03 258);
+  --role-ink: oklch(0.985 0.003 247.86);
+}
+[data-role="developer"] {
+  --role: oklch(0.55 0.24 295);
+  --role-strong: oklch(0.44 0.21 295);
+  --role-soft: oklch(0.955 0.035 300);
+  --role-ink: oklch(0.985 0.003 247.86);
+}
+[data-role="koordinator"] {
+  --role: oklch(0.6 0.12 195);
+  --role-strong: oklch(0.47 0.1 195);
+  --role-soft: oklch(0.95 0.035 195);
+  --role-ink: oklch(0.985 0.003 247.86);
+}
+[data-role="ustadz"] {
+  --role: oklch(0.6 0.15 160);
+  --role-strong: oklch(0.46 0.12 160);
+  --role-soft: oklch(0.952 0.04 160);
+  --role-ink: oklch(0.985 0.003 247.86);
+}
+[data-role="santri"] {
+  --role: oklch(0.72 0.17 65);
+  --role-strong: oklch(0.5 0.12 60);
+  --role-soft: oklch(0.965 0.05 85);
+  --role-ink: oklch(0.25 0.06 60);
+}
+
+.dark,
+.dark [data-role="admin"] {
+  --role: oklch(0.65 0.2 260);
+  --role-strong: oklch(0.82 0.11 258);
+  --role-soft: oklch(0.3 0.06 262);
+  --role-ink: oklch(0.985 0.003 247.86);
+}
+.dark [data-role="developer"] {
+  --role: oklch(0.66 0.2 295);
+  --role-strong: oklch(0.83 0.1 298);
+  --role-soft: oklch(0.3 0.07 295);
+  --role-ink: oklch(0.985 0.003 247.86);
+}
+.dark [data-role="koordinator"] {
+  --role: oklch(0.68 0.11 195);
+  --role-strong: oklch(0.84 0.09 195);
+  --role-soft: oklch(0.29 0.05 195);
+  --role-ink: oklch(0.15 0.03 195);
+}
+.dark [data-role="ustadz"] {
+  --role: oklch(0.68 0.15 160);
+  --role-strong: oklch(0.84 0.11 160);
+  --role-soft: oklch(0.29 0.055 160);
+  --role-ink: oklch(0.15 0.03 160);
+}
+.dark [data-role="santri"] {
+  --role: oklch(0.78 0.15 75);
+  --role-strong: oklch(0.88 0.11 85);
+  --role-soft: oklch(0.32 0.06 75);
+  --role-ink: oklch(0.2 0.05 60);
+}
+
+
+@layer base {
+  /* ==================================================================
+     Judul kolom tabel berwarna — tiap kolom mendapat warna berbeda
+     (urutan siklus 8). Dipakai otomatis oleh <TableHead>. Ikon titik kecil
+     di kiri judul memakai warna yang sama. Aman untuk dark mode.
+     ================================================================== */
+  [data-slot="table-header"] th { --th: var(--role-strong); color: var(--th); }
+  [data-slot="table-header"] th:nth-child(8n+1) { --th: oklch(0.5 0.16 250); }
+  [data-slot="table-header"] th:nth-child(8n+2) { --th: oklch(0.5 0.14 160); }
+  [data-slot="table-header"] th:nth-child(8n+3) { --th: oklch(0.5 0.2 295); }
+  [data-slot="table-header"] th:nth-child(8n+4) { --th: oklch(0.55 0.14 70); }
+  [data-slot="table-header"] th:nth-child(8n+5) { --th: oklch(0.52 0.2 15); }
+  [data-slot="table-header"] th:nth-child(8n+6) { --th: oklch(0.52 0.11 195); }
+  [data-slot="table-header"] th:nth-child(8n+7) { --th: oklch(0.5 0.19 275); }
+  [data-slot="table-header"] th:nth-child(8n+8) { --th: oklch(0.56 0.16 45); }
+  .dark [data-slot="table-header"] th:nth-child(8n+1) { --th: oklch(0.8 0.11 250); }
+  .dark [data-slot="table-header"] th:nth-child(8n+2) { --th: oklch(0.82 0.12 160); }
+  .dark [data-slot="table-header"] th:nth-child(8n+3) { --th: oklch(0.8 0.12 295); }
+  .dark [data-slot="table-header"] th:nth-child(8n+4) { --th: oklch(0.85 0.12 80); }
+  .dark [data-slot="table-header"] th:nth-child(8n+5) { --th: oklch(0.8 0.12 15); }
+  .dark [data-slot="table-header"] th:nth-child(8n+6) { --th: oklch(0.82 0.1 195); }
+  .dark [data-slot="table-header"] th:nth-child(8n+7) { --th: oklch(0.8 0.12 275); }
+  .dark [data-slot="table-header"] th:nth-child(8n+8) { --th: oklch(0.82 0.12 50); }
+  /* Titik penanda di depan judul kolom. */
+  [data-slot="table-header"] th:not(:empty)::before {
+    content: "";
+    display: inline-block;
+    width: 0.4rem;
+    height: 0.4rem;
+    margin-right: 0.45rem;
+    border-radius: 9999px;
+    background: var(--th);
+    vertical-align: middle;
+  }
+  /* Kolom Aksi (rata kanan) tidak diberi titik. */
+  [data-slot="table-header"] th.text-right::before { display: none; }
+
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    /* V12: font dasar lebih besar untuk keterbacaan (menu, card, isi). */
+    font-size: 1.03125rem; /* 16.5px */
+    font-feature-settings: "cv11", "ss01";
+  }
+  button:not([disabled]),
+  [role="button"]:not([disabled]) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: oklch(0.87 0.16 92 / 0.35);
+  }
+}
+
+@layer utilities {
+  /* Brand: BIRU solid sebagai utama; KUNING hanya aksen pinggiran (strip,
+     badge, hover) — tanpa gradient. Kelas gradient dipertahankan sebagai
+     alias warna solid agar pemakaian lama tetap konsisten. */
+  .bg-gradient-brand {
+    background-color: var(--primary);
+    background-image: none;
+  }
+  /* Di dalam dashboard (ada [data-role]) alias ini ikut warna role, sehingga
+     seluruh tombol utama & lencana skor otomatis berwarna Admin/Ustadz/dst. */
+  [data-role] .bg-gradient-brand {
+    background-color: var(--role);
+    color: var(--role-ink);
+  }
+  .text-gradient-brand {
+    background-image: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+    color: var(--primary);
+  }
+  [data-role] .text-gradient-brand {
+    color: var(--role-strong);
+  }
+  /* Soft layered card look (modern product design) */
+  .shadow-card {
+    box-shadow:
+      0 1px 2px 0 oklch(0.208 0.042 265.75 / 0.05),
+      0 4px 16px -4px oklch(0.208 0.042 265.75 / 0.08);
+  }
+  /* Pola titik halus untuk banner header (dekoratif, tanpa gradient). */
+  .bg-dots {
+    background-image: radial-gradient(currentColor 1px, transparent 1px);
+    background-size: 14px 14px;
+  }
+  /* Angka tabular agar kolom nominal/skor rata. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .shadow-card-lg {
+    box-shadow:
+      0 1px 2px 0 oklch(0.208 0.042 265.75 / 0.06),
+      0 12px 32px -8px oklch(0.208 0.042 265.75 / 0.14);
+  }
+}
+
+/* ==================================================================
+   TAHFIZH V9 — Report print pipeline (rule #35/#36/#57)
+   Print = only .report-page elements, exact size, margins from @page.
+   ================================================================== */
+@media print {
+  @page {
+    size: auto;
+    margin: 0;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .report-print-root,
+  .report-print-root * {
+    visibility: visible;
+  }
+  .report-print-root {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+  }
+  .report-page {
+    box-shadow: none !important;
+    outline: none !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    break-after: page;
+    page-break-after: always;
+  }
+  .report-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  /* Keep builder chrome (toolbar/panels) off the paper. */
+  .no-print {
+    display: none !important;
+  }
+}
