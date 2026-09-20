@@ -201,19 +201,14 @@ export default async function StudentTahfidzPage({
             </Card>
           )}
 
-          {v7Summary && (v7Summary.activeTargets > 0 || v7Summary.activeTasks > 0 || v7Summary.journalMonth > 0) && (
+          {v7Summary && (v7Summary.activeTasks > 0 || v7Summary.journalMonth > 0) && (
             <Card className="shadow-card rounded-2xl">
               <CardHeader>
-                <CardTitle>Target & Tugas & Jurnal</CardTitle>
+                <CardTitle>Tugas & Jurnal</CardTitle>
                 <CardDescription>Ringkasan V7 — data aktual, bukan angka dummy.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="rounded-xl bg-role-soft px-2 py-3">
-                    <p className="text-lg font-bold text-role-strong">{v7Summary.activeTargets}</p>
-                    <p className="text-muted-foreground text-[11px]">Target aktif</p>
-                    <p className="text-muted-foreground text-[11px]">rata-rata {v7Summary.avgProgress}%</p>
-                  </div>
+                <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="rounded-xl bg-orange-50 dark:bg-orange-500/15 px-2 py-3">
                     <p className="text-lg font-bold text-orange-700 dark:text-orange-300">{v7Summary.activeTasks}</p>
                     <p className="text-muted-foreground text-[11px]">Tugas aktif</p>
@@ -224,12 +219,6 @@ export default async function StudentTahfidzPage({
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href={`/ustadz/target/new?student=${studentId}`}
-                    className="rounded-lg border border-role/25 px-3 py-1.5 text-xs font-semibold text-role-strong transition hover:bg-role-soft"
-                  >
-                    + Target Baru
-                  </Link>
                   <Link
                     href={`/ustadz/tugas/new?student=${studentId}`}
                     className="rounded-lg border border-role/25 px-3 py-1.5 text-xs font-semibold text-role-strong transition hover:bg-role-soft"

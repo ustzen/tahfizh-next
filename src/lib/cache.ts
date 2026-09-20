@@ -39,11 +39,9 @@ export const CACHE_KEYS = {
   learningTemplates: (code: string | null) => `${CACHE_KEYS.tenant(code)}:learning-note-templates`,
   learningStudentSummary: (studentId: string, module: string) =>
     `student:${studentId}:${module.toLowerCase()}`,
-  // V7 — Target/Tugas/Jurnal (rule #43: tenant-aware)
-  v7Targets: (code: string | null) => `${CACHE_KEYS.tenant(code)}:targets`,
+  // V7 — Tugas/Jurnal (rule #43: tenant-aware). Target per halaqah (V17) tidak di-cache.
   v7Tasks: (code: string | null) => `${CACHE_KEYS.tenant(code)}:tasks`,
   v7JournalTemplates: (code: string | null) => `${CACHE_KEYS.tenant(code)}:journal-templates`,
-  v7StudentTargets: (studentId: string) => `student:${studentId}:targets`,
   v7StudentTasks: (studentId: string) => `student:${studentId}:tasks`,
   v7StudentJournals: (studentId: string) => `student:${studentId}:journals`,
   // V9 — Raport (rule #70: tenant-aware)
@@ -192,7 +190,7 @@ export function invalidateTenantConfig(tenantCode: string | null, role: AppRole 
 }
 
 /* ------------------------------------------------------------------------ */
-/* V7 — Target / Tugas / Custom Jurnal (rule #43/#44)                       */
+/* V7 — Tugas / Custom Jurnal (rule #43/#44)                                */
 /* ------------------------------------------------------------------------ */
 
 /** After ADMIN journal-template mutations. */
@@ -200,17 +198,6 @@ export function invalidateJournalConfig(tenantCode: string | null) {
   invalidateTags(CACHE_KEYS.v7JournalTemplates(tenantCode));
   revalidatePath("/admin/pengaturan/jurnal");
   revalidatePath("/ustadz/jurnal");
-}
-
-/** After guru target mutations (create/edit/progress/cancel). */
-export function invalidateTargets(studentIds: string[]) {
-  for (const id of studentIds) {
-    invalidateTags(CACHE_KEYS.v7StudentTargets(id), CACHE_KEYS.achievementCard(id));
-    revalidatePath(`/ustadz/target/${id}`);
-  }
-  revalidatePath("/ustadz/target");
-  revalidatePath("/ustadz");
-  revalidatePath("/ustadz/prestasi");
 }
 
 /** After guru task mutations (create/edit/status/grade). */

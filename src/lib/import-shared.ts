@@ -51,6 +51,9 @@ const HALAQAH_ALIASES = [
   "halaqah",
   "kelas",
   "halaqahcode",
+  "namahalaqah",
+  "namahalaqahkelas",
+  "halaqahname",
 ];
 
 export const TEACHER_IMPORT_COLUMNS: ImportColumn[] = [
@@ -86,7 +89,7 @@ export const STUDENT_IMPORT_COLUMNS: ImportColumn[] = [
   { key: "D", label: "Nama Panggilan", aliases: NICK_ALIASES },
   { key: "E", label: "Jenis Kelamin (L/P)", required: true, aliases: GENDER_ALIASES },
   { key: "F", label: "Nama Wali", aliases: ["namawali", "wali", "namaorangtua", "namaortu", "orangtua", "guardianname"] },
-  { key: "G", label: "Kode Halaqah/Kelas", aliases: HALAQAH_ALIASES },
+  { key: "G", label: "Nama Halaqah/Kelas", aliases: HALAQAH_ALIASES },
   {
     key: "H",
     label: "No. WhatsApp Wali",
@@ -364,7 +367,12 @@ export type ValidStudentRow = {
   nisn: string | null;
   guardianName: string | null;
   guardianWhatsapp: string | null;
-  halaqahCode: string;
+  /**
+   * V14 — NAMA halaqah persis seperti tertulis di file (huruf besar/kecil
+   * dipertahankan untuk ditampilkan di laporan), dicocokkan ke halaqah
+   * lembaga TANPA memandang besar/kecil huruf (mis. "Alif" = "ALIF" = "alif").
+   */
+  halaqahName: string;
 };
 
 type Checked<T> = { ok: true; value: T } | { ok: false; reason: string };
@@ -424,7 +432,10 @@ export function validateStudentRow(row: ImportRow, rowNum: number): Checked<Vali
   const nickname = cellValue(row, "D");
   const genderRaw = cellValue(row, "E");
   const guardianName = cellValue(row, "F").slice(0, 120);
-  const halaqahCode = cellValue(row, "G").toUpperCase();
+  // V14 — nama halaqah dipertahankan apa adanya (peka huruf besar/kecil TIDAK
+  // berlaku): pencocokan ke halaqah lembaga dilakukan case-insensitive di
+  // server (lihat resolveHalaqahByName di actions/import-export.ts).
+  const halaqahName = cellValue(row, "G").trim().slice(0, 120);
   const guardianWa = cleanPhone(cellValue(row, "H"));
 
   if (fullName.length < 2 || fullName.length > 120) {
@@ -463,7 +474,7 @@ export function validateStudentRow(row: ImportRow, rowNum: number): Checked<Vali
       nisn: nisn || null,
       guardianName: guardianName || null,
       guardianWhatsapp: guardianWa || null,
-      halaqahCode,
+      halaqahName,
     },
   };
 }

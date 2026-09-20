@@ -36,6 +36,17 @@ function periodText(ctx: CanvasContext): string {
   return `${formatDateID(ctx.periodStart)} — ${formatDateID(ctx.periodEnd)}`;
 }
 
+/**
+ * Perataan horizontal untuk komponen satu baris. Komponen-komponen ini dirender
+ * sebagai flex container, jadi `text-align` saja tidak menggesernya — posisi
+ * harus ikut `justify-*` sesuai style.align yang dipilih di builder.
+ */
+function justifyFor(align: ReportStyle["align"]): string {
+  if (align === "left") return "justify-start";
+  if (align === "right") return "justify-end";
+  return "justify-center";
+}
+
 /** Apply the builder's style knobs (rule #53 subset). */
 export function styleToCss(style: ReportStyle): React.CSSProperties {
   return {
@@ -168,49 +179,49 @@ export function ReportComponentContent({ comp, ctx, data, logoUrl, watermarkUrl 
 
     case "INSTITUTION_NAME":
       return (
-        <div className={cn(base, "flex items-center justify-center font-bold text-blue-950")} style={css}>
+        <div className={cn(base, "flex items-center font-bold text-blue-950", justifyFor(comp.style.align))} style={css}>
           {inst.name || "Nama Lembaga"}
         </div>
       );
 
     case "INSTITUTION_ADDRESS":
       return (
-        <div className={cn(base, "flex items-center justify-center text-slate-600")} style={css}>
+        <div className={cn(base, "flex items-center text-slate-600", justifyFor(comp.style.align))} style={css}>
           {inst.address ? inst.address : <span className="hidden">.</span>}
         </div>
       );
 
     case "INSTITUTION_CONTACT":
       return (
-        <div className={cn(base, "flex items-center justify-center text-slate-500")} style={css}>
+        <div className={cn(base, "flex items-center text-slate-500", justifyFor(comp.style.align))} style={css}>
           {inst.contact ? inst.contact : <span className="hidden">.</span>}
         </div>
       );
 
     case "REPORT_TITLE":
       return (
-        <div className={cn(base, "flex items-center justify-center text-center font-bold uppercase tracking-wide text-blue-900")} style={css}>
+        <div className={cn(base, "flex items-center text-center font-bold uppercase tracking-wide text-blue-900", justifyFor(comp.style.align))} style={css}>
           {String(comp.props?.text ?? "") || ctx.title}
         </div>
       );
 
     case "PERIOD":
       return (
-        <div className={cn(base, "flex items-center justify-center text-slate-700")} style={css}>
+        <div className={cn(base, "flex items-center text-slate-700", justifyFor(comp.style.align))} style={css}>
           Periode: {periodText(ctx)}
         </div>
       );
 
     case "ACADEMIC_YEAR":
       return (
-        <div className={cn(base, "flex items-center justify-center text-slate-700")} style={css}>
+        <div className={cn(base, "flex items-center text-slate-700", justifyFor(comp.style.align))} style={css}>
           Tahun Ajaran {ctx.academicYear || "-"}
         </div>
       );
 
     case "SEMESTER":
       return (
-        <div className={cn(base, "flex items-center justify-center text-slate-700")} style={css}>
+        <div className={cn(base, "flex items-center text-slate-700", justifyFor(comp.style.align))} style={css}>
           {ctx.semesterLabel || "-"}
         </div>
       );
@@ -291,9 +302,6 @@ export function ReportComponentContent({ comp, ctx, data, logoUrl, watermarkUrl 
         if (m && (m.total ?? 0) > 0)
           rows.push({ key, materi: mod, nilai: scoreText(mode, m.avgValue, m.lastLabel), ket: `${m.count}/${m.total} materi` });
       }
-      const tg = scores.target;
-      if (tg && (tg.active ?? 0) > 0)
-        rows.push({ key: "target", materi: MODULE_LABELS.TARGET, nilai: `${tg.avgProgress ?? 0}%`, ket: `${tg.active} target aktif` });
       const tk = scores.tugas;
       if (tk && (tk.total ?? 0) > 0)
         rows.push({ key: "tugas", materi: MODULE_LABELS.TUGAS, nilai: scoreText(mode, tk.avgValue, null), ket: `${tk.dinilai}/${tk.total} dinilai` });
@@ -426,7 +434,7 @@ export function ReportComponentContent({ comp, ctx, data, logoUrl, watermarkUrl 
 
     case "FOOTER":
       return (
-        <div className={cn(base, "flex items-center justify-center text-[11px] text-slate-400")} style={css}>
+        <div className={cn(base, "flex items-center text-[11px] text-slate-400", justifyFor(comp.style.align))} style={css}>
           {String(comp.props?.text ?? "") || inst.footer || ""}
         </div>
       );

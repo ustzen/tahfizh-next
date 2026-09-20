@@ -410,13 +410,9 @@ Tiga modul pembelajaran baru dengan satu engine generik:
 
 Migration: `supabase/migrations/20260915060000_tahfizh_v7_target_tugas_jurnal.sql`
 
-Tiga fitur baru untuk guru, satu engine generik:
+Fitur untuk guru, satu engine generik (Target per santri sudah tidak ada sejak V17):
 
-- **Target** — `/ustadz/target`: target per santri yang dapat dikaitkan ke 6 modul
-  (Tahfidz/Tartil/Setoran/Hadits/Doa/Tajwid) atau Custom. Progress modul **dihitung dari data
-  penilaian aktual** (RPC `target_recompute_progress` — 7/10 hadits = 70%, tanpa angka dummy);
-  target custom diperbarui manual. Progress bar visual, histori perubahan append-only
-  (`target_progress_history`), status: Belum Mulai/Berjalan/Tercapai/Terlambat/Dibatalkan.
+- **Target** — *dihapus di V17 dan diganti target per halaqah (lihat bagian V17 di akhir dokumen).*
 - **Tugas** — `/ustadz/tugas`: judul + instruksi + deadline + modul (termasuk Custom). Status
   Belum Dikerjakan → Dikerjakan → Dikumpulkan → Dinilai / Terlambat dengan histori status.
   Penilaian **memakai engine V3** (Centang/Huruf/Angka — rule #20/#69). Hanya tugas DINILAI
@@ -429,14 +425,13 @@ Tiga fitur baru untuk guru, satu engine generik:
   terblokir bila sudah dipakai (soft-delete arsip).
 - **Kartu Prestasi** — RPC `tahfidz_student_timeline` kini superset 8 modul (TAHFIDZ, TARTIL,
   SETORAN, HADITS, DOA, TAJWID, **TUGAS**, **JURNAL**) + filter baru di UI. Zero input ganda.
-- **Dashboard guru** — widget Target aktif / Tugas aktif / Jurnal 30 hari (RPC `v7_teacher_counts`).
-- **Detail santri** — ringkasan Target/Tugas/Jurnal (RPC `v7_student_summary`) + CTA
-  "Target/Tugas/Jurnal" yang membuka form dengan santri terpilih.
+- **Dashboard guru** — widget Target halaqah aktif / Tugas aktif / Jurnal 30 hari (RPC `v7_teacher_counts`).
+- **Detail santri** — ringkasan Tugas/Jurnal (RPC `v7_student_summary`) + CTA form dengan santri terpilih.
 - **RLS**: semua tabel V7 tenant-isolated; guru hanya membaca santri binaan; write **hanya via
-  RPC** (`target_save`, `target_set_progress`, `target_cancel`, `task_save`, `task_set_status`,
+  RPC** (`task_save`, `task_set_status`,
   `journal_entry_save`, `journal_template_*` untuk ADMIN) yang memverifikasi session → role →
   tenant → guru → relasi binaan (rule #41-#42).
-- Cache: `tenant:{code}:targets|tasks|journal-templates`, `student:{id}:targets|tasks|journals`,
+- Cache: `tenant:{code}:tasks|journal-templates`, `student:{id}:tasks|journals`,
   `student:{id}:achievement-card` — invalid saat guru/Admin menyimpan perubahan (rule #43/#44).
 
 ## 20. V9 — Raport Dinamis & Report Builder (baru)
@@ -957,3 +952,20 @@ Tailwind `bg-role`, `bg-role-soft`, `text-role-strong`, `text-role-ink`, `border
 
 **Catatan**: gunakan token semantik (`text-foreground`, `text-muted-foreground`, `bg-card`,
 `bg-muted`, `border-border`) alih-alih `text-slate-*`/`bg-white` agar dark mode benar.
+
+## V17 — Target per Halaqah (menggantikan Target per santri)
+
+Migration: `supabase/migrations/20260921010000_tahfizh_v17_target_halaqah.sql`
+
+- **Target diatur per halaqah, bukan per santri** — menu `/ustadz/target`. Tiap halaqah yang
+  diampu punya 3 target tetap: **Tahfidz Al-Qur'an** (satuan surat), **Hadits** (hadits), dan
+  **Doa** (doa). Satu halaqah = satu target per jenis (`unique (halaqah_id, category)`), dengan
+  jumlah, periode mulai–selesai, dan keterangan opsional.
+- Tabel `halaqah_targets`; RPC `target_halaqah_overview`, `target_halaqah_save`,
+  `target_halaqah_clear` (hanya USTADZ pengampu halaqah). RLS select: tenant + role.
+- **Target lama dihapus total**: tabel `targets` & `target_progress_history`, RPC `target_*`,
+  enum `target_status`, baris Target di raport (`report_student_data`), event TARGET di
+  `student_development_events`, ringkasan target di detail santri. Migration bersifat
+  destruktif — backup data target lama bila diperlukan.
+- Dashboard guru: widget "Target Halaqah Aktif" = target halaqah yang periodenya belum lewat.
+- Belum ada perhitungan capaian otomatis (hanya penetapan sasaran).

@@ -219,7 +219,7 @@ export default async function UstadzDashboardPage() {
         )}
       </CardBox>
 
-      {/* Rule #34: Target/Tugas/Jurnal widget — real data only. */}
+      {/* Rule #34: Target(halaqah)/Tugas/Jurnal widget — real data only. */}
       <CardBox className="mt-4">
         <SectionTitle
           tone="violet"
@@ -232,7 +232,7 @@ export default async function UstadzDashboardPage() {
             href="/ustadz/target"
             icon={<Target className="size-5" />}
             iconClass="bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
-            label="Target Aktif"
+            label="Target Halaqah Aktif"
             value={v7Counts.targets}
           />
           <WidgetLink

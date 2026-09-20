@@ -19451,3 +19451,1368 @@ $$;
 -- fungsi ini tidak pernah terbuka untuk user login (lihat migration sebelumnya).
 revoke all on function public.payment_mark_paid_auto(text, text, text) from public, anon, authenticated;
 grant execute on function public.payment_mark_paid_auto(text, text, text) to service_role;
+-- ============================================================================
+-- SOURCE: 20260920200000_tahfizh_v13_raport_galeri_utama.sql
+-- ============================================================================
+-- ============================================================================
+-- TAHFIZH V13 — Raport: galeri contoh + "Raport Utama Lembaga"
+-- ============================================================================
+-- Tujuan migrasi ini:
+--   1. Kolom is_primary pada report_templates — satu template per lembaga
+--      (dan satu template global bawaan) bisa ditandai sebagai RAPORT UTAMA.
+--   2. RPC report_template_set_primary — ADMIN, KOORDINATOR, dan USTADZ
+--      lembaga boleh menetapkan raport utama; DEVELOPER untuk template global.
+--   3. Hak ubah template diperluas: ADMIN + KOORDINATOR + USTADZ boleh
+--      menyalin, mengubah layout, mengaktifkan, dan menyimpan template milik
+--      lembaganya sendiri (tetap tenant-scoped penuh; hapus tetap ADMIN).
+--   4. RPC galeri (report_template_gallery / report_dev_gallery) yang ikut
+--      mengirim LAYOUT sehingga UI bisa menampilkan CONTOH RAPORT secara
+--      langsung, bukan sekadar nama template.
+--   5. Layout ketiga template bawaan diperbarui: 1 Kolom, 2 Kolom (contoh
+--      lengkap), dan Fleksibel 2 Halaman.
+-- Idempoten & repair-safe: semua create or replace / if not exists.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1. Kolom is_primary + indeks unik parsial
+-- ---------------------------------------------------------------------------
+alter table public.report_templates
+  add column if not exists is_primary boolean not null default false;
+
+-- Satu raport utama per lembaga, dan satu contoh utama bawaan (tenant_id null).
+drop index if exists report_templates_primary_tenant_idx;
+drop index if exists report_templates_primary_global_idx;
+drop index if exists report_templates_primary_scope_idx;
+create unique index report_templates_primary_scope_idx
+  on public.report_templates (coalesce(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid))
+  where is_primary;
+
+-- ---------------------------------------------------------------------------
+-- 2. Helper: siapa yang boleh mengelola template lembaga
+-- ---------------------------------------------------------------------------
+create or replace function public.report_can_manage_templates()
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select coalesce(
+    (select role from public.profiles where id = auth.uid())
+      in ('ADMIN', 'KOORDINATOR', 'USTADZ'),
+    false
+  );
+$$;
+
+grant execute on function public.report_can_manage_templates() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3. Simpan layout dari Report Builder — ADMIN/KOORDINATOR/USTADZ
+-- ---------------------------------------------------------------------------
+create or replace function public.report_template_save_layout(
+  p_template_id uuid,
+  p_layout      jsonb
+)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_profile public.profiles;
+  v_t       public.report_templates;
+begin
+  select * into v_profile from public.profiles where id = auth.uid();
+  if v_profile is null then raise exception 'AKSES_DITOLAK'; end if;
+  select * into v_t from public.report_templates where id = p_template_id;
+  if v_t is null then raise exception 'TEMPLATE_TIDAK_DITEMUKAN'; end if;
+  if not public.report_layout_valid(p_layout) then raise exception 'LAYOUT_TIDAK_VALID'; end if;
+
+  if v_t.tenant_id is null then
+    -- Template global hanya boleh diubah DEVELOPER (rule #4).
+    if v_profile.role <> 'DEVELOPER' then raise exception 'AKSES_DITOLAK'; end if;
+  else
+    -- Salinan lembaga: admin, koordinator, dan guru lembaga tersebut.
+    if v_profile.role not in ('ADMIN', 'KOORDINATOR', 'USTADZ')
+       or v_profile.tenant_id is distinct from v_t.tenant_id then
+      raise exception 'AKSES_DITOLAK';
+    end if;
+  end if;
+
+  update public.report_templates
+     set layout = p_layout,
+         version = version + 1,
+         updated_at = now()
+   where id = p_template_id;
+
+  -- on conflict: riwayat versi bersifat pelengkap, tidak boleh menggagalkan simpan.
+  insert into public.report_template_versions (tenant_id, template_id, version, layout, changed_by, note)
+  values (v_t.tenant_id, p_template_id, v_t.version + 1, p_layout, auth.uid(), 'Perubahan layout')
+  on conflict (template_id, version) do nothing;
+end;
+$$;
+
+grant execute on function public.report_template_save_layout(uuid, jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 4. Tandai sebagai RAPORT UTAMA lembaga
+-- ---------------------------------------------------------------------------
+create or replace function public.report_template_set_primary(p_template_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_profile public.profiles;
+  v_t       public.report_templates;
+begin
+  select * into v_profile from public.profiles where id = auth.uid();
+  if v_profile is null then raise exception 'AKSES_DITOLAK'; end if;
+  select * into v_t from public.report_templates where id = p_template_id;
+  if v_t is null then raise exception 'TEMPLATE_TIDAK_DITEMUKAN'; end if;
+
+  if v_t.tenant_id is null then
+    if v_profile.role <> 'DEVELOPER' then raise exception 'AKSES_DITOLAK'; end if;
+    update public.report_templates set is_primary = false
+     where tenant_id is null and is_primary and id <> v_t.id;
+    update public.report_templates set is_primary = true, is_active = true
+     where id = v_t.id;
+  else
+    if v_profile.role not in ('ADMIN', 'KOORDINATOR', 'USTADZ')
+       or v_profile.tenant_id is distinct from v_t.tenant_id then
+      raise exception 'AKSES_DITOLAK';
+    end if;
+    update public.report_templates set is_primary = false
+     where tenant_id = v_t.tenant_id and is_primary and id <> v_t.id;
+    update public.report_templates set is_primary = true, is_active = true
+     where id = v_t.id;
+  end if;
+end;
+$$;
+
+grant execute on function public.report_template_set_primary(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 5. Duplikat / instansiasi template — diperluas ke koordinator & guru
+-- ---------------------------------------------------------------------------
+create or replace function public.report_template_duplicate(p_template_id uuid, p_new_name text default null)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_profile public.profiles;
+  v_src     public.report_templates;
+  v_id      uuid;
+begin
+  select * into v_profile from public.profiles where id = auth.uid();
+  if v_profile is null then raise exception 'AKSES_DITOLAK'; end if;
+  select * into v_src from public.report_templates where id = p_template_id;
+  if v_src is null then raise exception 'TEMPLATE_TIDAK_DITEMUKAN'; end if;
+
+  if v_src.tenant_id is null then
+    if v_profile.role = 'DEVELOPER' then
+      insert into public.report_templates (
+        tenant_id, created_by, source_template_id, name, description,
+        paper, orientation, layout, version
+      ) values (
+        null, auth.uid(), v_src.id,
+        coalesce(nullif(trim(coalesce(p_new_name, '')), ''), v_src.name || ' (Salinan)'),
+        v_src.description, v_src.paper, v_src.orientation, v_src.layout, 1
+      ) returning id into v_id;
+    elsif v_profile.role in ('ADMIN', 'KOORDINATOR', 'USTADZ') and v_profile.tenant_id is not null then
+      -- Salinan milik lembaga (rule #5): perubahan Developer tidak menariknya.
+      insert into public.report_templates (
+        tenant_id, created_by, source_template_id, name, description,
+        paper, orientation, layout, version
+      ) values (
+        v_profile.tenant_id, auth.uid(), v_src.id,
+        coalesce(nullif(trim(coalesce(p_new_name, '')), ''), v_src.name),
+        v_src.description, v_src.paper, v_src.orientation, v_src.layout, 1
+      ) returning id into v_id;
+    else raise exception 'AKSES_DITOLAK'; end if;
+  else
+    if v_profile.role not in ('ADMIN', 'KOORDINATOR', 'USTADZ')
+       or v_src.tenant_id is distinct from v_profile.tenant_id then
+      raise exception 'AKSES_DITOLAK';
+    end if;
+    insert into public.report_templates (
+      tenant_id, created_by, source_template_id, name, description,
+      paper, orientation, layout, version
+    ) values (
+      v_profile.tenant_id, auth.uid(), v_src.id,
+      coalesce(nullif(trim(coalesce(p_new_name, '')), ''), v_src.name || ' (Salinan)'),
+      v_src.description, v_src.paper, v_src.orientation, v_src.layout, 1
+    ) returning id into v_id;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function public.report_template_duplicate(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 6. Aktif/nonaktif — diperluas ke koordinator & guru
+-- ---------------------------------------------------------------------------
+create or replace function public.report_template_set_active(p_template_id uuid, p_active boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_profile public.profiles;
+  v_t       public.report_templates;
+begin
+  select * into v_profile from public.profiles where id = auth.uid();
+  if v_profile is null then raise exception 'AKSES_DITOLAK'; end if;
+  select * into v_t from public.report_templates where id = p_template_id;
+  if v_t is null then raise exception 'TEMPLATE_TIDAK_DITEMUKAN'; end if;
+
+  if v_t.tenant_id is null then
+    if v_profile.role <> 'DEVELOPER' then raise exception 'AKSES_DITOLAK'; end if;
+  else
+    if v_profile.role not in ('ADMIN', 'KOORDINATOR', 'USTADZ')
+       or v_profile.tenant_id is distinct from v_t.tenant_id then
+      raise exception 'AKSES_DITOLAK';
+    end if;
+  end if;
+
+  -- Raport utama tidak boleh dinonaktifkan tanpa menunjuk pengganti.
+  if v_t.is_primary and not p_active then raise exception 'TEMPLATE_DIGUNAKAN'; end if;
+
+  update public.report_templates set is_active = p_active where id = v_t.id;
+end;
+$$;
+
+grant execute on function public.report_template_set_active(uuid, boolean) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 7. Simpan metadata template (nama/kertas/orientasi) — staf lembaga
+-- ---------------------------------------------------------------------------
+create or replace function public.report_template_save(
+  p_template_id uuid default null,
+  p_name        text default null,
+  p_description text default null,
+  p_paper       text default 'A4',
+  p_orientation text default 'PORTRAIT',
+  p_layout      jsonb default null
+)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_profile public.profiles;
+  v_id      uuid;
+  v_old     public.report_templates;
+  v_is_dev  boolean;
+begin
+  select * into v_profile from public.profiles where id = auth.uid();
+  if v_profile is null then raise exception 'AKSES_DITOLAK'; end if;
+  v_is_dev := v_profile.role = 'DEVELOPER';
+
+  if p_layout is not null and not public.report_layout_valid(p_layout) then
+    raise exception 'LAYOUT_TIDAK_VALID';
+  end if;
+  if p_paper not in ('A4','A5','LETTER') or p_orientation not in ('PORTRAIT','LANDSCAPE') then
+    raise exception 'LAYOUT_TIDAK_VALID';
+  end if;
+
+  if p_template_id is null then
+    if not v_is_dev and not public.report_can_manage_templates() then raise exception 'AKSES_DITOLAK'; end if;
+    if p_name is null or char_length(trim(p_name)) not between 1 and 120 then
+      raise exception 'NAMA_TIDAK_VALID';
+    end if;
+
+    insert into public.report_templates (
+      tenant_id, created_by, name, description, paper, orientation, layout
+    ) values (
+      case when v_is_dev then null else v_profile.tenant_id end,
+      auth.uid(), trim(p_name), p_description, p_paper, p_orientation,
+      coalesce(p_layout, '{"pages":[{"components":[]}]}'::jsonb)
+    ) returning id into v_id;
+
+    insert into public.report_template_versions (tenant_id, template_id, version, layout, changed_by, note)
+    values (case when v_is_dev then null else v_profile.tenant_id end,
+            v_id, 1, coalesce(p_layout, '{"pages":[{"components":[]}]}'::jsonb), auth.uid(), 'Initial')
+    on conflict (template_id, version) do nothing;
+  else
+    select * into v_old from public.report_templates where id = p_template_id;
+    if v_old is null then raise exception 'TEMPLATE_TIDAK_DITEMUKAN'; end if;
+
+    if v_old.tenant_id is null then
+      if not v_is_dev then raise exception 'AKSES_DITOLAK'; end if;
+    else
+      if v_profile.role not in ('ADMIN', 'KOORDINATOR', 'USTADZ')
+         or v_old.tenant_id is distinct from v_profile.tenant_id then
+        raise exception 'AKSES_DITOLAK';
+      end if;
+    end if;
+
+    insert into public.report_template_versions (tenant_id, template_id, version, layout, changed_by, note)
+    values (v_old.tenant_id, v_old.id, v_old.version, v_old.layout, auth.uid(), 'Sebelum perubahan')
+    on conflict (template_id, version) do nothing;
+
+    update public.report_templates set
+      name        = coalesce(nullif(trim(coalesce(p_name, '')), ''), name),
+      description = coalesce(p_description, description),
+      paper       = p_paper,
+      orientation = p_orientation,
+      layout      = coalesce(p_layout, layout),
+      version     = v_old.version + 1
+    where id = v_old.id;
+
+    if p_layout is not null then
+      insert into public.report_template_versions (tenant_id, template_id, version, layout, changed_by, note)
+      values (v_old.tenant_id, v_old.id, v_old.version + 1, p_layout, auth.uid(), 'Perubahan layout')
+      on conflict (template_id, version) do nothing;
+    end if;
+
+    v_id := v_old.id;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function public.report_template_save(uuid, text, text, text, text, jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 8. Galeri template — ikut mengirim LAYOUT agar contoh raport bisa dirender
+-- ---------------------------------------------------------------------------
+drop function if exists public.report_template_gallery();
+create function public.report_template_gallery()
+returns table (
+  id           uuid,
+  scope        text,
+  name         text,
+  description  text,
+  paper        text,
+  orientation  text,
+  version      integer,
+  is_active    boolean,
+  is_primary   boolean,
+  layout       jsonb,
+  report_count bigint
+)
+language sql
+security definer set search_path = public
+as $$
+  select t.id, 'TENANT'::text, t.name, t.description, t.paper, t.orientation,
+         t.version, t.is_active, t.is_primary, t.layout,
+         (select count(*) from public.reports r where r.template_id = t.id)
+  from public.report_templates t
+  where t.tenant_id = public.current_tenant_id()
+    and public.report_can_manage_templates()
+
+  union all
+
+  select g.id, 'GLOBAL'::text, g.name, g.description, g.paper, g.orientation,
+         g.version, g.is_active, g.is_primary, g.layout, 0::bigint
+  from public.report_templates g
+  where g.tenant_id is null and g.is_active
+    and public.report_can_manage_templates()
+  order by 2 desc, 9 desc, 3;
+$$;
+
+grant execute on function public.report_template_gallery() to authenticated;
+
+drop function if exists public.report_dev_gallery();
+create function public.report_dev_gallery()
+returns table (
+  id          uuid,
+  name        text,
+  description text,
+  paper       text,
+  orientation text,
+  version     integer,
+  is_active   boolean,
+  is_primary  boolean,
+  layout      jsonb,
+  copy_count  bigint
+)
+language sql
+security definer set search_path = public
+as $$
+  select g.id, g.name, g.description, g.paper, g.orientation, g.version,
+         g.is_active, g.is_primary, g.layout,
+         (select count(*) from public.report_templates c where c.source_template_id = g.id)
+  from public.report_templates g
+  where g.tenant_id is null
+    and public.is_platform_developer()
+  order by 8 desc, 2;
+$$;
+
+grant execute on function public.report_dev_gallery() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 9. Layout bawaan diperbarui (1 Kolom, 2 Kolom, Fleksibel 2 Halaman)
+-- ---------------------------------------------------------------------------
+
+insert into public.report_templates (tenant_id, name, description, paper, orientation, layout, is_primary)
+select null, 'Raport 1 Kolom', 'Satu kolom, alur membaca dari atas ke bawah: kop lembaga, identitas santri, rekap nilai, presensi & catatan, lalu tanda tangan.', 'A4', 'PORTRAIT', '{"pages": [{"components": [{"id": "c1-box", "type": "BOX", "x": 40, "y": 32, "w": 714, "h": 120, "z": 1, "locked": false, "hidden": false, "style": {"background": "#eff6ff", "borderColor": "#dbeafe", "radius": 14}, "props": {}}, {"id": "c2-logo", "type": "LOGO", "x": 54, "y": 44, "w": 96, "h": 96, "z": 2, "locked": false, "hidden": false, "style": {}, "props": {}}, {"id": "c3-institution_name", "type": "INSTITUTION_NAME", "x": 166, "y": 48, "w": 470, "h": 30, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 18, "bold": true, "align": "left"}, "props": {}}, {"id": "c4-institution_address", "type": "INSTITUTION_ADDRESS", "x": 166, "y": 80, "w": 470, "h": 24, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "left"}, "props": {}}, {"id": "c5-institution_contact", "type": "INSTITUTION_CONTACT", "x": 166, "y": 104, "w": 470, "h": 20, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "left"}, "props": {}}, {"id": "c6-divider", "type": "DIVIDER", "x": 40, "y": 160, "w": 714, "h": 6, "z": 6, "locked": false, "hidden": false, "style": {"borderColor": "#1d4ed8"}, "props": {"thickness": 3}}, {"id": "c7-report_title", "type": "REPORT_TITLE", "x": 40, "y": 180, "w": 714, "h": 34, "z": 7, "locked": false, "hidden": false, "style": {"fontSize": 19, "bold": true, "align": "center"}, "props": {}}, {"id": "c8-academic_year", "type": "ACADEMIC_YEAR", "x": 40, "y": 216, "w": 714, "h": 18, "z": 8, "locked": false, "hidden": false, "style": {"fontSize": 11, "align": "center"}, "props": {}}, {"id": "c9-period", "type": "PERIOD", "x": 40, "y": 234, "w": 714, "h": 18, "z": 9, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c10-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 278, "w": 714, "h": 24, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Identitas Santri"}}, {"id": "c11-student_identity", "type": "STUDENT_IDENTITY", "x": 40, "y": 308, "w": 714, "h": 104, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"fields": ["name", "id", "class", "halaqah"]}}, {"id": "c12-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 430, "w": 714, "h": 24, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekapitulasi Nilai"}}, {"id": "c13-score_table", "type": "SCORE_TABLE", "x": 40, "y": 460, "w": 714, "h": 300, "z": 13, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"modules": ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID", "TARGET", "TUGAS"]}}, {"id": "c14-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 776, "w": 340, "h": 24, "z": 14, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekap Presensi"}}, {"id": "c15-attendance", "type": "ATTENDANCE", "x": 40, "y": 806, "w": 340, "h": 140, "z": 15, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {}}, {"id": "c16-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 776, "w": 340, "h": 24, "z": 16, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Catatan & Saran"}}, {"id": "c17-notes", "type": "NOTES", "x": 414, "y": 806, "w": 340, "h": 140, "z": 17, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {"label": "Catatan & Saran", "text": "Ananda menunjukkan perkembangan hafalan yang stabil dan tertib mengikuti halaqah. Bacaan makhraj sudah baik, perlu penguatan pada hukum mad dan kelancaran muroja''ah juz sebelumnya. Mohon dukungan orang tua untuk membiasakan muroja''ah 15 menit setiap ba''da Maghrib."}}, {"id": "c18-divider", "type": "DIVIDER", "x": 40, "y": 958, "w": 714, "h": 4, "z": 18, "locked": false, "hidden": false, "style": {"borderColor": "#dbeafe"}, "props": {"thickness": 1}}, {"id": "c19-signatures", "type": "SIGNATURES", "x": 40, "y": 970, "w": 714, "h": 104, "z": 19, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showTeacher": true, "showHead": true}}, {"id": "c20-footer", "type": "FOOTER", "x": 40, "y": 1084, "w": 714, "h": 22, "z": 20, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center"}, "props": {}}]}]}'::jsonb, false
+where not exists (
+  select 1 from public.report_templates where tenant_id is null and name = 'Raport 1 Kolom'
+);
+
+update public.report_templates
+   set description = 'Satu kolom, alur membaca dari atas ke bawah: kop lembaga, identitas santri, rekap nilai, presensi & catatan, lalu tanda tangan.',
+       paper = 'A4',
+       orientation = 'PORTRAIT',
+       layout = '{"pages": [{"components": [{"id": "c1-box", "type": "BOX", "x": 40, "y": 32, "w": 714, "h": 120, "z": 1, "locked": false, "hidden": false, "style": {"background": "#eff6ff", "borderColor": "#dbeafe", "radius": 14}, "props": {}}, {"id": "c2-logo", "type": "LOGO", "x": 54, "y": 44, "w": 96, "h": 96, "z": 2, "locked": false, "hidden": false, "style": {}, "props": {}}, {"id": "c3-institution_name", "type": "INSTITUTION_NAME", "x": 166, "y": 48, "w": 470, "h": 30, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 18, "bold": true, "align": "left"}, "props": {}}, {"id": "c4-institution_address", "type": "INSTITUTION_ADDRESS", "x": 166, "y": 80, "w": 470, "h": 24, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "left"}, "props": {}}, {"id": "c5-institution_contact", "type": "INSTITUTION_CONTACT", "x": 166, "y": 104, "w": 470, "h": 20, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "left"}, "props": {}}, {"id": "c6-divider", "type": "DIVIDER", "x": 40, "y": 160, "w": 714, "h": 6, "z": 6, "locked": false, "hidden": false, "style": {"borderColor": "#1d4ed8"}, "props": {"thickness": 3}}, {"id": "c7-report_title", "type": "REPORT_TITLE", "x": 40, "y": 180, "w": 714, "h": 34, "z": 7, "locked": false, "hidden": false, "style": {"fontSize": 19, "bold": true, "align": "center"}, "props": {}}, {"id": "c8-academic_year", "type": "ACADEMIC_YEAR", "x": 40, "y": 216, "w": 714, "h": 18, "z": 8, "locked": false, "hidden": false, "style": {"fontSize": 11, "align": "center"}, "props": {}}, {"id": "c9-period", "type": "PERIOD", "x": 40, "y": 234, "w": 714, "h": 18, "z": 9, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c10-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 278, "w": 714, "h": 24, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Identitas Santri"}}, {"id": "c11-student_identity", "type": "STUDENT_IDENTITY", "x": 40, "y": 308, "w": 714, "h": 104, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"fields": ["name", "id", "class", "halaqah"]}}, {"id": "c12-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 430, "w": 714, "h": 24, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekapitulasi Nilai"}}, {"id": "c13-score_table", "type": "SCORE_TABLE", "x": 40, "y": 460, "w": 714, "h": 300, "z": 13, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"modules": ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID", "TARGET", "TUGAS"]}}, {"id": "c14-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 776, "w": 340, "h": 24, "z": 14, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekap Presensi"}}, {"id": "c15-attendance", "type": "ATTENDANCE", "x": 40, "y": 806, "w": 340, "h": 140, "z": 15, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {}}, {"id": "c16-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 776, "w": 340, "h": 24, "z": 16, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Catatan & Saran"}}, {"id": "c17-notes", "type": "NOTES", "x": 414, "y": 806, "w": 340, "h": 140, "z": 17, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {"label": "Catatan & Saran", "text": "Ananda menunjukkan perkembangan hafalan yang stabil dan tertib mengikuti halaqah. Bacaan makhraj sudah baik, perlu penguatan pada hukum mad dan kelancaran muroja''ah juz sebelumnya. Mohon dukungan orang tua untuk membiasakan muroja''ah 15 menit setiap ba''da Maghrib."}}, {"id": "c18-divider", "type": "DIVIDER", "x": 40, "y": 958, "w": 714, "h": 4, "z": 18, "locked": false, "hidden": false, "style": {"borderColor": "#dbeafe"}, "props": {"thickness": 1}}, {"id": "c19-signatures", "type": "SIGNATURES", "x": 40, "y": 970, "w": 714, "h": 104, "z": 19, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showTeacher": true, "showHead": true}}, {"id": "c20-footer", "type": "FOOTER", "x": 40, "y": 1084, "w": 714, "h": 22, "z": 20, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center"}, "props": {}}]}]}'::jsonb,
+       is_active = true,
+       version = version + 1,
+       updated_at = now()
+ where tenant_id is null
+   and name = 'Raport 1 Kolom';
+
+insert into public.report_templates (tenant_id, name, description, paper, orientation, layout, is_primary)
+select null, 'Raport 2 Kolom', 'Contoh lengkap dua kolom dalam satu halaman: kiri identitas, rekap nilai & presensi; kanan capaian, keterangan predikat & catatan guru.', 'A4', 'PORTRAIT', '{"pages": [{"components": [{"id": "c1-box", "type": "BOX", "x": 40, "y": 32, "w": 714, "h": 120, "z": 1, "locked": false, "hidden": false, "style": {"background": "#eff6ff", "borderColor": "#dbeafe", "radius": 14}, "props": {}}, {"id": "c2-logo", "type": "LOGO", "x": 54, "y": 44, "w": 96, "h": 96, "z": 2, "locked": false, "hidden": false, "style": {}, "props": {}}, {"id": "c3-institution_name", "type": "INSTITUTION_NAME", "x": 166, "y": 48, "w": 470, "h": 30, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 18, "bold": true, "align": "left"}, "props": {}}, {"id": "c4-institution_address", "type": "INSTITUTION_ADDRESS", "x": 166, "y": 80, "w": 470, "h": 24, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "left"}, "props": {}}, {"id": "c5-institution_contact", "type": "INSTITUTION_CONTACT", "x": 166, "y": 104, "w": 470, "h": 20, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "left"}, "props": {}}, {"id": "c6-divider", "type": "DIVIDER", "x": 40, "y": 160, "w": 714, "h": 6, "z": 6, "locked": false, "hidden": false, "style": {"borderColor": "#1d4ed8"}, "props": {"thickness": 3}}, {"id": "c7-report_title", "type": "REPORT_TITLE", "x": 40, "y": 178, "w": 714, "h": 32, "z": 7, "locked": false, "hidden": false, "style": {"fontSize": 18, "bold": true, "align": "center"}, "props": {}}, {"id": "c8-academic_year", "type": "ACADEMIC_YEAR", "x": 40, "y": 212, "w": 714, "h": 18, "z": 8, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c9-semester", "type": "SEMESTER", "x": 40, "y": 230, "w": 714, "h": 18, "z": 9, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c10-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 262, "w": 340, "h": 24, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Identitas Santri"}}, {"id": "c11-student_identity", "type": "STUDENT_IDENTITY", "x": 40, "y": 292, "w": 340, "h": 112, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"fields": ["name", "id", "class", "halaqah"]}}, {"id": "c12-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 420, "w": 340, "h": 24, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekapitulasi Nilai"}}, {"id": "c13-score_table", "type": "SCORE_TABLE", "x": 40, "y": 450, "w": 340, "h": 330, "z": 13, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {"modules": ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID"]}}, {"id": "c14-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 796, "w": 340, "h": 24, "z": 14, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekap Presensi"}}, {"id": "c15-attendance", "type": "ATTENDANCE", "x": 40, "y": 826, "w": 340, "h": 130, "z": 15, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "c16-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 262, "w": 340, "h": 24, "z": 16, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Capaian Periode Ini"}}, {"id": "c17-achievement_summary", "type": "ACHIEVEMENT_SUMMARY", "x": 414, "y": 292, "w": 340, "h": 170, "z": 17, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "c18-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 478, "w": 340, "h": 24, "z": 18, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Keterangan Predikat"}}, {"id": "c19-grade_legend", "type": "GRADE_LEGEND", "x": 414, "y": 508, "w": 340, "h": 116, "z": 19, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "c20-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 640, "w": 340, "h": 24, "z": 20, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Catatan & Saran Guru"}}, {"id": "c21-notes", "type": "NOTES", "x": 414, "y": 670, "w": 340, "h": 286, "z": 21, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {"label": "Catatan & Saran Guru", "text": "Ananda menunjukkan perkembangan hafalan yang stabil dan tertib mengikuti halaqah. Bacaan makhraj sudah baik, perlu penguatan pada hukum mad dan kelancaran muroja''ah juz sebelumnya. Mohon dukungan orang tua untuk membiasakan muroja''ah 15 menit setiap ba''da Maghrib."}}, {"id": "c22-divider", "type": "DIVIDER", "x": 40, "y": 964, "w": 714, "h": 4, "z": 22, "locked": false, "hidden": false, "style": {"borderColor": "#dbeafe"}, "props": {"thickness": 1}}, {"id": "c23-signatures", "type": "SIGNATURES", "x": 40, "y": 976, "w": 714, "h": 104, "z": 23, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showTeacher": true, "showHead": true}}, {"id": "c24-footer", "type": "FOOTER", "x": 40, "y": 1086, "w": 714, "h": 22, "z": 24, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center"}, "props": {}}]}]}'::jsonb, false
+where not exists (
+  select 1 from public.report_templates where tenant_id is null and name = 'Raport 2 Kolom'
+);
+
+update public.report_templates
+   set description = 'Contoh lengkap dua kolom dalam satu halaman: kiri identitas, rekap nilai & presensi; kanan capaian, keterangan predikat & catatan guru.',
+       paper = 'A4',
+       orientation = 'PORTRAIT',
+       layout = '{"pages": [{"components": [{"id": "c1-box", "type": "BOX", "x": 40, "y": 32, "w": 714, "h": 120, "z": 1, "locked": false, "hidden": false, "style": {"background": "#eff6ff", "borderColor": "#dbeafe", "radius": 14}, "props": {}}, {"id": "c2-logo", "type": "LOGO", "x": 54, "y": 44, "w": 96, "h": 96, "z": 2, "locked": false, "hidden": false, "style": {}, "props": {}}, {"id": "c3-institution_name", "type": "INSTITUTION_NAME", "x": 166, "y": 48, "w": 470, "h": 30, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 18, "bold": true, "align": "left"}, "props": {}}, {"id": "c4-institution_address", "type": "INSTITUTION_ADDRESS", "x": 166, "y": 80, "w": 470, "h": 24, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "left"}, "props": {}}, {"id": "c5-institution_contact", "type": "INSTITUTION_CONTACT", "x": 166, "y": 104, "w": 470, "h": 20, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "left"}, "props": {}}, {"id": "c6-divider", "type": "DIVIDER", "x": 40, "y": 160, "w": 714, "h": 6, "z": 6, "locked": false, "hidden": false, "style": {"borderColor": "#1d4ed8"}, "props": {"thickness": 3}}, {"id": "c7-report_title", "type": "REPORT_TITLE", "x": 40, "y": 178, "w": 714, "h": 32, "z": 7, "locked": false, "hidden": false, "style": {"fontSize": 18, "bold": true, "align": "center"}, "props": {}}, {"id": "c8-academic_year", "type": "ACADEMIC_YEAR", "x": 40, "y": 212, "w": 714, "h": 18, "z": 8, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c9-semester", "type": "SEMESTER", "x": 40, "y": 230, "w": 714, "h": 18, "z": 9, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c10-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 262, "w": 340, "h": 24, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Identitas Santri"}}, {"id": "c11-student_identity", "type": "STUDENT_IDENTITY", "x": 40, "y": 292, "w": 340, "h": 112, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"fields": ["name", "id", "class", "halaqah"]}}, {"id": "c12-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 420, "w": 340, "h": 24, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekapitulasi Nilai"}}, {"id": "c13-score_table", "type": "SCORE_TABLE", "x": 40, "y": 450, "w": 340, "h": 330, "z": 13, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {"modules": ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID"]}}, {"id": "c14-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 796, "w": 340, "h": 24, "z": 14, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekap Presensi"}}, {"id": "c15-attendance", "type": "ATTENDANCE", "x": 40, "y": 826, "w": 340, "h": 130, "z": 15, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "c16-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 262, "w": 340, "h": 24, "z": 16, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Capaian Periode Ini"}}, {"id": "c17-achievement_summary", "type": "ACHIEVEMENT_SUMMARY", "x": 414, "y": 292, "w": 340, "h": 170, "z": 17, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "c18-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 478, "w": 340, "h": 24, "z": 18, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Keterangan Predikat"}}, {"id": "c19-grade_legend", "type": "GRADE_LEGEND", "x": 414, "y": 508, "w": 340, "h": 116, "z": 19, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "c20-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 640, "w": 340, "h": 24, "z": 20, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Catatan & Saran Guru"}}, {"id": "c21-notes", "type": "NOTES", "x": 414, "y": 670, "w": 340, "h": 286, "z": 21, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {"label": "Catatan & Saran Guru", "text": "Ananda menunjukkan perkembangan hafalan yang stabil dan tertib mengikuti halaqah. Bacaan makhraj sudah baik, perlu penguatan pada hukum mad dan kelancaran muroja''ah juz sebelumnya. Mohon dukungan orang tua untuk membiasakan muroja''ah 15 menit setiap ba''da Maghrib."}}, {"id": "c22-divider", "type": "DIVIDER", "x": 40, "y": 964, "w": 714, "h": 4, "z": 22, "locked": false, "hidden": false, "style": {"borderColor": "#dbeafe"}, "props": {"thickness": 1}}, {"id": "c23-signatures", "type": "SIGNATURES", "x": 40, "y": 976, "w": 714, "h": 104, "z": 23, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showTeacher": true, "showHead": true}}, {"id": "c24-footer", "type": "FOOTER", "x": 40, "y": 1086, "w": 714, "h": 22, "z": 24, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center"}, "props": {}}]}]}'::jsonb,
+       is_active = true,
+       version = version + 1,
+       updated_at = now()
+ where tenant_id is null
+   and name = 'Raport 2 Kolom';
+
+insert into public.report_templates (tenant_id, name, description, paper, orientation, layout, is_primary)
+select null, 'Raport Fleksibel (2 Halaman)', 'Dua halaman: halaman 1 identitas, guru pembina & rekap nilai lengkap; halaman 2 lampiran presensi, capaian, catatan & pengesahan.', 'A4', 'PORTRAIT', '{"pages": [{"components": [{"id": "c1-box", "type": "BOX", "x": 40, "y": 32, "w": 714, "h": 120, "z": 1, "locked": false, "hidden": false, "style": {"background": "#eff6ff", "borderColor": "#dbeafe", "radius": 14}, "props": {}}, {"id": "c2-logo", "type": "LOGO", "x": 54, "y": 44, "w": 96, "h": 96, "z": 2, "locked": false, "hidden": false, "style": {}, "props": {}}, {"id": "c3-institution_name", "type": "INSTITUTION_NAME", "x": 166, "y": 48, "w": 470, "h": 30, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 18, "bold": true, "align": "left"}, "props": {}}, {"id": "c4-institution_address", "type": "INSTITUTION_ADDRESS", "x": 166, "y": 80, "w": 470, "h": 24, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "left"}, "props": {}}, {"id": "c5-institution_contact", "type": "INSTITUTION_CONTACT", "x": 166, "y": 104, "w": 470, "h": 20, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "left"}, "props": {}}, {"id": "c6-divider", "type": "DIVIDER", "x": 40, "y": 160, "w": 714, "h": 6, "z": 6, "locked": false, "hidden": false, "style": {"borderColor": "#1d4ed8"}, "props": {"thickness": 3}}, {"id": "c7-report_title", "type": "REPORT_TITLE", "x": 40, "y": 180, "w": 714, "h": 34, "z": 7, "locked": false, "hidden": false, "style": {"fontSize": 19, "bold": true, "align": "center"}, "props": {}}, {"id": "c8-academic_year", "type": "ACADEMIC_YEAR", "x": 40, "y": 216, "w": 714, "h": 18, "z": 8, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c9-period", "type": "PERIOD", "x": 40, "y": 234, "w": 714, "h": 18, "z": 9, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c10-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 278, "w": 340, "h": 24, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Identitas Santri"}}, {"id": "c11-student_identity", "type": "STUDENT_IDENTITY", "x": 40, "y": 308, "w": 340, "h": 120, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"fields": ["name", "id", "class", "halaqah"]}}, {"id": "c12-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 278, "w": 340, "h": 24, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Guru Pembina"}}, {"id": "c13-teacher_identity", "type": "TEACHER_IDENTITY", "x": 414, "y": 308, "w": 340, "h": 120, "z": 13, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showId": true}}, {"id": "c14-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 450, "w": 714, "h": 24, "z": 14, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekapitulasi Nilai"}}, {"id": "c15-score_table", "type": "SCORE_TABLE", "x": 40, "y": 480, "w": 714, "h": 420, "z": 15, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"modules": ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID", "TARGET", "TUGAS"]}}, {"id": "c16-grade_legend", "type": "GRADE_LEGEND", "x": 414, "y": 920, "w": 340, "h": 116, "z": 16, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "c17-student_photo", "type": "STUDENT_PHOTO", "x": 40, "y": 920, "w": 96, "h": 120, "z": 17, "locked": false, "hidden": false, "style": {"borderColor": "#cbd5e1", "radius": 8}, "props": {"size": "3 x 4"}}, {"id": "c18-footer", "type": "FOOTER", "x": 40, "y": 1084, "w": 714, "h": 22, "z": 18, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center"}, "props": {}}]}, {"components": [{"id": "c1-custom_text", "type": "CUSTOM_TEXT", "x": 40, "y": 48, "w": 714, "h": 32, "z": 1, "locked": false, "hidden": false, "style": {"fontSize": 16, "bold": true, "align": "center", "color": "#1d4ed8"}, "props": {"text": "LAMPIRAN RAPORT"}}, {"id": "c2-divider", "type": "DIVIDER", "x": 40, "y": 86, "w": 714, "h": 6, "z": 2, "locked": false, "hidden": false, "style": {"borderColor": "#1d4ed8"}, "props": {"thickness": 3}}, {"id": "c3-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 116, "w": 340, "h": 24, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekap Presensi"}}, {"id": "c4-attendance", "type": "ATTENDANCE", "x": 40, "y": 146, "w": 340, "h": 150, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {}}, {"id": "c5-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 116, "w": 340, "h": 24, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Capaian Periode Ini"}}, {"id": "c6-achievement_summary", "type": "ACHIEVEMENT_SUMMARY", "x": 414, "y": 146, "w": 340, "h": 150, "z": 6, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {}}, {"id": "c7-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 326, "w": 714, "h": 24, "z": 7, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Catatan & Saran"}}, {"id": "c8-notes", "type": "NOTES", "x": 40, "y": 356, "w": 714, "h": 260, "z": 8, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"label": "Catatan & Saran", "text": "Ananda menunjukkan perkembangan hafalan yang stabil dan tertib mengikuti halaqah. Bacaan makhraj sudah baik, perlu penguatan pada hukum mad dan kelancaran muroja''ah juz sebelumnya. Mohon dukungan orang tua untuk membiasakan muroja''ah 15 menit setiap ba''da Maghrib."}}, {"id": "c9-divider", "type": "DIVIDER", "x": 40, "y": 652, "w": 714, "h": 4, "z": 9, "locked": false, "hidden": false, "style": {"borderColor": "#dbeafe"}, "props": {"thickness": 1}}, {"id": "c10-signatures", "type": "SIGNATURES", "x": 40, "y": 676, "w": 714, "h": 120, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"showTeacher": true, "showHead": true}}, {"id": "c11-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 824, "w": 340, "h": 24, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Kepala Lembaga"}}, {"id": "c12-head_identity", "type": "HEAD_IDENTITY", "x": 414, "y": 854, "w": 340, "h": 80, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showId": true}}, {"id": "c13-footer", "type": "FOOTER", "x": 40, "y": 1084, "w": 714, "h": 22, "z": 13, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center"}, "props": {}}]}]}'::jsonb, false
+where not exists (
+  select 1 from public.report_templates where tenant_id is null and name = 'Raport Fleksibel (2 Halaman)'
+);
+
+update public.report_templates
+   set description = 'Dua halaman: halaman 1 identitas, guru pembina & rekap nilai lengkap; halaman 2 lampiran presensi, capaian, catatan & pengesahan.',
+       paper = 'A4',
+       orientation = 'PORTRAIT',
+       layout = '{"pages": [{"components": [{"id": "c1-box", "type": "BOX", "x": 40, "y": 32, "w": 714, "h": 120, "z": 1, "locked": false, "hidden": false, "style": {"background": "#eff6ff", "borderColor": "#dbeafe", "radius": 14}, "props": {}}, {"id": "c2-logo", "type": "LOGO", "x": 54, "y": 44, "w": 96, "h": 96, "z": 2, "locked": false, "hidden": false, "style": {}, "props": {}}, {"id": "c3-institution_name", "type": "INSTITUTION_NAME", "x": 166, "y": 48, "w": 470, "h": 30, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 18, "bold": true, "align": "left"}, "props": {}}, {"id": "c4-institution_address", "type": "INSTITUTION_ADDRESS", "x": 166, "y": 80, "w": 470, "h": 24, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "left"}, "props": {}}, {"id": "c5-institution_contact", "type": "INSTITUTION_CONTACT", "x": 166, "y": 104, "w": 470, "h": 20, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "left"}, "props": {}}, {"id": "c6-divider", "type": "DIVIDER", "x": 40, "y": 160, "w": 714, "h": 6, "z": 6, "locked": false, "hidden": false, "style": {"borderColor": "#1d4ed8"}, "props": {"thickness": 3}}, {"id": "c7-report_title", "type": "REPORT_TITLE", "x": 40, "y": 180, "w": 714, "h": 34, "z": 7, "locked": false, "hidden": false, "style": {"fontSize": 19, "bold": true, "align": "center"}, "props": {}}, {"id": "c8-academic_year", "type": "ACADEMIC_YEAR", "x": 40, "y": 216, "w": 714, "h": 18, "z": 8, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c9-period", "type": "PERIOD", "x": 40, "y": 234, "w": 714, "h": 18, "z": 9, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "center"}, "props": {}}, {"id": "c10-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 278, "w": 340, "h": 24, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Identitas Santri"}}, {"id": "c11-student_identity", "type": "STUDENT_IDENTITY", "x": 40, "y": 308, "w": 340, "h": 120, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"fields": ["name", "id", "class", "halaqah"]}}, {"id": "c12-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 278, "w": 340, "h": 24, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Guru Pembina"}}, {"id": "c13-teacher_identity", "type": "TEACHER_IDENTITY", "x": 414, "y": 308, "w": 340, "h": 120, "z": 13, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showId": true}}, {"id": "c14-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 450, "w": 714, "h": 24, "z": 14, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekapitulasi Nilai"}}, {"id": "c15-score_table", "type": "SCORE_TABLE", "x": 40, "y": 480, "w": 714, "h": 420, "z": 15, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"modules": ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID", "TARGET", "TUGAS"]}}, {"id": "c16-grade_legend", "type": "GRADE_LEGEND", "x": 414, "y": 920, "w": 340, "h": 116, "z": 16, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "c17-student_photo", "type": "STUDENT_PHOTO", "x": 40, "y": 920, "w": 96, "h": 120, "z": 17, "locked": false, "hidden": false, "style": {"borderColor": "#cbd5e1", "radius": 8}, "props": {"size": "3 x 4"}}, {"id": "c18-footer", "type": "FOOTER", "x": 40, "y": 1084, "w": 714, "h": 22, "z": 18, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center"}, "props": {}}]}, {"components": [{"id": "c1-custom_text", "type": "CUSTOM_TEXT", "x": 40, "y": 48, "w": 714, "h": 32, "z": 1, "locked": false, "hidden": false, "style": {"fontSize": 16, "bold": true, "align": "center", "color": "#1d4ed8"}, "props": {"text": "LAMPIRAN RAPORT"}}, {"id": "c2-divider", "type": "DIVIDER", "x": 40, "y": 86, "w": 714, "h": 6, "z": 2, "locked": false, "hidden": false, "style": {"borderColor": "#1d4ed8"}, "props": {"thickness": 3}}, {"id": "c3-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 116, "w": 340, "h": 24, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Rekap Presensi"}}, {"id": "c4-attendance", "type": "ATTENDANCE", "x": 40, "y": 146, "w": 340, "h": 150, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {}}, {"id": "c5-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 116, "w": 340, "h": 24, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Capaian Periode Ini"}}, {"id": "c6-achievement_summary", "type": "ACHIEVEMENT_SUMMARY", "x": 414, "y": 146, "w": 340, "h": 150, "z": 6, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {}}, {"id": "c7-section_heading", "type": "SECTION_HEADING", "x": 40, "y": 326, "w": 714, "h": 24, "z": 7, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Catatan & Saran"}}, {"id": "c8-notes", "type": "NOTES", "x": 40, "y": 356, "w": 714, "h": 260, "z": 8, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"label": "Catatan & Saran", "text": "Ananda menunjukkan perkembangan hafalan yang stabil dan tertib mengikuti halaqah. Bacaan makhraj sudah baik, perlu penguatan pada hukum mad dan kelancaran muroja''ah juz sebelumnya. Mohon dukungan orang tua untuk membiasakan muroja''ah 15 menit setiap ba''da Maghrib."}}, {"id": "c9-divider", "type": "DIVIDER", "x": 40, "y": 652, "w": 714, "h": 4, "z": 9, "locked": false, "hidden": false, "style": {"borderColor": "#dbeafe"}, "props": {"thickness": 1}}, {"id": "c10-signatures", "type": "SIGNATURES", "x": 40, "y": 676, "w": 714, "h": 120, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 12}, "props": {"showTeacher": true, "showHead": true}}, {"id": "c11-section_heading", "type": "SECTION_HEADING", "x": 414, "y": 824, "w": 340, "h": 24, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#1d4ed8", "borderColor": "#dbeafe"}, "props": {"text": "Kepala Lembaga"}}, {"id": "c12-head_identity", "type": "HEAD_IDENTITY", "x": 414, "y": 854, "w": 340, "h": 80, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showId": true}}, {"id": "c13-footer", "type": "FOOTER", "x": 40, "y": 1084, "w": 714, "h": 22, "z": 13, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center"}, "props": {}}]}]}'::jsonb,
+       is_active = true,
+       version = version + 1,
+       updated_at = now()
+ where tenant_id is null
+   and name = 'Raport Fleksibel (2 Halaman)';
+
+-- Tandai "Raport 2 Kolom" sebagai contoh utama bawaan platform.
+update public.report_templates set is_primary = false
+ where tenant_id is null and is_primary
+   and name <> 'Raport 2 Kolom';
+
+update public.report_templates set is_primary = true
+ where tenant_id is null and name = 'Raport 2 Kolom';
+
+-- Lembaga yang sudah punya salinan template tapi belum menunjuk raport utama:
+-- pakai template aktif paling lama sebagai default agar UI tidak kosong.
+update public.report_templates t set is_primary = true
+where t.tenant_id is not null
+  and t.is_active
+  and not exists (
+    select 1 from public.report_templates p
+    where p.tenant_id = t.tenant_id and p.is_primary
+  )
+  and t.id = (
+    select t2.id from public.report_templates t2
+    where t2.tenant_id = t.tenant_id and t2.is_active
+    order by t2.created_at, t2.id
+    limit 1
+  );
+-- ============================================================================
+-- SOURCE: 20260920210000_tahfizh_v13_template_2kolom_modern.sql
+-- ============================================================================
+-- ============================================================================
+-- TAHFIZH V13.1 — Template bawaan baru: "Raport 2 Kolom Modern"
+-- ============================================================================
+-- Satu template dua kolom bergaya modern (kop gelap penuh + aksen emas, tiap
+-- bagian dibungkus kartu berbingkai). Lembaga menyalinnya lewat "Pakai Contoh
+-- Ini", mengubahnya di Report Builder, lalu menekan "Jadikan Raport Utama" —
+-- salinan lembaga berdiri sendiri, perubahan di sini tidak menariknya.
+-- Idempoten: insert bila belum ada, lalu selalu disamakan dengan layout ini.
+-- ============================================================================
+
+insert into public.report_templates (tenant_id, name, description, paper, orientation, layout)
+select null, 'Raport 2 Kolom Modern', 'Dua kolom bergaya kartu: kop gelap dengan aksen emas, kartu identitas santri, kolom kiri rekap nilai & presensi, kolom kanan capaian, predikat & catatan guru. Siap dipakai lembaga lalu dikustomisasi di Report Builder.', 'A4', 'PORTRAIT', '{"pages": [{"components": [{"id": "m1-box", "type": "BOX", "x": 0, "y": 0, "w": 794, "h": 150, "z": 1, "locked": false, "hidden": false, "style": {"background": "#0f2b5b", "borderColor": "#0f2b5b", "radius": 0}, "props": {}}, {"id": "m2-logo", "type": "LOGO", "x": 40, "y": 28, "w": 94, "h": 94, "z": 2, "locked": false, "hidden": false, "style": {}, "props": {}}, {"id": "m3-institution_name", "type": "INSTITUTION_NAME", "x": 152, "y": 32, "w": 600, "h": 32, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 20, "bold": true, "align": "left", "color": "#ffffff"}, "props": {}}, {"id": "m4-institution_address", "type": "INSTITUTION_ADDRESS", "x": 152, "y": 66, "w": 600, "h": 22, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "left", "color": "#cbd5e1"}, "props": {}}, {"id": "m5-institution_contact", "type": "INSTITUTION_CONTACT", "x": 152, "y": 88, "w": 600, "h": 20, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "left", "color": "#94a3b8"}, "props": {}}, {"id": "m6-report_title", "type": "REPORT_TITLE", "x": 152, "y": 112, "w": 600, "h": 24, "z": 6, "locked": false, "hidden": false, "style": {"fontSize": 12, "bold": true, "align": "left", "color": "#fbbf24"}, "props": {}}, {"id": "m7-box", "type": "BOX", "x": 0, "y": 150, "w": 794, "h": 6, "z": 7, "locked": false, "hidden": false, "style": {"background": "#f59e0b", "borderColor": "#f59e0b", "radius": 0}, "props": {}}, {"id": "m8-box", "type": "BOX", "x": 40, "y": 176, "w": 714, "h": 96, "z": 8, "locked": false, "hidden": false, "style": {"background": "#f8fafc", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m9-student_identity", "type": "STUDENT_IDENTITY", "x": 64, "y": 192, "w": 400, "h": 72, "z": 9, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"fields": ["name", "id", "class", "halaqah"]}}, {"id": "m10-academic_year", "type": "ACADEMIC_YEAR", "x": 478, "y": 196, "w": 252, "h": 20, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "right", "color": "#475569"}, "props": {}}, {"id": "m11-semester", "type": "SEMESTER", "x": 478, "y": 216, "w": 252, "h": 20, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "right", "color": "#475569"}, "props": {}}, {"id": "m12-period", "type": "PERIOD", "x": 478, "y": 236, "w": 252, "h": 18, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "right", "color": "#94a3b8"}, "props": {}}, {"id": "m13-box", "type": "BOX", "x": 40, "y": 292, "w": 340, "h": 404, "z": 13, "locked": false, "hidden": false, "style": {"background": "#ffffff", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m14-section_heading", "type": "SECTION_HEADING", "x": 60, "y": 308, "w": 300, "h": 22, "z": 14, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#2563eb", "borderColor": "#dbeafe"}, "props": {"text": "Rekapitulasi Nilai"}}, {"id": "m15-score_table", "type": "SCORE_TABLE", "x": 60, "y": 338, "w": 300, "h": 340, "z": 15, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {"modules": ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID"]}}, {"id": "m16-box", "type": "BOX", "x": 40, "y": 712, "w": 340, "h": 230, "z": 16, "locked": false, "hidden": false, "style": {"background": "#ffffff", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m17-section_heading", "type": "SECTION_HEADING", "x": 60, "y": 728, "w": 300, "h": 22, "z": 17, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#2563eb", "borderColor": "#dbeafe"}, "props": {"text": "Rekap Presensi"}}, {"id": "m18-attendance", "type": "ATTENDANCE", "x": 60, "y": 758, "w": 300, "h": 166, "z": 18, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "m19-box", "type": "BOX", "x": 414, "y": 292, "w": 340, "h": 200, "z": 19, "locked": false, "hidden": false, "style": {"background": "#ffffff", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m20-section_heading", "type": "SECTION_HEADING", "x": 434, "y": 308, "w": 300, "h": 22, "z": 20, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#2563eb", "borderColor": "#dbeafe"}, "props": {"text": "Capaian Periode Ini"}}, {"id": "m21-achievement_summary", "type": "ACHIEVEMENT_SUMMARY", "x": 434, "y": 338, "w": 300, "h": 138, "z": 21, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "m22-box", "type": "BOX", "x": 414, "y": 508, "w": 340, "h": 188, "z": 22, "locked": false, "hidden": false, "style": {"background": "#ffffff", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m23-section_heading", "type": "SECTION_HEADING", "x": 434, "y": 524, "w": 300, "h": 22, "z": 23, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#2563eb", "borderColor": "#dbeafe"}, "props": {"text": "Keterangan Predikat"}}, {"id": "m24-grade_legend", "type": "GRADE_LEGEND", "x": 434, "y": 554, "w": 300, "h": 126, "z": 24, "locked": false, "hidden": false, "style": {"fontSize": 9}, "props": {}}, {"id": "m25-box", "type": "BOX", "x": 414, "y": 712, "w": 340, "h": 230, "z": 25, "locked": false, "hidden": false, "style": {"background": "#fffbeb", "borderColor": "#fde68a", "radius": 16}, "props": {}}, {"id": "m26-section_heading", "type": "SECTION_HEADING", "x": 434, "y": 728, "w": 300, "h": 22, "z": 26, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#b45309", "borderColor": "#fde68a"}, "props": {"text": "Catatan & Saran Guru"}}, {"id": "m27-notes", "type": "NOTES", "x": 434, "y": 758, "w": 300, "h": 166, "z": 27, "locked": false, "hidden": false, "style": {"fontSize": 9}, "props": {"label": "Catatan & Saran Guru", "text": "Ananda menunjukkan perkembangan hafalan yang stabil dan tertib mengikuti halaqah. Bacaan makhraj sudah baik, perlu penguatan pada hukum mad dan kelancaran muroja''ah juz sebelumnya. Mohon dukungan orang tua untuk membiasakan muroja''ah 15 menit setiap ba''da Maghrib."}}, {"id": "m28-divider", "type": "DIVIDER", "x": 40, "y": 958, "w": 714, "h": 4, "z": 28, "locked": false, "hidden": false, "style": {"borderColor": "#e2e8f0"}, "props": {"thickness": 1}}, {"id": "m29-signatures", "type": "SIGNATURES", "x": 40, "y": 970, "w": 714, "h": 104, "z": 29, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showTeacher": true, "showHead": true}}, {"id": "m30-box", "type": "BOX", "x": 0, "y": 1090, "w": 794, "h": 33, "z": 30, "locked": false, "hidden": false, "style": {"background": "#0f2b5b", "borderColor": "#0f2b5b", "radius": 0}, "props": {}}, {"id": "m31-footer", "type": "FOOTER", "x": 40, "y": 1096, "w": 714, "h": 22, "z": 31, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center", "color": "#cbd5e1"}, "props": {}}]}]}'::jsonb
+where not exists (
+  select 1 from public.report_templates where tenant_id is null and name = 'Raport 2 Kolom Modern'
+);
+
+update public.report_templates
+   set description = 'Dua kolom bergaya kartu: kop gelap dengan aksen emas, kartu identitas santri, kolom kiri rekap nilai & presensi, kolom kanan capaian, predikat & catatan guru. Siap dipakai lembaga lalu dikustomisasi di Report Builder.',
+       paper = 'A4',
+       orientation = 'PORTRAIT',
+       layout = '{"pages": [{"components": [{"id": "m1-box", "type": "BOX", "x": 0, "y": 0, "w": 794, "h": 150, "z": 1, "locked": false, "hidden": false, "style": {"background": "#0f2b5b", "borderColor": "#0f2b5b", "radius": 0}, "props": {}}, {"id": "m2-logo", "type": "LOGO", "x": 40, "y": 28, "w": 94, "h": 94, "z": 2, "locked": false, "hidden": false, "style": {}, "props": {}}, {"id": "m3-institution_name", "type": "INSTITUTION_NAME", "x": 152, "y": 32, "w": 600, "h": 32, "z": 3, "locked": false, "hidden": false, "style": {"fontSize": 20, "bold": true, "align": "left", "color": "#ffffff"}, "props": {}}, {"id": "m4-institution_address", "type": "INSTITUTION_ADDRESS", "x": 152, "y": 66, "w": 600, "h": 22, "z": 4, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "left", "color": "#cbd5e1"}, "props": {}}, {"id": "m5-institution_contact", "type": "INSTITUTION_CONTACT", "x": 152, "y": 88, "w": 600, "h": 20, "z": 5, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "left", "color": "#94a3b8"}, "props": {}}, {"id": "m6-report_title", "type": "REPORT_TITLE", "x": 152, "y": 112, "w": 600, "h": 24, "z": 6, "locked": false, "hidden": false, "style": {"fontSize": 12, "bold": true, "align": "left", "color": "#fbbf24"}, "props": {}}, {"id": "m7-box", "type": "BOX", "x": 0, "y": 150, "w": 794, "h": 6, "z": 7, "locked": false, "hidden": false, "style": {"background": "#f59e0b", "borderColor": "#f59e0b", "radius": 0}, "props": {}}, {"id": "m8-box", "type": "BOX", "x": 40, "y": 176, "w": 714, "h": 96, "z": 8, "locked": false, "hidden": false, "style": {"background": "#f8fafc", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m9-student_identity", "type": "STUDENT_IDENTITY", "x": 64, "y": 192, "w": 400, "h": 72, "z": 9, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"fields": ["name", "id", "class", "halaqah"]}}, {"id": "m10-academic_year", "type": "ACADEMIC_YEAR", "x": 478, "y": 196, "w": 252, "h": 20, "z": 10, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "right", "color": "#475569"}, "props": {}}, {"id": "m11-semester", "type": "SEMESTER", "x": 478, "y": 216, "w": 252, "h": 20, "z": 11, "locked": false, "hidden": false, "style": {"fontSize": 10, "align": "right", "color": "#475569"}, "props": {}}, {"id": "m12-period", "type": "PERIOD", "x": 478, "y": 236, "w": 252, "h": 18, "z": 12, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "right", "color": "#94a3b8"}, "props": {}}, {"id": "m13-box", "type": "BOX", "x": 40, "y": 292, "w": 340, "h": 404, "z": 13, "locked": false, "hidden": false, "style": {"background": "#ffffff", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m14-section_heading", "type": "SECTION_HEADING", "x": 60, "y": 308, "w": 300, "h": 22, "z": 14, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#2563eb", "borderColor": "#dbeafe"}, "props": {"text": "Rekapitulasi Nilai"}}, {"id": "m15-score_table", "type": "SCORE_TABLE", "x": 60, "y": 338, "w": 300, "h": 340, "z": 15, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {"modules": ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID"]}}, {"id": "m16-box", "type": "BOX", "x": 40, "y": 712, "w": 340, "h": 230, "z": 16, "locked": false, "hidden": false, "style": {"background": "#ffffff", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m17-section_heading", "type": "SECTION_HEADING", "x": 60, "y": 728, "w": 300, "h": 22, "z": 17, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#2563eb", "borderColor": "#dbeafe"}, "props": {"text": "Rekap Presensi"}}, {"id": "m18-attendance", "type": "ATTENDANCE", "x": 60, "y": 758, "w": 300, "h": 166, "z": 18, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "m19-box", "type": "BOX", "x": 414, "y": 292, "w": 340, "h": 200, "z": 19, "locked": false, "hidden": false, "style": {"background": "#ffffff", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m20-section_heading", "type": "SECTION_HEADING", "x": 434, "y": 308, "w": 300, "h": 22, "z": 20, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#2563eb", "borderColor": "#dbeafe"}, "props": {"text": "Capaian Periode Ini"}}, {"id": "m21-achievement_summary", "type": "ACHIEVEMENT_SUMMARY", "x": 434, "y": 338, "w": 300, "h": 138, "z": 21, "locked": false, "hidden": false, "style": {"fontSize": 10}, "props": {}}, {"id": "m22-box", "type": "BOX", "x": 414, "y": 508, "w": 340, "h": 188, "z": 22, "locked": false, "hidden": false, "style": {"background": "#ffffff", "borderColor": "#e2e8f0", "radius": 16}, "props": {}}, {"id": "m23-section_heading", "type": "SECTION_HEADING", "x": 434, "y": 524, "w": 300, "h": 22, "z": 23, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#2563eb", "borderColor": "#dbeafe"}, "props": {"text": "Keterangan Predikat"}}, {"id": "m24-grade_legend", "type": "GRADE_LEGEND", "x": 434, "y": 554, "w": 300, "h": 126, "z": 24, "locked": false, "hidden": false, "style": {"fontSize": 9}, "props": {}}, {"id": "m25-box", "type": "BOX", "x": 414, "y": 712, "w": 340, "h": 230, "z": 25, "locked": false, "hidden": false, "style": {"background": "#fffbeb", "borderColor": "#fde68a", "radius": 16}, "props": {}}, {"id": "m26-section_heading", "type": "SECTION_HEADING", "x": 434, "y": 728, "w": 300, "h": 22, "z": 26, "locked": false, "hidden": false, "style": {"fontSize": 11, "color": "#b45309", "borderColor": "#fde68a"}, "props": {"text": "Catatan & Saran Guru"}}, {"id": "m27-notes", "type": "NOTES", "x": 434, "y": 758, "w": 300, "h": 166, "z": 27, "locked": false, "hidden": false, "style": {"fontSize": 9}, "props": {"label": "Catatan & Saran Guru", "text": "Ananda menunjukkan perkembangan hafalan yang stabil dan tertib mengikuti halaqah. Bacaan makhraj sudah baik, perlu penguatan pada hukum mad dan kelancaran muroja''ah juz sebelumnya. Mohon dukungan orang tua untuk membiasakan muroja''ah 15 menit setiap ba''da Maghrib."}}, {"id": "m28-divider", "type": "DIVIDER", "x": 40, "y": 958, "w": 714, "h": 4, "z": 28, "locked": false, "hidden": false, "style": {"borderColor": "#e2e8f0"}, "props": {"thickness": 1}}, {"id": "m29-signatures", "type": "SIGNATURES", "x": 40, "y": 970, "w": 714, "h": 104, "z": 29, "locked": false, "hidden": false, "style": {"fontSize": 11}, "props": {"showTeacher": true, "showHead": true}}, {"id": "m30-box", "type": "BOX", "x": 0, "y": 1090, "w": 794, "h": 33, "z": 30, "locked": false, "hidden": false, "style": {"background": "#0f2b5b", "borderColor": "#0f2b5b", "radius": 0}, "props": {}}, {"id": "m31-footer", "type": "FOOTER", "x": 40, "y": 1096, "w": 714, "h": 22, "z": 31, "locked": false, "hidden": false, "style": {"fontSize": 9, "align": "center", "color": "#cbd5e1"}, "props": {}}]}]}'::jsonb,
+       is_active = true,
+       version = version + 1,
+       updated_at = now()
+ where tenant_id is null
+   and name = 'Raport 2 Kolom Modern';
+
+-- Jadikan contoh utama bawaan platform (menggantikan "Raport 2 Kolom").
+update public.report_templates set is_primary = false
+ where tenant_id is null and is_primary and name <> 'Raport 2 Kolom Modern';
+
+update public.report_templates set is_primary = true
+ where tenant_id is null and name = 'Raport 2 Kolom Modern';
+-- ============================================================================
+-- SOURCE: 20260920220000_tahfizh_v16_santri_self_guardian_link.sql
+-- ============================================================================
+-- ============================================================================
+-- TAHFIZH V16 — Perbaikan akar masalah: akun santri tidak pernah tertaut
+-- sebagai "wali" dari dirinya sendiri, sehingga menu Infak Pengembangan,
+-- "Data Saya", dan dasbor santri selalu tampil kosong walau akun itu jelas
+-- sudah tertaut ke datanya sendiri lewat students.login_username.
+-- ============================================================================
+-- AKAR MASALAH:
+--   Fitur wali (guardians + guardian_students) dipakai untuk membaca data di
+--   /santri/infak, /santri/anak, dan dasbor /santri — TAPI tidak ada satu pun
+--   jalur kode (buat guru/santri manual, import Excel, seed dummy) yang
+--   pernah MENULIS ke tabel guardians/guardian_students. Akibatnya semua akun
+--   santri di seluruh lembaga tampil "belum terhubung", bukan hanya kasus
+--   tertentu.
+--
+-- PERBAIKAN (dua lapis, bukan hanya kode aplikasi — supaya berlaku untuk
+-- SEMUA jalur, termasuk yang mungkin lupa ter-cover di lapisan aplikasi):
+--   1. TRIGGER pada public.students: begitu login_username terisi/berubah,
+--      akun (profiles, role WALI_SANTRI) dengan username yang sama otomatis
+--      dijadikan "wali dari dirinya sendiri" — guardians + guardian_students
+--      dibuat otomatis, tanpa langkah admin manual apa pun.
+--   2. BACKFILL satu kali untuk seluruh santri yang SUDAH punya akun login
+--      sebelum migrasi ini (termasuk akun yang sudah dipakai user sekarang).
+--
+-- Idempoten & repair-safe.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1. Trigger: tautkan otomatis begitu login_username terisi/berubah
+-- ---------------------------------------------------------------------------
+create or replace function public.students_self_guardian_link()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_profile_id  uuid;
+  v_guardian_id uuid;
+begin
+  if new.login_username is null or new.login_username = '' then
+    return new;
+  end if;
+  -- UPDATE lain (nilai/presensi, dst.) yang tidak menyentuh login_username
+  -- tidak perlu memicu ulang — hemat kerja pada trigger yang sering jalan.
+  if tg_op = 'UPDATE' and old.login_username is not distinct from new.login_username then
+    return new;
+  end if;
+
+  select id into v_profile_id
+  from public.profiles
+  where username = new.login_username
+    and tenant_id = new.tenant_id
+    and role = 'WALI_SANTRI'
+  limit 1;
+
+  -- Profil belum ada (race jarang terjadi karena profiles selalu dibuat lebih
+  -- dulu oleh createLoginAccount) — backfill di bawah akan menyusulkan nanti
+  -- bila perlu; tidak menggagalkan penyimpanan data santri.
+  if v_profile_id is null then
+    return new;
+  end if;
+
+  insert into public.guardians (tenant_id, profile_id)
+  values (new.tenant_id, v_profile_id)
+  on conflict (profile_id) do nothing;
+
+  select id into v_guardian_id from public.guardians where profile_id = v_profile_id;
+
+  if v_guardian_id is not null then
+    insert into public.guardian_students (tenant_id, guardian_id, student_id)
+    values (new.tenant_id, v_guardian_id, new.id)
+    on conflict (guardian_id, student_id) do nothing;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists students_self_guardian_link_trg on public.students;do $tfx$  -- idempotent: skip bila trigger sudah ada (aman dijalankan berulang)
+begin
+  execute 'create trigger students_self_guardian_link_trg
+  after insert or update of login_username on public.students
+  for each row execute function public.students_self_guardian_link()';
+exception
+  when duplicate_object then null;
+end
+$tfx$;
+
+-- ---------------------------------------------------------------------------
+-- 2. Backfill — santri yang sudah punya akun SEBELUM migrasi ini ada
+-- ---------------------------------------------------------------------------
+insert into public.guardians (tenant_id, profile_id)
+select distinct s.tenant_id, p.id
+from public.students s
+join public.profiles p
+  on p.username = s.login_username
+ and p.tenant_id = s.tenant_id
+ and p.role = 'WALI_SANTRI'
+where s.login_username is not null and s.login_username <> ''
+on conflict (profile_id) do nothing;
+
+insert into public.guardian_students (tenant_id, guardian_id, student_id)
+select s.tenant_id, g.id, s.id
+from public.students s
+join public.profiles p
+  on p.username = s.login_username
+ and p.tenant_id = s.tenant_id
+ and p.role = 'WALI_SANTRI'
+join public.guardians g on g.profile_id = p.id
+where s.login_username is not null and s.login_username <> ''
+on conflict (guardian_id, student_id) do nothing;
+-- ============================================================================
+-- SOURCE: 20260921010000_tahfizh_v17_target_halaqah.sql
+-- ============================================================================
+-- ============================================================================
+-- TAHFIZH V17 — TARGET PER HALAQAH (menggantikan Target per santri V7)
+-- ============================================================================
+-- Perubahan:
+--   1. Target lama (per santri, V7) DIHAPUS TOTAL: tabel `targets`,
+--      `target_progress_history`, seluruh RPC `target_*`, enum `target_status`,
+--      serta semua tempat yang membacanya (raport, timeline perkembangan,
+--      ringkasan dashboard/santri).
+--   2. Target baru diatur PER HALAQAH (bukan per santri), tepat 3 jenis:
+--        TAHFIDZ (Tahfidz Al-Qur'an) · HADITS · DOA
+--      Satu halaqah punya paling banyak satu target per jenis
+--      (unique halaqah_id + category). Satuan mengikuti jenis:
+--      TAHFIDZ = surat, HADITS = hadits, DOA = doa (dipetakan di aplikasi).
+--
+-- Tabel  : halaqah_targets
+-- RPC    : target_halaqah_overview()   — halaqah yang diampu + target-nya
+--          target_halaqah_save()       — buat / ubah target (upsert per jenis)
+--          target_halaqah_clear()      — kosongkan target satu jenis
+--          v7_teacher_counts()         — cabang TARGETS kini = target halaqah aktif
+--          v7_student_summary()        — tanpa kolom target
+--          report_student_data()       — tanpa blok target
+-- View   : student_development_events  — tanpa event TARGET
+--
+-- Keamanan: SECURITY DEFINER + verifikasi session → role USTADZ → tenant →
+-- halaqah yang diampu. Tulis hanya lewat RPC; RLS select tenant + role.
+-- Idempoten: aman dijalankan ulang (file gabungan menjalankan ulang semua
+-- migration berurutan; urutan di bawah membuat hasil akhirnya tetap sama).
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 1. Tabel halaqah_targets
+-- ----------------------------------------------------------------------------
+create table if not exists public.halaqah_targets (
+  id            uuid primary key default gen_random_uuid(),
+  tenant_id     uuid not null references public.tenants (id) on delete cascade,
+  halaqah_id    uuid not null references public.halaqahs (id) on delete cascade,
+  category      text not null check (category in ('TAHFIDZ', 'HADITS', 'DOA')),
+  target_value  integer not null check (target_value between 1 and 10000),
+  start_date    date not null,
+  end_date      date not null,
+  description   text check (char_length(description) <= 300),
+  teacher_id    uuid references public.teachers (id) on delete set null,
+  created_by    uuid references public.profiles (id) on delete set null,
+  updated_by    uuid references public.profiles (id) on delete set null,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  unique (halaqah_id, category),
+  constraint halaqah_targets_period_check check (end_date >= start_date)
+);
+
+create index if not exists halaqah_targets_tenant_idx
+  on public.halaqah_targets (tenant_id, end_date);
+
+drop trigger if exists halaqah_targets_updated_at on public.halaqah_targets;do $tfx$  -- idempotent: skip bila trigger sudah ada (aman dijalankan berulang)
+begin
+  execute 'create trigger halaqah_targets_updated_at
+  before update on public.halaqah_targets
+  for each row execute function public.touch_updated_at()';
+exception
+  when duplicate_object then null;
+end
+$tfx$;
+
+alter table public.halaqah_targets enable row level security;
+
+-- Repair-safe: drop before create (create policy is not idempotent).
+drop policy if exists halaqah_targets_select on public.halaqah_targets;
+create policy halaqah_targets_select on public.halaqah_targets
+  for select to authenticated
+  using (
+    (
+      tenant_id = public.current_tenant_id()
+      and (
+        public.current_role() in ('ADMIN', 'KOORDINATOR')
+        or (
+          public.current_role() = 'USTADZ'
+          and exists (
+            select 1 from public.halaqah_teachers ht
+            where ht.halaqah_id = halaqah_targets.halaqah_id
+              and ht.teacher_id = public.halaqah_current_teacher()
+          )
+        )
+      )
+    )
+    or public.is_platform_developer()
+  );
+
+-- ----------------------------------------------------------------------------
+-- 2. RPC target_halaqah_overview — halaqah yang diampu guru + target-nya
+-- ----------------------------------------------------------------------------
+drop function if exists public.target_halaqah_overview();
+
+create or replace function public.target_halaqah_overview()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_tenant  uuid;
+  v_role    text;
+  v_teacher uuid;
+  v_halaqah jsonb;
+  v_targets jsonb;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  select p.tenant_id, p.role::text into v_tenant, v_role
+  from public.profiles p where p.id = v_uid;
+
+  if v_tenant is null or v_role <> 'USTADZ' then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  v_teacher := public.halaqah_current_teacher();
+  if v_teacher is null then
+    return jsonb_build_object('halaqah', '[]'::jsonb, 'targets', '[]'::jsonb);
+  end if;
+
+  -- Halaqah aktif yang diampu guru + jumlah santri aktif yang masih tergabung.
+  select coalesce(jsonb_agg(
+           jsonb_build_object(
+             'id', h.id,
+             'name', h.name,
+             'studentCount', (
+               select count(*) from public.halaqah_students hs
+               join public.students s on s.id = hs.student_id
+               where hs.halaqah_id = h.id and hs.left_at is null and s.status = 'ACTIVE'
+             )
+           ) order by h.name), '[]'::jsonb)
+  into v_halaqah
+  from public.halaqahs h
+  join public.halaqah_teachers ht on ht.halaqah_id = h.id and ht.teacher_id = v_teacher
+  where h.tenant_id = v_tenant
+    and h.status = 'ACTIVE';
+
+  select coalesce(jsonb_agg(
+           jsonb_build_object(
+             'id', t.id,
+             'halaqahId', t.halaqah_id,
+             'category', t.category,
+             'targetValue', t.target_value,
+             'startDate', t.start_date,
+             'endDate', t.end_date,
+             'description', t.description,
+             'updatedAt', t.updated_at
+           ) order by t.category), '[]'::jsonb)
+  into v_targets
+  from public.halaqah_targets t
+  where t.tenant_id = v_tenant
+    and t.halaqah_id in (
+      select ht.halaqah_id from public.halaqah_teachers ht where ht.teacher_id = v_teacher
+    );
+
+  return jsonb_build_object('halaqah', v_halaqah, 'targets', v_targets);
+end;
+$$;
+
+grant execute on function public.target_halaqah_overview() to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- 3. RPC target_halaqah_save — buat / ubah target satu jenis untuk satu halaqah
+--    Errors: AKSES_DITOLAK | GURU_TIDAK_DITEMUKAN | KATEGORI_TIDAK_VALID |
+--            TARGET_TIDAK_VALID | PERIODE_TIDAK_VALID |
+--            DESKRIPSI_TERLALU_PANJANG | HALAQAH_TIDAK_VALID
+-- ----------------------------------------------------------------------------
+drop function if exists public.target_halaqah_save(uuid, text, integer, date, date, text);
+
+create or replace function public.target_halaqah_save(
+  p_halaqah_id   uuid,
+  p_category     text,
+  p_target_value integer,
+  p_start_date   date,
+  p_end_date     date,
+  p_description  text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_tenant  uuid;
+  v_role    text;
+  v_teacher uuid;
+  v_halaqah uuid;
+  v_desc    text := nullif(btrim(coalesce(p_description, '')), '');
+  v_id      uuid;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  select p.tenant_id, p.role::text into v_tenant, v_role
+  from public.profiles p where p.id = v_uid;
+
+  if v_tenant is null or v_role <> 'USTADZ' then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  v_teacher := public.halaqah_current_teacher();
+  if v_teacher is null then
+    raise exception 'GURU_TIDAK_DITEMUKAN';
+  end if;
+
+  if p_category is null or p_category not in ('TAHFIDZ', 'HADITS', 'DOA') then
+    raise exception 'KATEGORI_TIDAK_VALID';
+  end if;
+  if p_target_value is null or p_target_value < 1 or p_target_value > 10000 then
+    raise exception 'TARGET_TIDAK_VALID';
+  end if;
+  if p_start_date is null or p_end_date is null or p_end_date < p_start_date
+     or (p_end_date - p_start_date) > 1100 then
+    raise exception 'PERIODE_TIDAK_VALID';
+  end if;
+  if v_desc is not null and char_length(v_desc) > 300 then
+    raise exception 'DESKRIPSI_TERLALU_PANJANG';
+  end if;
+
+  select h.id into v_halaqah
+  from public.halaqahs h
+  join public.halaqah_teachers ht on ht.halaqah_id = h.id
+  where h.id = p_halaqah_id
+    and h.tenant_id = v_tenant
+    and ht.teacher_id = v_teacher;
+  if v_halaqah is null then
+    raise exception 'HALAQAH_TIDAK_VALID';
+  end if;
+
+  insert into public.halaqah_targets (
+    tenant_id, halaqah_id, category, target_value, start_date, end_date,
+    description, teacher_id, created_by, updated_by
+  ) values (
+    v_tenant, v_halaqah, p_category, p_target_value, p_start_date, p_end_date,
+    v_desc, v_teacher, v_uid, v_uid
+  )
+  on conflict (halaqah_id, category) do update set
+    target_value = excluded.target_value,
+    start_date   = excluded.start_date,
+    end_date     = excluded.end_date,
+    description  = excluded.description,
+    teacher_id   = excluded.teacher_id,
+    updated_by   = excluded.updated_by
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function public.target_halaqah_save(uuid, text, integer, date, date, text) to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- 4. RPC target_halaqah_clear — kosongkan target satu jenis
+--    Errors: AKSES_DITOLAK | GURU_TIDAK_DITEMUKAN | KATEGORI_TIDAK_VALID |
+--            HALAQAH_TIDAK_VALID | TARGET_TIDAK_DITEMUKAN
+-- ----------------------------------------------------------------------------
+drop function if exists public.target_halaqah_clear(uuid, text);
+
+create or replace function public.target_halaqah_clear(
+  p_halaqah_id uuid,
+  p_category   text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_tenant  uuid;
+  v_role    text;
+  v_teacher uuid;
+  v_halaqah uuid;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  select p.tenant_id, p.role::text into v_tenant, v_role
+  from public.profiles p where p.id = v_uid;
+
+  if v_tenant is null or v_role <> 'USTADZ' then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  v_teacher := public.halaqah_current_teacher();
+  if v_teacher is null then
+    raise exception 'GURU_TIDAK_DITEMUKAN';
+  end if;
+
+  if p_category is null or p_category not in ('TAHFIDZ', 'HADITS', 'DOA') then
+    raise exception 'KATEGORI_TIDAK_VALID';
+  end if;
+
+  select h.id into v_halaqah
+  from public.halaqahs h
+  join public.halaqah_teachers ht on ht.halaqah_id = h.id
+  where h.id = p_halaqah_id
+    and h.tenant_id = v_tenant
+    and ht.teacher_id = v_teacher;
+  if v_halaqah is null then
+    raise exception 'HALAQAH_TIDAK_VALID';
+  end if;
+
+  delete from public.halaqah_targets
+  where halaqah_id = v_halaqah and category = p_category and tenant_id = v_tenant;
+  if not found then
+    raise exception 'TARGET_TIDAK_DITEMUKAN';
+  end if;
+end;
+$$;
+
+grant execute on function public.target_halaqah_clear(uuid, text) to authenticated;
+
+-- ============================================================================
+-- 5. HAPUS TOTAL TARGET LAMA (per santri, V7)
+--    Urutan penting: pertama ganti SEMUA pembaca `targets` (view/fungsi),
+--    baru buang fungsi, tabel, dan tipe — tanpa CASCADE.
+-- ============================================================================
+
+-- 5a. Dashboard guru: cabang TARGETS kini menghitung target halaqah yang
+--     masih berlaku (end_date belum lewat) pada halaqah yang diampu guru.
+create or replace function public.v7_teacher_counts(p_teacher_id uuid)
+returns table (section text, cnt bigint)
+language sql
+security definer set search_path = public
+as $$
+  with session_teacher as (
+    select t.id from public.teachers t
+    where t.id = p_teacher_id
+      and t.tenant_id = (select tenant_id from public.profiles where id = auth.uid())
+      and t.full_name ilike (select full_name from public.profiles where id = auth.uid())
+      and (select role from public.profiles where id = auth.uid()) = 'USTADZ'
+  )
+  select * from (
+    select 'TARGETS'::text as section,
+           count(*)::bigint as cnt
+    from public.halaqah_targets ht2
+    join public.halaqah_teachers hte on hte.halaqah_id = ht2.halaqah_id
+    join session_teacher st on st.id = hte.teacher_id
+    where ht2.end_date >= current_date
+    union all
+    select 'TASKS'::text,
+           count(*)::bigint
+    from public.tasks k, session_teacher st
+    where k.teacher_id = st.id and k.deleted_at is null
+      and k.status in ('BELUM_DIKERJAKAN', 'DIKERJAKAN', 'DIKUMPULKAN', 'TERLAMBAT')
+    union all
+    select 'JOURNALS'::text,
+           count(*)::bigint
+    from public.journal_entries e, session_teacher st
+    where e.teacher_id = st.id and e.deleted_at is null
+      and e.entry_date >= (current_date - interval '30 days')::date
+  ) u;
+$$;
+
+-- 5b. Ringkasan santri: kolom target dibuang (bentuk return berubah → drop dulu).
+drop function if exists public.v7_student_summary(uuid);
+
+create or replace function public.v7_student_summary(p_student_id uuid)
+returns table (
+  active_tasks   integer,
+  journal_month  integer
+)
+language sql
+security definer set search_path = public
+as $$
+  select
+    (select count(*)::integer from public.tasks k
+      where k.student_id = p_student_id and k.tenant_id = public.current_tenant_id()
+        and k.deleted_at is null
+        and k.status in ('BELUM_DIKERJAKAN','DIKERJAKAN','DIKUMPULKAN','TERLAMBAT')),
+    (select count(*)::integer from public.journal_entries e
+      where e.student_id = p_student_id and e.tenant_id = public.current_tenant_id()
+        and e.deleted_at is null
+        and e.entry_date >= date_trunc('month', current_date)::date)
+$$;
+
+-- 5c. Raport: report_student_data tanpa blok TARGET (salinan V9 minus target).
+create or replace function public.report_student_data(
+  p_student_id  uuid,
+  p_period_start date,
+  p_period_end   date
+)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_tenant  uuid := public.current_tenant_id();
+  v_student public.students;
+  v_teacher public.teachers;
+  v_head    public.leader_profiles;
+  v_settings public.report_settings;
+  v_tsettings public.tenant_settings;
+  v_mode    public.tahfidz_mode;
+  v_payload jsonb;
+  v_tahfidz jsonb;
+  v_tartil  jsonb;
+  v_setoran jsonb;
+  v_hadits  jsonb;
+  v_doa     jsonb;
+  v_tajwid  jsonb;
+  v_tugas   jsonb;
+  v_jurnal  jsonb;
+  v_attendance jsonb;
+  v_in_period date := p_period_start;
+  v_out_period date := p_period_end;
+begin
+  if v_tenant is null then raise exception 'AKSES_DITOLAK'; end if;
+  if p_period_start is null or p_period_end is null or p_period_end < p_period_start then
+    raise exception 'PERIODE_TIDAK_VALID';
+  end if;
+
+  select * into v_student from public.students
+  where id = p_student_id and tenant_id = v_tenant;
+  if v_student is null then raise exception 'SANTRI_TIDAK_DITEMUKAN'; end if;
+
+  select * into v_tsettings from public.tenant_settings where tenant_id = v_tenant;
+  select * into v_settings from public.report_settings where tenant_id = v_tenant;
+  v_mode := coalesce(public.tahfidz_settings_mode(v_tenant), 'CENTANG');
+
+  -- TAHFIDZ (V3): surah rows + summary per V3 mode.
+  v_tahfidz := (
+    select jsonb_build_object(
+      'count', count(*) filter (where a.status = 'DINILAI'),
+      'avgValue', round(avg(a.score_value) filter (where a.status = 'DINILAI' and a.score_value is not null), 0),
+      'lastLabel', (select a2.score_label from public.tahfidz_assessments a2
+                    where a2.student_id = p_student_id and a2.status = 'DINILAI'
+                    order by a2.assessed_at desc limit 1),
+      'activeTotal', (select count(*) from public.tahfidz_tenant_surahs ts
+                      where ts.tenant_id = v_tenant and ts.is_active),
+      'rows', coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'name', coalesce(ts2.name_override, gs.name, 'Surat'),
+            'scoreLabel', a.score_label, 'scoreValue', a.score_value, 'status', a.status)
+          order by ts2.sort_order)
+        from public.tahfidz_assessments a
+        join public.tahfidz_tenant_surahs ts2 on ts2.id = a.tenant_surah_id
+        left join public.tahfidz_surahs gs on gs.id = ts2.surah_id
+        where a.student_id = p_student_id and a.status = 'DINILAI'
+      ), '[]'::jsonb)
+    )
+    from public.tahfidz_assessments a
+    where a.student_id = p_student_id
+  );
+
+  -- TARTIL (V4)
+  v_tartil := (
+    select jsonb_build_object(
+      'count', count(*),
+      'avgValue', round(avg(a.score_value), 0),
+      'lastLabel', (select a2.score_label from public.tartil_assessments a2
+                    where a2.student_id = p_student_id and a2.deleted_at is null
+                      and a2.status = 'DINILAI'
+                    order by a2.assessed_at desc limit 1),
+      'lastPages', (select a2.pages_label from public.tartil_assessments a2
+                    where a2.student_id = p_student_id and a2.deleted_at is null
+                    order by a2.assessed_at desc limit 1)
+    )
+    from public.tartil_assessments a
+    where a.student_id = p_student_id and a.deleted_at is null
+      and a.assessed_at::date between v_in_period and v_out_period
+  );
+
+  -- SETORAN (V5)
+  v_setoran := (
+    select jsonb_build_object(
+      'total', count(*),
+      'lulus', count(*) filter (where s.result = 'LULUS'),
+      'ulang', count(*) filter (where s.result = 'PERLU_MENGULANG'),
+      'lastKind', (select s2.kind::text from public.tahfidz_submissions s2
+                   where s2.student_id = p_student_id and s2.deleted_at is null
+                   order by s2.assessed_date desc limit 1)
+    )
+    from public.tahfidz_submissions s
+    where s.student_id = p_student_id and s.deleted_at is null
+      and s.assessed_date between v_in_period and v_out_period
+  );
+
+  -- HADITS / DOA / TAJWID (V6)
+  v_hadits := (
+    select jsonb_build_object(
+      'count', count(*) filter (where a.status in ('LULUS','MENGUASAI')),
+      'total', count(*),
+      'avgValue', round(avg(a.score_value), 0),
+      'lastLabel', (select a2.score_label from public.learning_assessments a2
+                    where a2.student_id = p_student_id and a2.deleted_at is null
+                      and a2.module_type = 'HADITS'
+                    order by a2.assessed_date desc limit 1)
+    )
+    from public.learning_assessments a
+    where a.student_id = p_student_id and a.deleted_at is null
+      and a.module_type = 'HADITS'
+      and a.assessed_date between v_in_period and v_out_period
+  );
+
+  v_doa := (
+    select jsonb_build_object(
+      'count', count(*) filter (where a.status in ('LULUS','MENGUASAI')),
+      'total', count(*),
+      'avgValue', round(avg(a.score_value), 0),
+      'lastLabel', (select a2.score_label from public.learning_assessments a2
+                    where a2.student_id = p_student_id and a2.deleted_at is null
+                      and a2.module_type = 'DOA'
+                    order by a2.assessed_date desc limit 1)
+    )
+    from public.learning_assessments a
+    where a.student_id = p_student_id and a.deleted_at is null
+      and a.module_type = 'DOA'
+      and a.assessed_date between v_in_period and v_out_period
+  );
+
+  v_tajwid := (
+    select jsonb_build_object(
+      'count', count(*) filter (where a.status = 'MENGUASAI'),
+      'total', count(*),
+      'avgValue', round(avg(a.score_value), 0),
+      'lastLabel', (select a2.score_label from public.learning_assessments a2
+                    where a2.student_id = p_student_id and a2.deleted_at is null
+                      and a2.module_type = 'TAJWID'
+                    order by a2.assessed_date desc limit 1)
+    )
+    from public.learning_assessments a
+    where a.student_id = p_student_id and a.deleted_at is null
+      and a.module_type = 'TAJWID'
+      and a.assessed_date between v_in_period and v_out_period
+  );
+
+  -- TUGAS (V7)
+  v_tugas := (
+    select jsonb_build_object(
+      'total', count(*),
+      'dinilai', count(*) filter (where k.status = 'DINILAI'),
+      'avgValue', round(avg(k.score_value) filter (where k.status = 'DINILAI'), 0)
+    )
+    from public.tasks k
+    where k.student_id = p_student_id and k.deleted_at is null
+      and k.due_date between v_in_period and v_out_period
+  );
+
+  -- JURNAL (V7): jumlah entry bulan periode (untuk Kartu Prestasi ringkas).
+  v_jurnal := (
+    select coalesce(count(*), 0)
+    from public.journal_entries e
+    where e.student_id = p_student_id and e.deleted_at is null
+      and e.entry_date between v_in_period and v_out_period
+  );
+
+  -- PRESENSI (V8): rekap H/I/S/A + persentase untuk periode raport.
+  -- rpc dipanggil via helper SQL langsung (bukan nested RPC) agar payload
+  -- tetap satu query terstruktur (rule #73).
+  v_attendance := (
+    select jsonb_build_object(
+      'hadir', count(*) filter (where r.status = 'HADIR'),
+      'izin', count(*) filter (where r.status = 'IZIN'),
+      'sakit', count(*) filter (where r.status = 'SAKIT'),
+      'alpa', count(*) filter (where r.status = 'ALPA'),
+      'persen', coalesce(round(
+        count(*) filter (where r.status = 'HADIR')::numeric / nullif(count(*), 0) * 100, 0), 0)
+    )
+    from public.attendance_records r
+    where r.student_id = p_student_id
+      and r.tenant_id = v_tenant
+      and r.created_at::date between v_in_period and v_out_period
+  );
+  select * into v_head from public.leader_profiles where tenant_id = v_tenant;
+
+  select * into v_teacher from public.teachers
+  where tenant_id = v_tenant and id = (
+    select ts.teacher_id from public.teacher_students ts
+    where ts.student_id = p_student_id
+    order by ts.created_at desc limit 1
+  );
+
+  v_payload := jsonb_build_object(
+    'student', jsonb_build_object(
+      'name', v_student.full_name,
+      'id', v_student.business_code,
+      'gender', v_student.gender
+    ),
+    'teacher', case when v_teacher is null then null else jsonb_build_object(
+      'name', v_teacher.full_name,
+      'id', case when coalesce(v_tsettings.show_teacher_identity, false)
+                 then coalesce((select ti.value from public.teacher_identities ti
+                                where ti.teacher_id = v_teacher.id
+                                order by ti.identity_key limit 1), '')
+                 else '' end,
+      'identityLabel', coalesce((select t2 ->> 'label' from public.tenant_settings ts2,
+                                 jsonb_array_elements(ts2.identity_types) t2
+                                 where ts2.tenant_id = v_tenant limit 1), 'ID')
+    ) end,
+    'head', case when v_head is null then null else jsonb_build_object(
+      'name', trim(coalesce(v_head.front_title, '') || ' ' || v_head.full_name
+                   || case when coalesce(v_head.back_title, '') <> '' then ', ' || v_head.back_title else '' end),
+      'id', coalesce(v_head.identity_number, ''),
+      'identityLabel', coalesce(v_head.identity_key, 'ID')
+    ) end,
+    'institution', jsonb_build_object(
+      'name', (select name from public.tenants where id = v_tenant),
+      'code', (select business_code from public.tenants where id = v_tenant),
+      'address', coalesce(v_settings.address, ''),
+      'contact', coalesce(v_settings.contact, ''),
+      'logoPath', v_settings.logo_path,
+      'watermark', jsonb_build_object(
+        'enabled', coalesce(v_settings.watermark_enabled, false),
+        'opacity', coalesce(v_settings.watermark_opacity, 15),
+        'scale', coalesce(v_settings.watermark_scale, 60),
+        'path', v_settings.watermark_path
+      ),
+      'footer', coalesce(v_settings.footer_text, ''),
+      'showPageNumbers', coalesce(v_settings.show_page_numbers, true)
+    ),
+    'mode', v_mode::text,
+    'scores', jsonb_build_object(
+      'tahfidz', v_tahfidz,
+      'tartil', v_tartil,
+      'setoran', v_setoran,
+      'hadits', v_hadits,
+      'doa', v_doa,
+      'tajwid', v_tajwid,
+      'tugas', v_tugas,
+      'jurnal', v_jurnal
+    ),
+    'attendance', v_attendance,  -- V8 real data (rule #65: hideable in builder)
+    'period', jsonb_build_object(
+      'start', v_in_period,
+      'end', v_out_period
+    )
+  );
+
+  return v_payload;
+end;
+$$;
+
+
+-- 5d. Timeline perkembangan santri: tanpa event TARGET (salinan V11 minus target).
+create or replace view public.student_development_events
+with (security_invoker = on) as  -- RLS of underlying tables applies (no bypass)
+select s.tenant_id, s.student_id, s.assessed_at::date as event_date,
+       'TAHFIDZ'::text as kind,
+       coalesce(ts.name_override, q.name, 'Surah') as title,
+       s.status::text as detail, t.full_name as teacher,
+       s.score_label, s.assessed_at as created_at
+from public.tahfidz_assessments s
+left join public.tahfidz_tenant_surahs ts on ts.id = s.tenant_surah_id
+left join public.tahfidz_surahs q on q.id = ts.surah_id
+left join public.teachers t on t.id = s.teacher_id
+union all
+select s.tenant_id, s.student_id, s.assessed_date, 'SETORAN',
+       coalesce(ts.name_override, q.name, 'Setoran'),
+       case s.kind when 'MUROJAAH' then 'Murojaah' else 'Hafalan Baru' end
+         || coalesce(' · ' || s.ayat_label, '') || ' · ' || s.result::text,
+       t.full_name, s.score_label, s.created_at
+from public.tahfidz_submissions s
+left join public.tahfidz_tenant_surahs ts on ts.id = s.tenant_surah_id
+left join public.tahfidz_surahs q on q.id = ts.surah_id
+left join public.teachers t on t.id = s.teacher_id
+where s.deleted_at is null
+union all
+select s.tenant_id, s.student_id, s.assessed_at::date, 'TARTIL',
+       coalesce(m.name, 'Tartil'), coalesce(s.pages_label, ''),
+       t.full_name, s.score_label, s.created_at
+from public.tartil_assessments s
+left join public.tartil_materials m on m.id = s.material_id
+left join public.teachers t on t.id = s.teacher_id
+where s.deleted_at is null
+union all
+select s.tenant_id, s.student_id, s.assessed_date, s.module_type::text,
+       coalesce(
+         (select h.title from public.hadith_materials h where h.id = s.hadith_id),
+         (select p.title from public.daily_prayer_materials p where p.id = s.prayer_id),
+         (select w.title from public.tajwid_materials w where w.id = s.tajwid_id),
+         s.module_type::text),
+       s.status::text, t.full_name, s.score_label, s.created_at
+from public.learning_assessments s
+left join public.teachers t on t.id = s.teacher_id
+where s.deleted_at is null
+union all
+select s.tenant_id, s.student_id, s.assigned_date, 'TUGAS',
+       s.title, s.status::text, t.full_name, s.score_label, s.created_at
+from public.tasks s
+left join public.teachers t on t.id = s.teacher_id
+where s.deleted_at is null
+union all
+select s.tenant_id, s.student_id, s.entry_date, 'JURNAL',
+       tm.name, coalesce(s.free_text, ''), t.full_name, null, s.created_at
+from public.journal_entries s
+left join public.journal_templates tm on tm.id = s.template_id
+left join public.teachers t on t.id = s.teacher_id
+where s.deleted_at is null
+union all
+select ar.tenant_id, ar.student_id, as2.session_date, 'PRESENSI',
+       h.name, ar.status::text || coalesce(' · ' || ar.note, ''),
+       null, null, ar.created_at
+from public.attendance_records ar
+join public.attendance_sessions as2 on as2.id = ar.session_id
+join public.halaqahs h on h.id = ar.halaqah_id
+union all
+select s.tenant_id, s.student_id, s.effective_date, 'MUTASI',
+       'Mutasi Halaqah',
+       coalesce((select h.name from public.halaqahs h where h.id = s.to_halaqah_id), '') || coalesce(' · ' || s.reason, ''),
+       (select t.full_name from public.teachers t where t.id = s.to_teacher_id),
+       null, s.created_at
+from public.student_transfers s
+union all
+select s.tenant_id, s.student_id, s.created_at::date, 'PROMOSI',
+       'Kenaikan Level',
+       coalesce(s.from_level || ' → ', '') || s.to_level,
+       null, null, s.created_at
+from public.student_promotions s
+union all
+select s.tenant_id, s.student_id, s.effective_date, 'STATUS',
+       'Perubahan Status', s.to_status::text || coalesce(' · ' || s.reason, ''),
+       null, null, s.created_at
+from public.student_status_history s;
+
+
+-- 5e. Template raport tersimpan: buang penanda modul "TARGET" pada komponen
+--     SCORE_TABLE (murni penanda; renderer tidak lagi memuat modul ini).
+update public.report_templates
+set layout = replace(replace(layout::text, '"TARGET", ', ''), ', "TARGET"', '')::jsonb
+where layout::text like '%"TARGET"%';
+
+-- 5f. Buang fungsi, tabel, dan tipe target lama (tidak ada pembaca tersisa).
+drop function if exists public.target_save(uuid, text, date, date, text, text, numeric, text, text, uuid);
+drop function if exists public.target_recompute_progress(uuid, text);
+drop function if exists public.target_recompute_status(uuid, text);
+drop function if exists public.target_set_progress(uuid, numeric);
+drop function if exists public.target_cancel(uuid);
+drop function if exists public.target_teacher_list();
+drop function if exists public.target_student_detail(uuid);
+drop function if exists public.target_progress_history_list(uuid);
+
+drop table if exists public.target_progress_history;
+drop table if exists public.targets;
+
+drop function if exists public.target_record_history();
+drop type if exists public.target_status;

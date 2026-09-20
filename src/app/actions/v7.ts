@@ -5,11 +5,10 @@ import { getSessionProfile } from "@/lib/auth";
 import {
   invalidateJournalConfig,
   invalidateJournals,
-  invalidateTargets,
   invalidateTasks,
 } from "@/lib/cache";
 import {
-  TARGET_MODULES,
+  TASK_MODULE_OPTIONS,
   TASK_STATUSES,
   type JournalFieldDef,
   type JournalFieldType,
@@ -17,7 +16,7 @@ import {
 import type { ActionResult } from "@/app/actions/crud";
 
 /**
- * TAHFIZH V7 — Guru actions for Target / Tugas / Custom Jurnal
+ * TAHFIZH V7 — Guru actions for Tugas / Custom Jurnal
  * (rule #41-#42, #55-#56). Every write goes through a SECURITY DEFINER RPC
  * that re-verifies session → role → tenant → teacher identity → assignment.
  * Client-side validation here only gives fast, friendly feedback.
@@ -29,11 +28,6 @@ const V7_ERROR_MAP: { match: RegExp; message: string }[] = [
   { match: /AKSES_DITOLAK|GURU_TIDAK_DITEMUKAN/, message: "Session Anda telah berakhir atau profil guru tidak ditemukan. Silakan login kembali." },
   { match: /SANTRI_BUKAN_BINAAN/, message: "Santri bukan binaan Anda atau sudah tidak terdaftar." },
   { match: /JUDUL_TIDAK_VALID/, message: "Judul wajib diisi (1-160 karakter)." },
-  { match: /PERIODE_TIDAK_VALID/, message: "Periode tidak valid — tanggal akhir tidak boleh sebelum tanggal mulai." },
-  { match: /TARGET_TIDAK_VALID/, message: "Nilai target harus angka antara 0 dan 10000." },
-  { match: /PROGRESS_TIDAK_VALID/, message: "Nilai progress tidak valid (0 sampai nilai target)." },
-  { match: /PROGRESS_MANUAL_SAJA/, message: "Target modul dihitung dari data penilaian. Gunakan tombol Hitung dari Data." },
-  { match: /TARGET_TIDAK_DITEMUKAN/, message: "Target tidak ditemukan atau bukan kewenangan Anda." },
   { match: /INSTRUKSI_TIDAK_VALID/, message: "Instruksi tugas wajib diisi (maksimal 1000 karakter)." },
   { match: /DEADLINE_TIDAK_VALID/, message: "Deadline tidak valid." },
   { match: /TUGAS_TIDAK_DITEMUKAN/, message: "Tugas tidak ditemukan atau bukan kewenangan Anda." },
@@ -68,116 +62,6 @@ function validDate(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
 }
 
-/* ------------------------------- TARGET ----------------------------------- */
-
-export async function saveTargetAction(input: {
-  studentId: string;
-  module: string;
-  title: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  targetValue: number;
-  unit: string;
-  note: string;
-  targetId?: string | null;
-}): Promise<ActionResult & { id?: string }> {
-  const profile = await requireUstadz();
-  if (!profile) return { error: "Session Anda telah berakhir. Silakan login kembali." };
-
-  if (!UUID_RE.test(input.studentId)) return { error: "Pilih santri terlebih dahulu." };
-  if (input.targetId && !UUID_RE.test(input.targetId)) return { error: "Target tidak valid." };
-  const title = input.title.trim();
-  if (title.length < 1 || title.length > 160) return { error: "Judul target wajib diisi (1-160 karakter)." };
-  if (!(TARGET_MODULES as readonly string[]).includes(input.module)) {
-    return { error: "Modul target tidak valid." };
-  }
-  if (!validDate(input.startDate) || !validDate(input.endDate)) {
-    return { error: "Periode target tidak valid." };
-  }
-  if (input.endDate < input.startDate) {
-    return { error: "Tanggal akhir tidak boleh sebelum tanggal mulai." };
-  }
-  if (!Number.isFinite(input.targetValue) || input.targetValue <= 0 || input.targetValue > 10000) {
-    return { error: "Nilai target harus angka lebih dari 0 (maks 10000)." };
-  }
-  const unit = input.unit.trim().slice(0, 30);
-  const description = input.description.trim().slice(0, 500);
-  const note = input.note.trim().slice(0, 500);
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("target_save", {
-    p_student_id: input.studentId,
-    p_module: input.module,
-    p_title: title,
-    p_description: description || null,
-    p_start_date: input.startDate,
-    p_end_date: input.endDate,
-    p_target_value: input.targetValue,
-    p_unit: unit || null,
-    p_note: note || null,
-    p_target_id: input.targetId ?? null,
-  });
-  if (error) return { error: friendlyV7Error(error.message) };
-
-  invalidateTargets([input.studentId]);
-  return { success: input.targetId ? "Target berhasil diperbarui." : "Target berhasil dibuat.", id: (data as string) ?? undefined };
-}
-
-export async function setTargetProgressAction(input: {
-  targetId: string;
-  value: number;
-}): Promise<ActionResult> {
-  const profile = await requireUstadz();
-  if (!profile) return { error: "Session Anda telah berakhir. Silakan login kembali." };
-  if (!UUID_RE.test(input.targetId)) return { error: "Target tidak valid." };
-  if (!Number.isFinite(input.value) || input.value < 0) {
-    return { error: "Nilai progress tidak valid." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("target_set_progress", {
-    p_target_id: input.targetId,
-    p_value: input.value,
-  });
-  if (error) return { error: friendlyV7Error(error.message) };
-
-  invalidateTargets([]); // student id resolved server-side; paths revalidated
-  return { success: "Progress target diperbarui." };
-}
-
-/** Rule #11 — recompute from real assessment data (module targets only). */
-export async function refreshTargetProgressAction(input: {
-  targetId: string;
-}): Promise<ActionResult> {
-  const profile = await requireUstadz();
-  if (!profile) return { error: "Session Anda telah berakhir. Silakan login kembali." };
-  if (!UUID_RE.test(input.targetId)) return { error: "Target tidak valid." };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("target_recompute_progress", {
-    p_target_id: input.targetId,
-    p_source: "AUTO",
-  });
-  if (error) return { error: friendlyV7Error(error.message) };
-
-  invalidateTargets([]);
-  return { success: `Progress dihitung ulang dari data: ${Number(data ?? 0)}.` };
-}
-
-export async function cancelTargetAction(input: { targetId: string }): Promise<ActionResult> {
-  const profile = await requireUstadz();
-  if (!profile) return { error: "Session Anda telah berakhir. Silakan login kembali." };
-  if (!UUID_RE.test(input.targetId)) return { error: "Target tidak valid." };
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("target_cancel", { p_target_id: input.targetId });
-  if (error) return { error: friendlyV7Error(error.message) };
-
-  invalidateTargets([]);
-  return { success: "Target dibatalkan." };
-}
-
 /* --------------------------------- TUGAS ---------------------------------- */
 
 export async function saveTaskAction(input: {
@@ -200,7 +84,7 @@ export async function saveTaskAction(input: {
   if (instruction.length < 1 || instruction.length > 1000) {
     return { error: "Instruksi tugas wajib diisi (maksimal 1000 karakter)." };
   }
-  if (!(TARGET_MODULES as readonly string[]).includes(input.module)) {
+  if (!TASK_MODULE_OPTIONS.some((o) => o.value === input.module)) {
     return { error: "Modul tugas tidak valid." };
   }
   if (!validDate(input.dueDate)) return { error: "Deadline tidak valid." };

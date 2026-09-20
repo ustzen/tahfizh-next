@@ -25,22 +25,13 @@ export async function changeOwnPasswordAction(
   const sessionProfile = await getSessionProfile();
   if (!sessionProfile) return { error: "Sesi berakhir. Silakan login kembali." };
 
-  const current = String(formData.get("currentPassword") ?? "");
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirmPassword") ?? "");
 
   if (password.length < 8) return { error: "Password baru minimal 8 karakter." };
   if (password !== confirm) return { error: "Konfirmasi password tidak cocok." };
-  if (password === current) return { error: "Password baru harus berbeda dari password lama." };
 
   const supabase = await createClient();
-
-  // Verifikasi password lama dulu (re-auth) agar sesi curi tidak bisa ganti.
-  const email = sessionProfile.email;
-  if (email) {
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password: current });
-    if (signInErr) return { error: "Password saat ini salah." };
-  }
 
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: "Gagal menyimpan password. Coba lagi." };

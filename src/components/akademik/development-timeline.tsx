@@ -35,7 +35,6 @@ const KINDS: { value: string; label: string; color: string }[] = [
   { value: "DOA", label: "Doa Harian", color: "bg-orange-500" },
   { value: "TAJWID", label: "Tajwid", color: "bg-violet-500" },
   { value: "TUGAS", label: "Tugas", color: "bg-sky-500" },
-  { value: "TARGET", label: "Target", color: "bg-rose-500" },
   { value: "JURNAL", label: "Jurnal", color: "bg-slate-500" },
 ];
 

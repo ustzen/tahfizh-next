@@ -51,7 +51,9 @@ async function loadBase() {
     terms,
     lembaga: session.tenantName ?? "TAHFIZH",
     tahunAjaran: activeYear?.name ?? null,
-    halaqahHint: (halaqahCodes ?? []).map((h) => h.business_code as string),
+    // V14 — import santri mencocokkan berdasarkan NAMA halaqah (bukan kode),
+    // tanpa peka huruf besar/kecil (rule: "ALIF" = "Alif" = "alif").
+    halaqahHint: (halaqahCodes ?? []).map((h) => h.name as string),
     halaqahRows: halaqahCodes ?? [],
   };
 }

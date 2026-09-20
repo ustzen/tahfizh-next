@@ -74,6 +74,7 @@ const STUDENT_SAMPLE: Record<string, (i: number, halaqah: string) => string> = {
   D: (i) => `Contoh ${i}`,
   E: (i) => (i % 2 === 1 ? "L" : "P"),
   F: (i) => `Bapak Wali ${i}`,
+  // V14 — dicocokkan berdasarkan NAMA halaqah, tanpa peka huruf besar/kecil.
   G: (i, halaqah) => (i <= 5 ? halaqah : ""),
   H: (i) => `0898765432${String(i).padStart(2, "0")}`,
 };
@@ -342,10 +343,11 @@ export function ImportDialog({
           </p>
           {kind === "santri" && (
             <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
-              *Kode Halaqah/Kelas pada kolom G sebaiknya sama persis dengan kode halaqah yang sudah
-              terdaftar ({halaqahHint.slice(0, 3).join(", ") || "belum ada"}). Jika kosong atau belum
-              terdaftar, santri tetap diimport dengan status &ldquo;Tidak ada halaqah&rdquo; dan bisa diatur
-              manual belakangan.
+              *Nama Halaqah/Kelas pada kolom G dicocokkan dengan nama halaqah yang sudah terdaftar
+              ({halaqahHint.slice(0, 3).join(", ") || "belum ada"}) — huruf besar/kecil tidak
+              berpengaruh (mis. &ldquo;ALIF&rdquo;, &ldquo;Alif&rdquo;, dan &ldquo;alif&rdquo; dianggap
+              sama). Jika kosong atau belum terdaftar, santri tetap diimport dengan status
+              &ldquo;Tidak ada halaqah&rdquo; dan bisa diatur manual belakangan.
             </p>
           )}
           <Button

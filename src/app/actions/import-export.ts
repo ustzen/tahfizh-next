@@ -50,10 +50,11 @@ import {
  *
  * - business_code (A-1, S-1, …) dibiarkan NULL agar trigger DB
  *   (next_business_id) yang membuat ID internal otomatis — race-safe.
- * - Kode Halaqah pada import santri opsional: baris dengan kode yang cocok
- *   ditautkan ke halaqah via halaqah_students (RLS V8 mengizinkan ADMIN;
- *   KOORDINATOR hanya jika lembaga mengizinkan — error dilaporkan sebagai
- *   catatan, data santri tetap terimport).
+ * - Nama Halaqah pada import santri opsional: baris dengan nama yang cocok
+ *   (case-insensitive — "ALIF", "Alif", "alif" dianggap sama) ditautkan ke
+ *   halaqah via halaqah_students (RLS V8 mengizinkan ADMIN; KOORDINATOR hanya
+ *   jika lembaga mengizinkan — error dilaporkan sebagai catatan, data santri
+ *   tetap terimport).
  */
 
 const MAX_ROWS = 500;
@@ -313,7 +314,7 @@ export async function importTeachersAction(
   };
 }
 
-/** Import SANTRI: A. NIS | B. NISN | C. Nama | D. Panggilan | E. Gender | F. Nama Wali | G. Kode Halaqah | H. WhatsApp Wali */
+/** Import SANTRI: A. NIS | B. NISN | C. Nama | D. Panggilan | E. Gender | F. Nama Wali | G. Nama Halaqah | H. WhatsApp Wali */
 export async function importStudentsAction(
   _prev: ImportSummary | null,
   formData: FormData
@@ -404,17 +405,22 @@ export async function importStudentsAction(
     };
   }
 
-  // Resolusi kode halaqah → id (sekali saja per potongan).
-  const codeSet = new Set(prepared.map((p) => p.halaqahCode).filter(Boolean));
-  const halaqahByCode = new Map<string, string>();
-  if (codeSet.size > 0) {
+  // Resolusi NAMA halaqah → id (sekali saja per potongan), TIDAK peka
+  // huruf besar/kecil: "ALIF" di file tetap tertaut ke halaqah bernama "Alif".
+  // Dicocokkan di JS (bukan `.ilike` per nama) supaya satu query saja cukup
+  // dan pencocokan dua arah (spasi berlebih, dsb.) konsisten dengan pratinjau.
+  const nameSet = new Set(
+    prepared.map((p) => p.halaqahName.trim().toLowerCase()).filter(Boolean)
+  );
+  const halaqahByName = new Map<string, string>();
+  if (nameSet.size > 0) {
     const { data: halaqahs } = await db
       .from("halaqahs")
-      .select("id, business_code")
-      .eq("tenant_id", tid)
-      .in("business_code", Array.from(codeSet));
+      .select("id, name")
+      .eq("tenant_id", tid);
     for (const h of halaqahs ?? []) {
-      if (h.business_code) halaqahByCode.set(String(h.business_code).toUpperCase(), String(h.id));
+      const key = String(h.name ?? "").trim().toLowerCase();
+      if (key && nameSet.has(key)) halaqahByName.set(key, String(h.id));
     }
   }
 
@@ -488,12 +494,12 @@ export async function importStudentsAction(
   // dilaporkan sebagai catatan, tidak membatalkan import santri.
   const memberRows: { tenant_id: string; halaqah_id: string; student_id: string }[] = [];
   for (const p of created) {
-    if (!p.halaqahCode) continue;
-    const halaqahId = halaqahByCode.get(p.halaqahCode);
+    if (!p.halaqahName) continue;
+    const halaqahId = halaqahByName.get(p.halaqahName.trim().toLowerCase());
     if (!halaqahId) {
       issues.push({
         row: p.rowNum,
-        reason: `Kode halaqah "${p.halaqahCode}" tidak ditemukan — santri terimport tanpa halaqah`,
+        reason: `Halaqah "${p.halaqahName}" tidak ditemukan — santri terimport tanpa halaqah`,
         level: "warning",
       });
       continue;

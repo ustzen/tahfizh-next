@@ -14,8 +14,10 @@ export const metadata = { title: "Data Saya" };
 
 /**
  * V12 — halaman "Data Saya" untuk role Santri: daftar santri yang terhubung
- * dengan akun ini. Dialog "Hubungkan Anak" (kode relasi) dihapus — penghubungan
- * hanya dilakukan admin lembaga.
+ * dengan akun ini. Dialog "Hubungkan Anak" (kode relasi) dihapus — penautan
+ * kini OTOMATIS (V16): begitu akun santri dibuat/diimport, trigger DB
+ * menautkannya sebagai wali dari dirinya sendiri (guardians/guardian_students).
+ * Admin tidak perlu langkah manual apa pun.
  */
 export default async function SantriAnakPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/anak");
@@ -73,9 +75,10 @@ export default async function SantriAnakPage() {
             <Empty className="py-16">
               <EmptyHeader>
                 <EmptyMedia variant="icon"><Baby /></EmptyMedia>
-                <EmptyTitle>Belum ada data yang terhubung.</EmptyTitle>
+                <EmptyTitle>Data belum bisa ditampilkan.</EmptyTitle>
                 <EmptyDescription>
-                  Hubungi admin lembaga untuk menghubungkan data Anda.
+                  Ini seharusnya otomatis terhubung. Coba muat ulang halaman, atau hubungi
+                  Admin/Developer bila terus berlanjut.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

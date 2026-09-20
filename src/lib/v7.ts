@@ -7,7 +7,10 @@ import { getSessionProfile } from "@/lib/auth";
 import { type JournalFieldDef, type JournalFieldDto } from "@/lib/v7-shared";
 
 /**
- * TAHFIZH V7 — Target / Tugas / Custom Jurnal data access (SERVER ONLY).
+ * TAHFIZH V7 — Tugas / Custom Jurnal data access (SERVER ONLY).
+ *
+ * (Target per santri sudah dihapus di V17 — target kini per halaqah, lihat
+ * lib/target-halaqah.ts.)
  *
  * All identity (tenant/teacher/student) resolves from the server session,
  * never the client (rule #42). Lists and details come from SECURITY DEFINER
@@ -42,93 +45,6 @@ export const getV7TeacherForSession = cache(async () => {
     .maybeSingle();
   return teacher ?? null;
 });
-
-/* -------------------------------- TARGET ---------------------------------- */
-
-export type TargetRow = {
-  id: string;
-  studentId: string;
-  studentName: string;
-  studentCode: string;
-  moduleType: string;
-  title: string;
-  description: string | null;
-  startDate: string;
-  endDate: string;
-  targetValue: number;
-  currentValue: number;
-  unit: string | null;
-  status: string;
-  note: string | null;
-  teacherName: string | null;
-  updatedAt: string;
-};
-
-function mapTarget(r: Record<string, unknown>): TargetRow {
-  return {
-    id: r.id as string,
-    studentId: r.student_id as string,
-    studentName: r.student_name as string,
-    studentCode: r.student_code as string,
-    moduleType: r.module_type as string,
-    title: r.title as string,
-    description: (r.description as string | null) ?? null,
-    startDate: r.start_date as string,
-    endDate: r.end_date as string,
-    targetValue: Number(r.target_value ?? 0),
-    currentValue: Number(r.current_value ?? 0),
-    unit: (r.unit as string | null) ?? null,
-    status: r.status as string,
-    note: (r.note as string | null) ?? null,
-    teacherName: (r.teacher_name as string | null) ?? null,
-    updatedAt: r.updated_at as string,
-  };
-}
-
-export async function getTargetTeacherList(): Promise<TargetRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("target_teacher_list");
-  if (error) {
-    console.error("target_teacher_list failed:", error.message);
-    return [];
-  }
-  return ((data ?? []) as Record<string, unknown>[]).map(mapTarget);
-}
-
-export async function getTargetDetail(targetId: string): Promise<TargetRow | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("target_student_detail", { p_target_id: targetId });
-  if (error || !data || data.length === 0) return null;
-  return mapTarget((data as Record<string, unknown>[])[0]);
-}
-
-export type TargetHistoryRow = {
-  id: string;
-  oldValue: number | null;
-  newValue: number | null;
-  oldStatus: string | null;
-  newStatus: string | null;
-  source: string;
-  createdAt: string;
-};
-
-export async function getTargetHistory(targetId: string): Promise<TargetHistoryRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("target_progress_history_list", { p_target_id: targetId });
-  if (error) {
-    console.error("target_progress_history_list failed:", error.message);
-    return [];
-  }
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    id: r.id as string,
-    oldValue: (r.old_value as number | null) ?? null,
-    newValue: (r.new_value as number | null) ?? null,
-    oldStatus: (r.old_status as string | null) ?? null,
-    newStatus: (r.new_status as string | null) ?? null,
-    source: r.source as string,
-    createdAt: r.created_at as string,
-  }));
-}
 
 /* --------------------------------- TUGAS ---------------------------------- */
 
@@ -356,6 +272,7 @@ export async function getJournalEntryDetail(entryId: string): Promise<JournalEnt
 
 /* ----------------------- DASHBOARD / STUDENT SUMMARY ---------------------- */
 
+/** `targets` = jumlah target halaqah yang masih berlaku (V17, per halaqah). */
 export type V7TeacherCounts = { targets: number; tasks: number; journals: number };
 
 export async function getV7TeacherCounts(teacherId: string): Promise<V7TeacherCounts> {
@@ -375,8 +292,6 @@ export async function getV7TeacherCounts(teacherId: string): Promise<V7TeacherCo
 }
 
 export type V7StudentSummary = {
-  activeTargets: number;
-  avgProgress: number;
   activeTasks: number;
   journalMonth: number;
 };
@@ -387,14 +302,12 @@ export async function getV7StudentSummary(studentId: string): Promise<V7StudentS
   if (error || !data || data.length === 0) return null;
   const r = (data as Record<string, unknown>[])[0];
   return {
-    activeTargets: Number(r.active_targets ?? 0),
-    avgProgress: Number(r.avg_progress ?? 0),
     activeTasks: Number(r.active_tasks ?? 0),
     journalMonth: Number(r.journal_month ?? 0),
   };
 }
 
-/** Assigned students of this guru (for target/task/journal forms). */
+/** Assigned students of this guru (for task/journal forms). */
 export const getV7AssignedStudents = cache(async () => {
   const teacher = await getV7TeacherForSession();
   if (!teacher) return [];

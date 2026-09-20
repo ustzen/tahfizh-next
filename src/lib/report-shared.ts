@@ -150,7 +150,6 @@ export type ReportData = {
     hadits?: { count?: number; total?: number; avgValue?: number | null; lastLabel?: string | null };
     doa?: { count?: number; total?: number; avgValue?: number | null; lastLabel?: string | null };
     tajwid?: { count?: number; total?: number; avgValue?: number | null; lastLabel?: string | null };
-    target?: { active?: number; avgProgress?: number };
     tugas?: { total?: number; dinilai?: number; avgValue?: number | null };
     jurnal?: number;
   };
@@ -165,7 +164,6 @@ export const MODULE_LABELS: Record<string, string> = {
   HADITS: "Hadits",
   DOA: "Doa Harian",
   TAJWID: "Tajwid",
-  TARGET: "Target",
   TUGAS: "Tugas",
 };
 
@@ -206,7 +204,6 @@ export const SAMPLE_REPORT_DATA: ReportData = {
     hadits: { count: 12, total: 15, avgValue: 90, lastLabel: "Hadits Niat" },
     doa: { count: 14, total: 18, avgValue: 92, lastLabel: "Doa Masuk Masjid" },
     tajwid: { count: 9, total: 12, avgValue: 86, lastLabel: "Mad Thabi'i" },
-    target: { active: 3, avgProgress: 76 },
     tugas: { total: 10, dinilai: 9, avgValue: 87 },
     jurnal: 21,
   },

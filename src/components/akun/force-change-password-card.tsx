@@ -40,11 +40,7 @@ export function ForceChangePasswordCard() {
               Akun Anda masih memakai password sementara dari admin. Wajib diganti sebelum
               menggunakan aplikasi.
             </p>
-            <form action={formAction} className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="force-current">Password Sementara</Label>
-                <PasswordInput id="force-current" name="currentPassword" required autoComplete="current-password" />
-              </div>
+            <form action={formAction} className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="force-new">Password Baru</Label>
                 <PasswordInput id="force-new" name="password" required minLength={8} autoComplete="new-password" placeholder="Minimal 8 karakter" />
@@ -53,7 +49,7 @@ export function ForceChangePasswordCard() {
                 <Label htmlFor="force-confirm">Konfirmasi</Label>
                 <PasswordInput id="force-confirm" name="confirmPassword" required minLength={8} autoComplete="new-password" placeholder="Ulangi password baru" />
               </div>
-              <div className="sm:col-span-3">
+              <div className="sm:col-span-2">
                 <Button type="submit" disabled={pending} className="bg-gradient-brand hover:opacity-90">
                   {pending && <Spinner />} Simpan Password Baru
                 </Button>

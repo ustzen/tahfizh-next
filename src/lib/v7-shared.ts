@@ -1,59 +1,9 @@
 /**
- * TAHFIZH V7 — client-safe Target / Tugas / Jurnal constants (no server
- * imports). Server data access lives in target.ts, task.ts, journal.ts
- * (import "server-only").
+ * TAHFIZH V7 — client-safe Tugas / Jurnal constants (no server imports).
+ * Server data access lives in lib/v7.ts (import "server-only").
+ *
+ * Target per halaqah (V17) punya konstanta sendiri di lib/target-shared.ts.
  */
-
-/* ------------------------------- TARGET ---------------------------------- */
-
-export const TARGET_MODULES = [
-  "TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID", "CUSTOM",
-] as const;
-export type TargetModule = (typeof TARGET_MODULES)[number];
-
-export const TARGET_MODULE_LABELS: Record<TargetModule, string> = {
-  TAHFIDZ: "Tahfidz",
-  TARTIL: "Tartil",
-  SETORAN: "Setoran",
-  HADITS: "Hadits",
-  DOA: "Doa Harian",
-  TAJWID: "Tajwid",
-  CUSTOM: "Custom",
-};
-
-export const TARGET_STATUSES = [
-  "BELUM_MULAI", "BERJALAN", "TERCAPAI", "TERLAMBAT", "DIBATALKAN",
-] as const;
-export type TargetStatus = (typeof TARGET_STATUSES)[number];
-
-export const TARGET_STATUS_STYLES: Record<TargetStatus, string> = {
-  BELUM_MULAI: "border-slate-200 bg-slate-100 text-slate-600",
-  BERJALAN: "border-blue-200 bg-blue-50 text-blue-700",
-  TERCAPAI: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  TERLAMBAT: "border-amber-200 bg-amber-50 text-amber-700",
-  DIBATALKAN: "border-slate-200 bg-slate-100 text-slate-500",
-};
-
-export const TARGET_STATUS_LABELS: Record<TargetStatus, string> = {
-  BELUM_MULAI: "Belum Mulai",
-  BERJALAN: "Berjalan",
-  TERCAPAI: "Tercapai",
-  TERLAMBAT: "Terlambat",
-  DIBATALKAN: "Dibatalkan",
-};
-
-export function targetStatusLabel(v: string): string {
-  return TARGET_STATUS_LABELS[v as TargetStatus] ?? v;
-}
-
-export function targetStatusStyle(v: string): string {
-  return TARGET_STATUS_STYLES[v as TargetStatus] ?? TARGET_STATUS_STYLES.BELUM_MULAI;
-}
-
-export function targetPercent(current: number, target: number): number {
-  if (!target || target <= 0) return 0;
-  return Math.min(100, Math.round((current / target) * 100));
-}
 
 /* -------------------------------- TUGAS ---------------------------------- */
 

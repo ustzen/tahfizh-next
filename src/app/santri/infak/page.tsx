@@ -1,6 +1,7 @@
-import { Lock } from "lucide-react";
+import { AlertTriangle, Lock } from "lucide-react";
 
 import { PageHeader, CardBox } from "@/components/dashboard/section";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { requireRole } from "@/lib/auth";
 import { getPaymentGate, getWaliHistory, getWaliInvoices, getWaliTransactions } from "@/lib/v10";
 import { WaliPaymentPanel } from "@/components/infak/wali-payment-panel";
@@ -97,10 +98,21 @@ export default async function SantriInfakPage() {
         <InfakHistoryCard history={history} />
         </div>
       ) : (
-        <CardBox>
-          <p className="text-muted-foreground text-sm">
-            Data infak belum tersedia. Pastikan akun Anda sudah terhubung dengan data santri.
-          </p>
+        <CardBox className="p-0">
+          <Empty className="py-14">
+            <EmptyMedia
+              variant="icon"
+              className="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+            >
+              <AlertTriangle />
+            </EmptyMedia>
+            <EmptyTitle>Data infak belum bisa ditampilkan</EmptyTitle>
+            <EmptyDescription>
+              Ini bukan sesuatu yang perlu Anda atur sendiri — akun santri seharusnya otomatis
+              terhubung ke datanya sendiri. Kemungkinan ada gangguan sementara pada sistem.
+              Silakan muat ulang halaman, atau hubungi Admin/Developer bila terus berlanjut.
+            </EmptyDescription>
+          </Empty>
         </CardBox>
       )}
     </div>

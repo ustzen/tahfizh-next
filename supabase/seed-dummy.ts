@@ -358,7 +358,6 @@ async function main() {
               { module: "HADITS", label: "Hadits", value: "88", predicate: "B", description: "Hafalan hadits pilihan baik." },
               { module: "DOA", label: "Doa Harian", value: "92", predicate: "A", description: "Hafalan doa harian lengkap." },
               { module: "TAJWID", label: "Tajwid", value: "89", predicate: "B", description: "Penerapan tajwid makin ringkas." },
-              { module: "TARGET", label: "Target", value: "100", predicate: "A", description: "Target semester tercapai." },
               { module: "TUGAS", label: "Tugas", value: "91", predicate: "A", description: "Tugas dikerjakan tertib." },
             ],
             attendance: { hadir: 92, izin: 3, sakit: 2, alpa: 1, persen: 94 },
