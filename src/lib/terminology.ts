@@ -80,6 +80,8 @@ export type NavKey =
   | "halaqah"
   | "presensi"
   | "anak"
+  | "prestasi"
+  | "pantauan"
   | "infak"
   | "akademik"
   | "onboarding"
@@ -124,6 +126,8 @@ const NAV_GROUP_OF: Record<NavKey, NavGroupKey> = {
   perkembangan: "laporan",
   raport: "laporan",
   anak: "master",
+  prestasi: "laporan",
+  pantauan: "pembelajaran",
   infak: "keuangan",
   saran: "komunitas",
   pengaturan: "pengaturan",
@@ -194,8 +198,14 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
   WALI_SANTRI: [
     { key: "dashboard", label: "Dashboard", href: "/santri" },
     { key: "anak", label: "Data Saya", href: "/santri/anak" },
+    // V18 — pantauan mandiri santri, sinkron dengan penilaian guru.
+    { key: "pantauan", label: "Pantauan Pembelajaran", href: "/santri/pantauan" },
+    { key: "target", label: "Target", href: "/santri/target" },
+    { key: "presensi", label: "Presensi", href: "/santri/presensi" },
+    { key: "prestasi", label: "Kartu Prestasi", href: "/santri/prestasi" },
     { key: "perkembangan", label: "Riwayat Perkembangan", href: "/santri/perkembangan" },
-    { key: "infak", label: "Infak", href: "/santri/infak" },
+    { key: "raport", label: "Raport", href: "/santri/raport" },
+    { key: "infak", label: "Infak Pengembangan", href: "/santri/infak" },
     { key: "saran", label: "Kritik & Saran", href: "/santri/saran" },
     { key: "pengaturan", label: "Pengaturan", href: "/santri/pengaturan" },
   ],
