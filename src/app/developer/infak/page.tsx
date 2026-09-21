@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, Coins, Hourglass, Landmark } from "lucide-react";
+import { ArrowRight, Building2, Coins, HandCoins, Hourglass, Landmark } from "lucide-react";
 
 import { StatCard } from "@/components/stat-card";
 import { PageHeader, CardBox, SectionTitle } from "@/components/dashboard/section";
@@ -34,6 +34,11 @@ export default async function DeveloperInfakPage() {
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
               <Link href="/developer/infak/transaksi">Semua Transaksi</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/developer/infak/pelunasan">
+                <HandCoins className="size-4" /> Pelunasan
+              </Link>
             </Button>
             <Button asChild variant="outline">
               <Link href="/developer/infak/pengaturan">
@@ -114,6 +119,26 @@ export default async function DeveloperInfakPage() {
             ))}
           </ul>
         )}
+      </CardBox>
+
+      {/* Pelunasan manual oleh Developer */}
+      <CardBox className="mt-6">
+        <SectionTitle
+          tone="emerald"
+          icon={<HandCoins />}
+          title="Pelunasan oleh Developer"
+          description="untuk infak yang diterima di luar aplikasi (tunai, donatur, transfer lain)"
+          action={
+            <Link href="/developer/infak/pelunasan" className="text-role-strong inline-flex items-center gap-1 text-sm font-semibold hover:underline">
+              Buka <ArrowRight className="size-3.5" />
+            </Link>
+          }
+        />
+        <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+          Pilih santri yang menunggak (diurutkan dari tunggakan paling lama), tuliskan{" "}
+          <span className="font-medium text-foreground">dibayarkan oleh siapa</span>, lalu lunasi. Nama pembayar
+          dan tanggal pelunasan langsung tampil pada riwayat infak santri yang bersangkutan.
+        </p>
       </CardBox>
 
       {/* Ketentuan + rekening */}

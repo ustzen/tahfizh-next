@@ -19,6 +19,7 @@ import {
   type PaymentItem,
 } from "@/app/actions/v10";
 import {
+  ANONYMOUS_PAYER_NAME,
   DUE_DAY,
   INFAK_MIN_AMOUNT,
   IPAYMU_MIN_TOTAL,
@@ -87,6 +88,9 @@ export function WaliPaymentPanel({
   const [othersQuery, setOthersQuery] = useState("");
   const [othersShown, setOthersShown] = useState(10);
   const [othersOpen, setOthersOpen] = useState<Record<string, boolean>>({});
+  // "Dibayarkan atas nama" — dipakai bila ingin infak untuk santri lain tanpa
+  // menampilkan nama asli (mis. "Hamba Allah").
+  const [payerAlias, setPayerAlias] = useState("");
 
   const pendingTx = transactions.find((t) => t.status === "PENDING");
   const locked = pending || pendingTx !== undefined;
@@ -141,6 +145,18 @@ export function WaliPaymentPanel({
     setError(null);
   }
 
+  /** Pilih N santri lain dengan tunggakan paling lama (seluruh bulannya). */
+  function pickOldestOthers(n: number) {
+    setError(null);
+    setSelected((prev) => {
+      const next = { ...prev };
+      for (const o of others.slice(0, n)) {
+        for (const inv of o.invoices.filter(isSelectable)) next[keyOf(o.studentId, inv.y, inv.m)] = inv.amount;
+      }
+      return next;
+    });
+  }
+
   /* ---- bayar ------------------------------------------------------------ */
   function handlePay(method: "MANUAL" | "IPAYMU") {
     setError(null);
@@ -162,7 +178,7 @@ export function WaliPaymentPanel({
     }
     const payTotal = total;
     startTransition(async () => {
-      const res = await initiatePaymentAction(items, method);
+      const res = await initiatePaymentAction(items, method, payerAlias.trim());
       if (res.error) {
         setError(res.error);
         return;
@@ -381,6 +397,24 @@ export function WaliPaymentPanel({
                 </p>
               </div>
 
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground text-xs">Bantu yang paling lama menunggak:</span>
+                {[1, 3, 5].map((n) => (
+                  <Button
+                    key={n}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 bg-white px-2.5 text-xs dark:bg-transparent"
+                    disabled={locked || others.length < n}
+                    onClick={() => pickOldestOthers(n)}
+                  >
+                    {n} santri
+                  </Button>
+                ))}
+                <span className="text-muted-foreground text-xs">({others.length} santri menunggak)</span>
+              </div>
+
               <div className="relative">
                 <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                 <Input
@@ -533,6 +567,35 @@ export function WaliPaymentPanel({
                   />
                 </div>
               </div>
+
+              {studentCount > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  <Label htmlFor="infak-alias" className="text-xs">
+                    Dibayarkan atas nama (opsional) — nama ini yang dilihat santri penerima
+                  </Label>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Input
+                      id="infak-alias"
+                      value={payerAlias}
+                      onChange={(e) => setPayerAlias(e.target.value)}
+                      maxLength={60}
+                      placeholder="Kosongkan untuk memakai nama Anda"
+                      className="h-8 w-56 bg-white dark:bg-transparent"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={payerAlias === ANONYMOUS_PAYER_NAME ? "default" : "outline"}
+                      className="h-8"
+                      onClick={() =>
+                        setPayerAlias((v) => (v === ANONYMOUS_PAYER_NAME ? "" : ANONYMOUS_PAYER_NAME))
+                      }
+                    >
+                      {ANONYMOUS_PAYER_NAME}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

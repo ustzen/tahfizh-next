@@ -62,6 +62,15 @@ export default async function DeveloperTransactionDetailPage({
               <dt className="text-muted-foreground">Pembayar</dt>
               <dd className="font-medium text-foreground">{tx.payerName}</dd>
             </div>
+            {tx.payerAlias && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Dibayarkan atas nama</dt>
+                <dd className="font-medium text-foreground">
+                  {tx.payerAlias}
+                  <span className="text-muted-foreground ml-1 text-xs">(tampil ke santri)</span>
+                </dd>
+              </div>
+            )}
             {tx.tenantName && (
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Lembaga</dt>
@@ -168,7 +177,9 @@ export default async function DeveloperTransactionDetailPage({
                 {tx.status === "PENDING"
                   ? "Wali belum mengunggah bukti transfer."
                   : tx.status === "PAID"
-                    ? "Transaksi sudah lunas."
+                    ? tx.method === "OFFLINE"
+                      ? `Pelunasan dicatat Developer atas nama ${tx.payerAlias ?? tx.payerName}.`
+                      : "Transaksi sudah lunas."
                     : "Transaksi ini tidak dapat dikonfirmasi ulang."}
               </p>
             </CardBox>

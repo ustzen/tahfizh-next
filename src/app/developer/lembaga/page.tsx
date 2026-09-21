@@ -18,13 +18,21 @@ export default async function LembagaListPage() {
   await requireRole(["DEVELOPER"], "/developer/lembaga");
   const supabase = await createClient();
 
-  // Join admin profile per tenant (first ADMIN of each tenant).
-  const { data: tenants } = await supabase
+  const { data: tenants, error: tenantsError } = await supabase
     .from("tenants")
-    .select("id, business_code, name, kind, status, created_at, profiles(full_name, email_role)")
+    .select("id, business_code, name, kind, status, created_at")
     .order("business_code");
 
-  // The join above doesn't filter admins client-side; fetch admins separately.
+  if (tenantsError) {
+    console.error("[developer/lembaga] gagal memuat tenants:", tenantsError.message);
+  }
+
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  // Admin per tenant (first ADMIN of each tenant), diambil terpisah karena
+  // tenants <-> profiles tidak selalu di-embed lewat satu query select().
   const { data: admins } = await supabase
     .from("profiles")
     .select("id, full_name, tenant_id")
@@ -38,6 +46,18 @@ export default async function LembagaListPage() {
   return (
     <div>
       <PageHeader title="Lembaga" description="Seluruh lembaga terdaftar di platform TAHFIZH." />
+
+      {/* DEBUG SEMENTARA — hapus blok ini setelah penyebab menu kosong ketemu. */}
+      <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+        <p>auth.uid() sesi ini: <span className="font-mono">{authUser?.id ?? "null (tidak login / cookie tidak terbaca)"}</span></p>
+        <p>Jumlah baris tenants yang berhasil diambil: {tenants?.length ?? 0}</p>
+        {tenantsError && (
+          <>
+            <p className="mt-1 font-semibold text-rose-700 dark:text-rose-300">Error query: {tenantsError.message}</p>
+            <p className="text-rose-700 dark:text-rose-300">Code: {tenantsError.code} · Detail: {tenantsError.details || "-"}</p>
+          </>
+        )}
+      </div>
 
       <Card className="shadow-card rounded-2xl">
         <CardContent className="px-0 py-0">

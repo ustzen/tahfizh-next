@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
-import { dbErrorMessage, isValidWaNumber, MAX_PAYMENT_ITEMS } from "@/lib/v10-shared";
+import { dbErrorMessage, isValidWaNumber, MAX_PAYMENT_ITEMS, MAX_SETTLE_ITEMS } from "@/lib/v10-shared";
 import { createRedirectPayment, isIpaymuConfigured } from "@/lib/ipaymu";
 
 export type V10Result = { error?: string; success?: string; data?: Record<string, unknown> };
@@ -123,6 +123,56 @@ export async function confirmPaymentAction(_prev: V10Result | null, formData: Fo
 }
 
 /* ------------------------------------------------------------------------ */
+/* DEVELOPER — pelunasan langsung (pembayaran diterima di luar aplikasi)    */
+/* ------------------------------------------------------------------------ */
+
+export type SettleItem = { studentId: string; y: number; m: number; amount?: number };
+
+/**
+ * Melunasi tagihan infak sejumlah santri sekaligus dan MENCATAT SIAPA yang
+ * membayarkan. Nama pembayar tampil pada riwayat infak santri terkait.
+ */
+export async function settleInvoicesAction(
+  items: SettleItem[],
+  payerName: string,
+  note: string = "",
+  force: boolean = false
+): Promise<V10Result> {
+  const session = await getSessionProfile();
+  if (!session || session.role !== "DEVELOPER") return { error: "Akses ditolak." };
+
+  const name = String(payerName ?? "").trim();
+  if (name.length < 2) return { error: "Tuliskan nama pembayar infak terlebih dahulu." };
+  if (name.length > 120) return { error: "Nama pembayar maksimal 120 karakter." };
+  if (!Array.isArray(items) || items.length === 0) return { error: "Pilih minimal satu tagihan." };
+  if (items.length > MAX_SETTLE_ITEMS)
+    return { error: `Terlalu banyak tagihan sekaligus (maksimal ${MAX_SETTLE_ITEMS}). Lunasi bertahap.` };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("payment_dev_settle", {
+    p_items: items.map((i) => ({
+      studentId: String(i.studentId ?? ""),
+      y: Math.trunc(Number(i.y)),
+      m: Math.trunc(Number(i.m)),
+      amount: i.amount == null ? null : Math.trunc(Number(i.amount)),
+    })),
+    p_payer_name: name,
+    p_note: String(note ?? "").trim() || null,
+    p_force: force === true,
+  });
+  if (error) return { error: dbErrorMessage(error.message) };
+
+  const res = (data ?? {}) as { invoices?: number; students?: number; total?: number; cancelled?: number };
+  for (const path of DEV_INFAK_PATHS) revalidatePath(path);
+  revalidatePath("/developer/infak/pelunasan");
+  revalidatePath("/santri/infak");
+  return {
+    success: `${Number(res.invoices ?? 0)} tagihan (${Number(res.students ?? 0)} santri) dilunasi atas nama ${name}.`,
+    data: res as Record<string, unknown>,
+  };
+}
+
+/* ------------------------------------------------------------------------ */
 /* WALI — payments                                                          */
 /* ------------------------------------------------------------------------ */
 
@@ -140,7 +190,8 @@ async function appBaseUrl(): Promise<string> {
 /** Start a payment (MANUAL or IPAYMU). Server recomputes/validates everything. */
 export async function initiatePaymentAction(
   items: PaymentItem[],
-  method: "MANUAL" | "IPAYMU"
+  method: "MANUAL" | "IPAYMU",
+  payerAlias: string = ""
 ): Promise<V10Result> {
   const session = await getSessionProfile();
   if (!session || session.role !== "WALI_SANTRI") return { error: "Akses ditolak." };
@@ -148,6 +199,9 @@ export async function initiatePaymentAction(
   if (items.length > MAX_PAYMENT_ITEMS)
     return { error: `Terlalu banyak tagihan dalam satu pembayaran (maksimal ${MAX_PAYMENT_ITEMS}). Bayar bertahap.` };
   if (method !== "MANUAL" && method !== "IPAYMU") return { error: "Metode pembayaran tidak valid." };
+
+  const alias = String(payerAlias ?? "").trim();
+  if (alias.length > 60) return { error: "Nama pembayar maksimal 60 karakter." };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("payment_initiate", {
@@ -158,6 +212,7 @@ export async function initiatePaymentAction(
       amount: Math.trunc(Number(i.amount)),
     })),
     p_method: method,
+    p_payer_alias: alias || null,
   });
   if (error) return { error: dbErrorMessage(error.message) };
 

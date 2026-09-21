@@ -131,6 +131,30 @@ export type WaliHistoryChild = {
   items: WaliHistoryItem[];
 };
 
+/** Satu santri menunggak (sudut pandang Developer, lintas lembaga). */
+export type DevArrearStudent = {
+  studentId: string;
+  name: string;
+  code: string;
+  tenantId: string;
+  tenantName: string;
+  tenantCode: string;
+  oldestY: number;
+  oldestM: number;
+  monthsBehind: number;
+  unpaidCount: number;
+  unpaidTotal: number;
+  invoices: WaliInvoiceItem[];
+};
+
+export type DevArrearsData = {
+  y: number;
+  m: number;
+  defaultAmount: number;
+  tenants: { id: string; name: string; code: string }[];
+  students: DevArrearStudent[];
+};
+
 export type WaliMonthlyStatus = {
   studentId: string;
   name: string;
@@ -141,6 +165,7 @@ export type WaliMonthlyStatus = {
   paidAt: string | null;
   paidByName: string | null;
   paidBySelf: boolean;
+  paidVia?: string | null;
   bundleMonths: number | null;
 };
 
@@ -173,6 +198,8 @@ export type TxDistribution = {
   id: string;
   reference: string;
   payerName: string;
+  /** "Dibayarkan atas nama" — yang ditampilkan ke santri bila diisi. */
+  payerAlias?: string | null;
   tenantName?: string;
   tenantCode?: string;
   method: string;
@@ -389,6 +416,27 @@ export async function getDevTransactionDetail(id: string): Promise<TxDistributio
   if (!profile || profile.role !== "DEVELOPER") return null;
   try {
     return await callRpc<TxDistribution>("payment_dev_detail", { p_transaction_id: id });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Daftar santri menunggak untuk layar pelunasan Developer — seluruh lembaga,
+ * diurutkan dari tunggakan paling lama.
+ */
+export async function getDevArrears(
+  query: string = "",
+  tenantId: string = ""
+): Promise<DevArrearsData | null> {
+  const profile = await getSessionProfile();
+  if (!profile || profile.role !== "DEVELOPER") return null;
+  try {
+    return await callRpc<DevArrearsData>("payment_dev_arrears", {
+      p_query: query || null,
+      p_tenant_id: tenantId || null,
+      p_limit: 200,
+    });
   } catch {
     return null;
   }

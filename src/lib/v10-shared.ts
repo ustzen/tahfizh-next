@@ -41,7 +41,14 @@ export const TRANSACTION_STATUS_LABEL: Record<string, string> = {
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   MANUAL: "Transfer Manual",
   IPAYMU: "Otomatis (iPaymu)",
+  OFFLINE: "Pelunasan Dicatat Developer",
 };
+
+/** Batas santri yang boleh dilunasi Developer dalam satu kali proses. */
+export const MAX_SETTLE_ITEMS = 300;
+
+/** Pilihan cepat nama pembayar saat infak ingin disamarkan. */
+export const ANONYMOUS_PAYER_NAME = "Hamba Allah";
 
 export const FEEDBACK_CATEGORY_LABEL: Record<string, string> = {
   KRITIK: "Kritik",
@@ -182,6 +189,7 @@ export function paidNote(p: {
   paidBySelf: boolean;
   bundleMonths: number | null;
   paidInAdvance?: boolean;
+  paidVia?: string | null;
 }): string {
   const parts: string[] = [];
   const date = formatDateId(p.paidAt);
@@ -190,6 +198,7 @@ export function paidNote(p: {
   if ((p.bundleMonths ?? 0) > 1) parts.push(`sekaligus ${p.bundleMonths} bulan`);
   if (p.paidBySelf) parts.push("dibayar sendiri");
   else if (p.paidByName) parts.push(`oleh ${p.paidByName}`);
+  if (p.paidVia === "OFFLINE") parts.push("dicatat pengelola platform");
   return parts.join(" · ");
 }
 
@@ -220,6 +229,9 @@ export const DB_ERROR_MESSAGE: Record<string, string> = {
   GURU_TIDAK_DITEMUKAN: "Guru tidak ditemukan.",
   FEEDBACK_TIDAK_DITEMUKAN: "Masukan tidak ditemukan.",
   STATUS_TIDAK_VALID: "Status tidak valid.",
+  NAMA_TERLALU_PANJANG: "Nama pembayar maksimal 60 karakter.",
+  NAMA_PEMBAYAR_WAJIB: "Tuliskan nama pembayar infak terlebih dahulu.",
+  NAMA_PEMBAYAR_TIDAK_VALID: "Nama pembayar harus 2-120 karakter.",
 };
 
 /** Map a DB error (message or code prefix) to a friendly Indonesian message. */
