@@ -1,7 +1,6 @@
-import { AlertTriangle, Lock } from "lucide-react";
+import { Info, Lock } from "lucide-react";
 
 import { PageHeader, CardBox } from "@/components/dashboard/section";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { requireRole } from "@/lib/auth";
 import { getPaymentGate, getWaliHistory, getWaliInvoices, getWaliTransactions } from "@/lib/v10";
 import { WaliPaymentPanel } from "@/components/infak/wali-payment-panel";
@@ -82,39 +81,38 @@ export default async function SantriInfakPage() {
         description="Dukung pengembangan TAHFIZH — mulai Rp1.000 per bulan per santri. Bisa untuk beberapa bulan sekaligus dan untuk santri lain di lembaga Anda."
       />
 
-      {invoices ? (
-        <div className="space-y-6">
+      {/* V18 — panel infak SELALU tampil. Bila RPC tagihan sedang tidak dapat
+          dibaca, panel tetap dirender dengan nilai dasar agar santri tetap bisa
+          melihat nominal, rekening, dan riwayatnya. */}
+      {!invoices && (
+        <CardBox className="mb-6 border-sky-200 bg-sky-50 dark:border-sky-500/25 dark:bg-sky-500/10">
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+              <Info className="size-4.5" />
+            </span>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Rincian tagihan bulan ini belum termuat. Anda tetap dapat melihat nominal infak,
+              informasi rekening, dan riwayat pembayaran di bawah. Muat ulang halaman bila
+              tagihan belum muncul.
+            </p>
+          </div>
+        </CardBox>
+      )}
+
+      <div className="space-y-6">
         <WaliPaymentPanel
-          kids={invoices.children}
-          others={invoices.others}
-          defaultAmount={invoices.defaultAmount}
-          academicYear={invoices.academicYear}
+          kids={invoices?.children ?? []}
+          others={invoices?.others ?? []}
+          defaultAmount={invoices?.defaultAmount ?? 1000}
+          academicYear={invoices?.academicYear ?? "-"}
           bank={bank}
           transactions={transactions}
           autoEnabled={isIpaymuConfigured()}
-          currentY={invoices.y}
-          currentM={invoices.m}
+          currentY={invoices?.y ?? new Date().getFullYear()}
+          currentM={invoices?.m ?? new Date().getMonth() + 1}
         />
         <InfakHistoryCard history={history} />
-        </div>
-      ) : (
-        <CardBox className="p-0">
-          <Empty className="py-14">
-            <EmptyMedia
-              variant="icon"
-              className="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
-            >
-              <AlertTriangle />
-            </EmptyMedia>
-            <EmptyTitle>Data infak belum bisa ditampilkan</EmptyTitle>
-            <EmptyDescription>
-              Ini bukan sesuatu yang perlu Anda atur sendiri — akun santri seharusnya otomatis
-              terhubung ke datanya sendiri. Kemungkinan ada gangguan sementara pada sistem.
-              Silakan muat ulang halaman, atau hubungi Admin/Developer bila terus berlanjut.
-            </EmptyDescription>
-          </Empty>
-        </CardBox>
-      )}
+      </div>
     </div>
   );
 }

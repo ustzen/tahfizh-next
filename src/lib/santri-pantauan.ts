@@ -12,7 +12,6 @@ import type {
   PantauanItem,
   PresensiRekap,
   PrestasiCard,
-  RaportItem,
   TargetProgress,
 } from "@/lib/santri-pantauan-shared";
 
@@ -43,8 +42,4 @@ export function getPresensiRekap(months = 6) {
 
 export function getTargetProgress() {
   return rpc<TargetProgress>("santri_target_progress");
-}
-
-export function getRaportList() {
-  return rpc<RaportItem>("santri_raport_list");
 }

@@ -4,7 +4,6 @@ import {
   AudioLines,
   Award,
   CalendarCheck,
-  FileText,
   HandCoins,
   LayoutDashboard,
   Lock,
@@ -117,13 +116,12 @@ export default async function SantriDashboardPage() {
       {mustChangePassword && <ForceChangePasswordCard />}
 
       {/* V18 — pintasan menu pantauan (sinkron dengan penilaian guru) */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { href: "/santri/prestasi", label: "Kartu Prestasi", desc: "Rangkuman capaian", Icon: Award, tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
           { href: "/santri/pantauan", label: "Pantauan", desc: "Semua penilaian guru", Icon: Activity, tone: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
           { href: "/santri/target", label: "Target", desc: "Progres target halaqah", Icon: TargetIcon, tone: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
           { href: "/santri/presensi", label: "Presensi", desc: "Rekap kehadiran", Icon: CalendarCheck, tone: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" },
-          { href: "/santri/raport", label: "Raport", desc: "Raport final", Icon: FileText, tone: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
         ].map(({ href, label, desc, Icon, tone }) => (
           <Link
             key={href}

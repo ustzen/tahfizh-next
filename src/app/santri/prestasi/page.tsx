@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
 import { getPrestasiCards } from "@/lib/santri-pantauan";
 import {
+  EMPTY_MODULE_STAT,
+  MODULE_ORDER,
   badgesFor,
   moduleLabel,
   moduleTone,
   persen,
   predikat,
   tanggalId,
+  type ModuleStat,
 } from "@/lib/santri-pantauan-shared";
 
 export const metadata: Metadata = { title: "Kartu Prestasi" };
@@ -116,26 +119,49 @@ export default async function SantriPrestasiPage() {
                   </div>
                 )}
 
-                {/* Rekap penilaian per modul */}
-                <div className="mt-4">
+                {/* Kartu pencapaian per modul — selalu tampil lengkap,
+                    modul yang belum dinilai ditampilkan dengan angka 0. */}
+                <div className="mt-5">
                   <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-widest">
-                    <BookOpenCheck className="size-3.5" /> Penilaian per modul
+                    <BookOpenCheck className="size-3.5" /> Pencapaian per modul
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(c.modules)
-                      .filter(([, n]) => n > 0)
-                      .map(([key, n]) => (
-                        <span
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {MODULE_ORDER.map((key) => {
+                      const st: ModuleStat = c.moduleStats?.[key] ?? EMPTY_MODULE_STAT;
+                      const kosong = st.count === 0;
+                      return (
+                        <div
                           key={key}
-                          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${moduleTone(key)}`}
+                          className={`rounded-xl border px-3.5 py-3 ${kosong ? "opacity-70" : ""}`}
                         >
-                          {moduleLabel(key)}
-                          <span className="tabular font-bold">{n}</span>
-                        </span>
-                      ))}
-                    {Object.values(c.modules).every((n) => n === 0) && (
-                      <span className="text-muted-foreground text-xs italic">Belum ada penilaian tercatat.</span>
-                    )}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`rounded-lg px-2 py-0.5 text-[0.7rem] font-bold ${moduleTone(key)}`}>
+                              {moduleLabel(key)}
+                            </span>
+                            <span className="tabular text-lg font-bold leading-none">
+                              {st.avgScore ?? "—"}
+                            </span>
+                          </div>
+                          <p className="text-muted-foreground mt-2 text-xs">
+                            <span className="tabular text-foreground font-semibold">{st.count}</span> penilaian
+                            {key === "TAHFIDZ" ? (
+                              <>
+                                {" · "}
+                                <span className="tabular text-foreground font-semibold">
+                                  {c.surahSelesai}/{c.surahTotal || 0}
+                                </span>{" "}
+                                surat
+                              </>
+                            ) : null}
+                          </p>
+                          <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                            {kosong
+                              ? "Belum ada penilaian"
+                              : `${st.lastTitle ?? "-"} · ${tanggalId(st.lastDate)}`}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

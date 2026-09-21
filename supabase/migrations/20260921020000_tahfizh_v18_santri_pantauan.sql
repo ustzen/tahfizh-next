@@ -85,33 +85,62 @@ begin
     order by hs.student_id, hs.joined_at desc
   ),
   nilai as (
-    select a.student_id, x.modul, x.score_value, x.tgl
+    select a.student_id, x.modul, x.score_value, x.tgl, x.title
     from anak a
     join lateral (
-      select 'TAHFIDZ'::text as modul, t.score_value, t.assessed_at::date as tgl
+      select 'TAHFIDZ'::text as modul, t.score_value, t.assessed_at::date as tgl,
+             coalesce(ts.name_override, ms.name, 'Surat') as title
         from public.tahfidz_assessments t
+        left join public.tahfidz_tenant_surahs ts on ts.id = t.tenant_surah_id
+        left join public.tahfidz_surahs ms on ms.id = ts.surah_id
         where t.student_id = a.student_id and t.tenant_id = v_tenant and t.status = 'DINILAI'
       union all
-      select 'TARTIL', t.score_value, t.assessed_at::date
+      select 'TARTIL', t.score_value, t.assessed_at::date, coalesce(m.name, 'Materi Tartil')
         from public.tartil_assessments t
+        left join public.tartil_materials m on m.id = t.material_id
         where t.student_id = a.student_id and t.tenant_id = v_tenant and t.deleted_at is null
       union all
-      select l.module_type::text, l.score_value, l.assessed_date
+      select l.module_type::text, l.score_value, l.assessed_date,
+             coalesce(h.title, p2.title, tj.title, 'Materi')
         from public.learning_assessments l
+        left join public.hadith_materials h on h.id = l.hadith_id
+        left join public.daily_prayer_materials p2 on p2.id = l.prayer_id
+        left join public.tajwid_materials tj on tj.id = l.tajwid_id
         where l.student_id = a.student_id and l.tenant_id = v_tenant and l.deleted_at is null
       union all
-      select 'TUGAS', sc.score_value, sc.assessed_at::date
+      select 'TUGAS', sc.score_value, sc.assessed_at::date, coalesce(tg.title, 'Tugas')
         from public.tugas_halaqah_scores sc
+        left join public.tugas_halaqah tg on tg.id = sc.tugas_id
         where sc.student_id = a.student_id and sc.tenant_id = v_tenant
       union all
-      select 'TAJWID', sc.score_value, sc.assessed_at::date
+      select 'TAJWID', sc.score_value, sc.assessed_at::date, coalesce(tm.title, 'Materi Tajwid')
         from public.tajwid_materi_scores sc
+        left join public.tajwid_materi tm on tm.id = sc.materi_id
         where sc.student_id = a.student_id and sc.tenant_id = v_tenant
       union all
-      select 'SETORAN', sb.score_value, sb.assessed_date
+      select 'SETORAN', sb.score_value, sb.assessed_date,
+             coalesce(ts2.name_override, ms2.name, 'Surat')
         from public.tahfidz_submissions sb
+        left join public.tahfidz_tenant_surahs ts2 on ts2.id = sb.tenant_surah_id
+        left join public.tahfidz_surahs ms2 on ms2.id = ts2.surah_id
         where sb.student_id = a.student_id and sb.tenant_id = v_tenant and sb.deleted_at is null
     ) x on true
+  ),
+  per_modul as (
+    select student_id, modul,
+           count(*) as jml,
+           round(avg(score_value) filter (where score_value is not null))::int as avg_score,
+           max(tgl) as last_tgl,
+           (array_agg(title order by tgl desc nulls last))[1] as last_title
+    from nilai group by student_id, modul
+  ),
+  per_modul_json as (
+    select student_id,
+           jsonb_object_agg(modul, jsonb_build_object(
+             'count', jml, 'avgScore', avg_score,
+             'lastDate', last_tgl, 'lastTitle', last_title
+           )) as obj
+    from per_modul group by student_id
   ),
   agg as (
     select
@@ -202,6 +231,7 @@ begin
           'sakit', coalesce(pr.sakit, 0),
           'alpa',  coalesce(pr.alpa, 0)
         ),
+        'moduleStats', coalesce(pm.obj, '{}'::jsonb),
         'catatanApresiasi', ap.catatan
       ) order by a.student_name
     ), '[]'::jsonb)
@@ -211,6 +241,7 @@ begin
   left join agg       ag on ag.student_id = a.student_id
   left join hafalan   hf on hf.student_id = a.student_id
   left join presensi  pr on pr.student_id = a.student_id
+  left join per_modul_json pm on pm.student_id = a.student_id
   left join apresiasi ap on ap.student_id = a.student_id;
 
   return v_out;

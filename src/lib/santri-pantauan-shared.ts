@@ -35,6 +35,31 @@ export const MODULE_TONES: Record<ModuleKey, string> = {
   TUGAS: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
 };
 
+/** Urutan tampilan kartu modul di Kartu Prestasi. */
+export const MODULE_ORDER: ModuleKey[] = [
+  "TAHFIDZ",
+  "SETORAN",
+  "TARTIL",
+  "HADITS",
+  "DOA",
+  "TAJWID",
+  "TUGAS",
+];
+
+export type ModuleStat = {
+  count: number;
+  avgScore: number | null;
+  lastDate: string | null;
+  lastTitle: string | null;
+};
+
+export const EMPTY_MODULE_STAT: ModuleStat = {
+  count: 0,
+  avgScore: null,
+  lastDate: null,
+  lastTitle: null,
+};
+
 export function moduleLabel(key: string) {
   return MODULE_LABELS[key as ModuleKey] ?? key;
 }
@@ -55,6 +80,7 @@ export type PrestasiCard = {
   penilaian30Hari: number;
   lastAssessedAt: string | null;
   modules: Record<string, number>;
+  moduleStats: Record<string, ModuleStat>;
   presensi: { total: number; hadir: number; izin: number; sakit: number; alpa: number };
   catatanApresiasi: string | null;
 };

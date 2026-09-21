@@ -119,7 +119,6 @@ export const ROLE_NAV: Record<AppRole, NavItem[]> = {
     { label: "Presensi", href: "/santri/presensi" },
     { label: "Kartu Prestasi", href: "/santri/prestasi" },
     { label: "Riwayat Perkembangan", href: "/santri/perkembangan" },
-    { label: "Raport", href: "/santri/raport" },
     { label: "Infak Pengembangan", href: "/santri/infak" },
     { label: "Kritik & Saran", href: "/santri/saran" },
     { label: "Pengaturan", href: "/santri/pengaturan" },

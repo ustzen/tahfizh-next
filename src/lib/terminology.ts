@@ -204,7 +204,6 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "presensi", label: "Presensi", href: "/santri/presensi" },
     { key: "prestasi", label: "Kartu Prestasi", href: "/santri/prestasi" },
     { key: "perkembangan", label: "Riwayat Perkembangan", href: "/santri/perkembangan" },
-    { key: "raport", label: "Raport", href: "/santri/raport" },
     { key: "infak", label: "Infak Pengembangan", href: "/santri/infak" },
     { key: "saran", label: "Kritik & Saran", href: "/santri/saran" },
     { key: "pengaturan", label: "Pengaturan", href: "/santri/pengaturan" },
