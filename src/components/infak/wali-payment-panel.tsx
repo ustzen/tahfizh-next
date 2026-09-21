@@ -226,7 +226,7 @@ export function WaliPaymentPanel({
             <h4 className="text-sm font-semibold text-foreground">Tagihan Saya</h4>
             {kids.length === 0 && (
               <p className="text-muted-foreground py-4 text-center text-sm">
-                Belum ada data anak yang terhubung. Hubungi admin lembaga.
+                Tagihan infak bulan ini belum diterbitkan lembaga. Anda tetap dapat berinfak untuk santri lain di daftar bawah.
               </p>
             )}
             <div className="grid gap-4 md:grid-cols-2">

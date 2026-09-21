@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Award, BookOpenCheck, CalendarCheck, Sparkles } from "lucide-react";
+import { Award, BookOpenCheck, CalendarCheck } from "lucide-react";
 
-import { CardBox, PageHeader, SectionTitle } from "@/components/dashboard/section";
+import { CardBox, PageHeader } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
@@ -17,6 +17,7 @@ import {
   predikat,
   tanggalId,
   type ModuleStat,
+  type PrestasiCard,
 } from "@/lib/santri-pantauan-shared";
 
 export const metadata: Metadata = { title: "Kartu Prestasi" };
@@ -40,8 +41,33 @@ function Meter({ label, value, total, tone }: { label: string; value: number; to
 }
 
 export default async function SantriPrestasiPage() {
-  await requireRole(["WALI_SANTRI"], "/santri/prestasi");
-  const cards = await getPrestasiCards();
+  const profile = await requireRole(["WALI_SANTRI"], "/santri/prestasi");
+  const data = await getPrestasiCards();
+
+  // Kartu prestasi SELALU tampil. Bila guru belum menilai sama sekali (atau
+  // biodata santri belum dilengkapi lembaga), bentuk kartunya tetap dirender
+  // dengan angka 0 supaya santri tahu apa saja yang akan terisi nanti.
+  const cards: PrestasiCard[] =
+    data.length > 0
+      ? data
+      : [
+          {
+            studentId: "placeholder",
+            studentName: profile.fullName,
+            businessCode: null,
+            halaqahName: null,
+            surahSelesai: 0,
+            surahTotal: 0,
+            avgScore: null,
+            totalPenilaian: 0,
+            penilaian30Hari: 0,
+            lastAssessedAt: null,
+            modules: {},
+            moduleStats: {},
+            presensi: { total: 0, hadir: 0, izin: 0, sakit: 0, alpa: 0 },
+            catatanApresiasi: null,
+          },
+        ];
 
   return (
     <div>
@@ -56,17 +82,7 @@ export default async function SantriPrestasiPage() {
         }
       />
 
-      {cards.length === 0 ? (
-        <CardBox>
-          <SectionTitle
-            tone="amber"
-            icon={<Sparkles />}
-            title="Belum ada data prestasi"
-            description="Kartu prestasi akan terisi otomatis begitu guru mencatat penilaian pertama untuk ananda."
-          />
-        </CardBox>
-      ) : (
-        <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-2">
           {cards.map((c) => {
             const p = predikat(c.avgScore);
             const lencana = badgesFor(c);
@@ -180,16 +196,17 @@ export default async function SantriPrestasiPage() {
                   </span>
                   <div className="flex items-center gap-2">
                     <Badge variant="neutral">{c.totalPenilaian} penilaian</Badge>
-                    <Button asChild size="sm" variant="ghost">
-                      <Link href={`/santri/pantauan?student=${c.studentId}`}>Detail</Link>
-                    </Button>
+                    {c.studentId !== "placeholder" && (
+                      <Button asChild size="sm" variant="ghost">
+                        <Link href={`/santri/pantauan?student=${c.studentId}`}>Detail</Link>
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardBox>
             );
           })}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

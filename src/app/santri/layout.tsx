@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth";
 import { getDisplayProfile } from "@/lib/layout-data";
 import { DashboardShell } from "@/components/dashboard/shell";
+import { ensureSantriSelfLink } from "@/lib/santri-pantauan";
 
 /**
  * Santri layout. The V10 payment gate (rule #7-#10: day ≥ 16 & unpaid → only
@@ -9,6 +10,9 @@ import { DashboardShell } from "@/components/dashboard/shell";
  */
 export default async function SantriLayout({ children }: { children: React.ReactNode }) {
   const session = await requireRole(["WALI_SANTRI"], "/santri");
+  // V19 — akun santri pasti milik satu lembaga & satu baris santri; tautkan
+  // otomatis di sini agar tidak ada halaman yang tampil "belum terhubung".
+  await ensureSantriSelfLink();
   const profile = (await getDisplayProfile()) ?? {
     ...session,
     frontTitle: null,

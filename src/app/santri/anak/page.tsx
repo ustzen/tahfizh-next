@@ -75,10 +75,10 @@ export default async function SantriAnakPage() {
             <Empty className="py-16">
               <EmptyHeader>
                 <EmptyMedia variant="icon"><Baby /></EmptyMedia>
-                <EmptyTitle>Data belum bisa ditampilkan.</EmptyTitle>
+                <EmptyTitle>Data santri sedang disiapkan</EmptyTitle>
                 <EmptyDescription>
-                  Ini seharusnya otomatis terhubung. Coba muat ulang halaman, atau hubungi
-                  Admin/Developer bila terus berlanjut.
+                  Data akan muncul otomatis setelah lembaga melengkapi biodata santri. Anda
+                  tidak perlu melakukan apa pun.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

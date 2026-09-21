@@ -7,6 +7,8 @@
  */
 import "server-only";
 
+import { cache } from "react";
+
 import { createClient } from "@/lib/supabase/server";
 import type {
   PantauanItem,
@@ -43,3 +45,18 @@ export function getPresensiRekap(months = 6) {
 export function getTargetProgress() {
   return rpc<TargetProgress>("santri_target_progress");
 }
+
+/**
+ * V19 — self-heal: pastikan akun santri tertaut ke baris santri-nya sendiri.
+ * Dipanggil sekali per render dari layout /santri, jadi tidak ada lagi keadaan
+ * "data belum terhubung" yang harus diurus admin secara manual.
+ */
+export const ensureSantriSelfLink = cache(async (): Promise<number> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("santri_ensure_self_link");
+  if (error) {
+    console.error("[santri_ensure_self_link]", error.message);
+    return 0;
+  }
+  return Number(data ?? 0);
+});

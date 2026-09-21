@@ -151,7 +151,7 @@ export default async function SantriDashboardPage() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon="student" label="Jumlah Anak" value={childCount ?? 0} hint="santri terhubung dengan Anda" />
+        <StatCard icon="student" label="Jumlah Anak" value={childCount ?? 0} hint="santri pada akun ini" />
         <StatCard
           icon="paid"
           label="Lunas Bulan Ini"
