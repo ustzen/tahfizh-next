@@ -29,6 +29,7 @@ import {
   HandCoins,
   MessageSquareText,
   MessageCircle,
+  MessagesSquare,
   Settings,
 } from "lucide-react";
 
@@ -61,6 +62,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   prestasi: Award,
   pantauan: Activity,
   saran: MessageSquareText,
+  obrolan: MessagesSquare,
   whatsapp: MessageCircle,
   pengaturan: Settings,
 };

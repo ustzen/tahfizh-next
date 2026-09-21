@@ -1,41 +1,104 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Award, BookOpenCheck, CalendarCheck } from "lucide-react";
+import {
+  Award,
+  BookOpenCheck,
+  BookOpenText,
+  ClipboardCheck,
+  HandHeart,
+  SpellCheck,
+  AudioLines,
+  ListChecks,
+  ArrowUpRight,
+} from "lucide-react";
 
-import { CardBox, PageHeader } from "@/components/dashboard/section";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getPrestasiCards } from "@/lib/santri-pantauan";
+import { cn } from "@/lib/utils";
 import {
   EMPTY_MODULE_STAT,
   MODULE_ORDER,
   badgesFor,
   moduleLabel,
-  moduleTone,
   persen,
   predikat,
   tanggalId,
+  type ModuleKey,
   type ModuleStat,
   type PrestasiCard,
 } from "@/lib/santri-pantauan-shared";
 
 export const metadata: Metadata = { title: "Kartu Prestasi" };
 
-function Meter({ label, value, total, tone }: { label: string; value: number; total: number; tone: string }) {
-  const pct = persen(value, total);
+const MODULE_ICONS: Record<ModuleKey, React.ComponentType<{ className?: string }>> = {
+  TAHFIDZ: BookOpenCheck,
+  SETORAN: ClipboardCheck,
+  TARTIL: AudioLines,
+  HADITS: BookOpenText,
+  DOA: HandHeart,
+  TAJWID: SpellCheck,
+  TUGAS: ListChecks,
+};
+
+/** Warna ikon+angka per modul — dot kecil, bukan chip besar, biar ringkas. */
+const MODULE_ACCENT: Record<ModuleKey, string> = {
+  TAHFIDZ: "text-emerald-600 dark:text-emerald-400",
+  SETORAN: "text-blue-600 dark:text-blue-400",
+  TARTIL: "text-sky-600 dark:text-sky-400",
+  HADITS: "text-violet-600 dark:text-violet-400",
+  DOA: "text-amber-600 dark:text-amber-400",
+  TAJWID: "text-rose-600 dark:text-rose-400",
+  TUGAS: "text-orange-600 dark:text-orange-400",
+};
+
+/** Cincin skor kecil pakai conic-gradient — tanpa SVG/JS tambahan. */
+function ScoreRing({ score }: { score: number | null }) {
+  const pct = score ?? 0;
+  const ringColor =
+    score === null
+      ? "#cbd5e1"
+      : score >= 90
+        ? "#059669"
+        : score >= 80
+          ? "#0284c7"
+          : score >= 70
+            ? "#d97706"
+            : "#e11d48";
   return (
-    <div>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-muted-foreground text-xs font-medium">{label}</span>
-        <span className="tabular text-sm font-semibold">
-          {value}
-          <span className="text-muted-foreground font-normal">/{total || 0}</span>
-        </span>
+    <div
+      className="relative flex size-14 shrink-0 items-center justify-center rounded-full"
+      style={{ background: `conic-gradient(${ringColor} ${pct * 3.6}deg, #e2e8f0 0deg)` }}
+    >
+      <div className="bg-card flex size-11 items-center justify-center rounded-full">
+        <span className="tabular text-sm font-bold leading-none">{score ?? "–"}</span>
       </div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-500/20">
-        <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
-      </div>
+    </div>
+  );
+}
+
+function ModuleTile({ moduleKey, stat }: { moduleKey: ModuleKey; stat: ModuleStat }) {
+  const Icon = MODULE_ICONS[moduleKey];
+  const kosong = stat.count === 0;
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center gap-1 rounded-xl px-1.5 py-2.5 text-center",
+        kosong ? "bg-slate-50 dark:bg-slate-500/5" : "bg-slate-50 dark:bg-slate-500/10"
+      )}
+      title={
+        kosong
+          ? `${moduleLabel(moduleKey)} · belum ada penilaian`
+          : `${moduleLabel(moduleKey)} · ${stat.lastTitle ?? ""} · ${tanggalId(stat.lastDate)}`
+      }
+    >
+      <Icon className={cn("size-4", kosong ? "text-slate-400 dark:text-slate-500" : MODULE_ACCENT[moduleKey])} />
+      <span className={cn("tabular text-base leading-none font-bold", kosong && "text-muted-foreground")}>
+        {stat.count}
+      </span>
+      <span className="text-muted-foreground truncate text-[0.6rem] leading-tight font-medium">
+        {moduleLabel(moduleKey).split(" ")[0]}
+      </span>
     </div>
   );
 }
@@ -73,139 +136,115 @@ export default async function SantriPrestasiPage() {
     <div>
       <PageHeader
         title="Kartu Prestasi"
-        description="Rangkuman capaian ananda — seluruh angkanya diambil langsung dari penilaian ustadz/ustadzah."
+        description="Rangkuman capaian ananda, langsung dari penilaian ustadz/ustadzah."
         icon={<Award className="size-6" />}
-        action={
-          <Button asChild variant="outline">
-            <Link href="/santri/pantauan">Lihat Detail Penilaian</Link>
-          </Button>
-        }
       />
 
-      <div className="grid gap-5 xl:grid-cols-2">
-          {cards.map((c) => {
-            const p = predikat(c.avgScore);
-            const lencana = badgesFor(c);
-            const hadirPct = persen(c.presensi.hadir, c.presensi.total);
-            return (
-              <CardBox key={c.studentId} className="overflow-hidden">
-                {/* Identitas */}
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-role-strong text-lg font-bold tracking-tight">{c.studentName}</p>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                      {c.halaqahName ?? "Belum tergabung halaqah"}
-                      {c.businessCode ? ` · ${c.businessCode}` : ""}
-                    </p>
-                  </div>
-                  <span className={`shadow-card inline-flex items-center rounded-xl px-3 py-1.5 text-sm font-bold ${p.tone}`}>
-                    {c.avgScore !== null ? `${c.avgScore} · ` : ""}
-                    {p.label}
-                  </span>
-                </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {cards.map((c) => {
+          const p = predikat(c.avgScore);
+          const lencana = badgesFor(c).slice(0, 3);
+          const hadirPct = persen(c.presensi.hadir, c.presensi.total);
+          const surahPct = persen(c.surahSelesai, c.surahTotal);
+          const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
 
-                {/* Meter utama */}
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <Meter
-                    label="Surat dikuasai"
-                    value={c.surahSelesai}
-                    total={c.surahTotal}
-                    tone="bg-emerald-500"
-                  />
-                  <Meter
-                    label={`Kehadiran (${hadirPct}%)`}
-                    value={c.presensi.hadir}
-                    total={c.presensi.total}
-                    tone="bg-sky-500"
-                  />
-                </div>
+          return (
+            <div
+              key={c.studentId}
+              className="bg-card shadow-card relative flex flex-col overflow-hidden rounded-2xl border"
+            >
+              {/* Strip identitas warna role */}
+              <span aria-hidden className="bg-role absolute inset-x-0 top-0 h-1" />
 
-                {/* Lencana */}
-                {lencana.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {lencana.map((b) => (
-                      <span
-                        key={b.label}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${b.tone}`}
-                      >
-                        <span aria-hidden>{b.emoji}</span>
-                        {b.label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Kartu pencapaian per modul — selalu tampil lengkap,
-                    modul yang belum dinilai ditampilkan dengan angka 0. */}
-                <div className="mt-5">
-                  <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-widest">
-                    <BookOpenCheck className="size-3.5" /> Pencapaian per modul
+              <div className="flex items-start gap-3 px-4 pt-4">
+                <span className="bg-role-soft text-role-strong flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold">
+                  {initial}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[0.95rem] font-bold tracking-tight text-foreground">
+                    {c.studentName}
                   </p>
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    {MODULE_ORDER.map((key) => {
-                      const st: ModuleStat = c.moduleStats?.[key] ?? EMPTY_MODULE_STAT;
-                      const kosong = st.count === 0;
-                      return (
-                        <div
-                          key={key}
-                          className={`rounded-xl border px-3.5 py-3 ${kosong ? "opacity-70" : ""}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`rounded-lg px-2 py-0.5 text-[0.7rem] font-bold ${moduleTone(key)}`}>
-                              {moduleLabel(key)}
-                            </span>
-                            <span className="tabular text-lg font-bold leading-none">
-                              {st.avgScore ?? "—"}
-                            </span>
-                          </div>
-                          <p className="text-muted-foreground mt-2 text-xs">
-                            <span className="tabular text-foreground font-semibold">{st.count}</span> penilaian
-                            {key === "TAHFIDZ" ? (
-                              <>
-                                {" · "}
-                                <span className="tabular text-foreground font-semibold">
-                                  {c.surahSelesai}/{c.surahTotal || 0}
-                                </span>{" "}
-                                surat
-                              </>
-                            ) : null}
-                          </p>
-                          <p className="text-muted-foreground mt-0.5 truncate text-xs">
-                            {kosong
-                              ? "Belum ada penilaian"
-                              : `${st.lastTitle ?? "-"} · ${tanggalId(st.lastDate)}`}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Catatan apresiasi terakhir */}
-                {c.catatanApresiasi && (
-                  <p className="mt-4 rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm leading-relaxed text-amber-900 dark:bg-yellow-500/10 dark:text-yellow-200">
-                    “{c.catatanApresiasi}”
+                  <p className="text-muted-foreground truncate text-xs">
+                    {c.halaqahName ?? "Belum tergabung halaqah"}
                   </p>
-                )}
+                </div>
+                <ScoreRing score={c.avgScore} />
+              </div>
 
-                {/* Footer */}
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-                  <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                    <CalendarCheck className="size-3.5" />
-                    Penilaian terakhir {tanggalId(c.lastAssessedAt)}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="neutral">{c.totalPenilaian} penilaian</Badge>
-                    {c.studentId !== "placeholder" && (
-                      <Button asChild size="sm" variant="ghost">
-                        <Link href={`/santri/pantauan?student=${c.studentId}`}>Detail</Link>
-                      </Button>
-                    )}
+              <div className="px-4 pt-2">
+                <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[0.68rem] font-bold", p.tone)}>
+                  {p.label}
+                </span>
+              </div>
+
+              {/* Dua meter ringkas berdampingan */}
+              <div className="mt-3 grid grid-cols-2 gap-2 px-4">
+                <div className="rounded-xl bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">
+                  <p className="tabular text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                    {c.surahSelesai}
+                    <span className="text-muted-foreground font-normal">/{c.surahTotal || 0}</span>
+                  </p>
+                  <p className="text-muted-foreground text-[0.65rem] font-medium">Surat dikuasai</p>
+                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-emerald-200/70 dark:bg-emerald-500/20">
+                    <div className="h-full rounded-full bg-emerald-500" style={{ width: `${surahPct}%` }} />
                   </div>
                 </div>
-              </CardBox>
-            );
-          })}
+                <div className="rounded-xl bg-sky-50 px-3 py-2 dark:bg-sky-500/10">
+                  <p className="tabular text-sm font-bold text-sky-700 dark:text-sky-300">{hadirPct}%</p>
+                  <p className="text-muted-foreground text-[0.65rem] font-medium">Kehadiran</p>
+                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-sky-200/70 dark:bg-sky-500/20">
+                    <div className="h-full rounded-full bg-sky-500" style={{ width: `${hadirPct}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tile modul — ringkas, ikonik, selalu 7 tampil termasuk yang 0 */}
+              <div className="mt-3 grid grid-cols-4 gap-1 px-4">
+                {MODULE_ORDER.map((key) => (
+                  <ModuleTile key={key} moduleKey={key} stat={c.moduleStats?.[key] ?? EMPTY_MODULE_STAT} />
+                ))}
+              </div>
+
+              {/* Lencana pencapaian */}
+              {lencana.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5 px-4">
+                  {lencana.map((b) => (
+                    <span
+                      key={b.label}
+                      className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold", b.tone)}
+                    >
+                      <span aria-hidden>{b.emoji}</span>
+                      {b.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Catatan apresiasi */}
+              {c.catatanApresiasi && (
+                <p className="mx-4 mt-3 line-clamp-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs leading-relaxed text-amber-900 dark:bg-yellow-500/10 dark:text-yellow-200">
+                  “{c.catatanApresiasi}”
+                </p>
+              )}
+
+              {/* Footer */}
+              <div className="mt-3 flex items-center justify-between gap-2 border-t px-4 py-2.5">
+                <span className="text-muted-foreground text-[0.7rem]">
+                  {c.lastAssessedAt ? `Terakhir dinilai ${tanggalId(c.lastAssessedAt)}` : "Belum ada penilaian"}
+                </span>
+                {c.studentId !== "placeholder" && (
+                  <Link
+                    href={`/santri/pantauan?student=${c.studentId}`}
+                    className="text-role-strong inline-flex items-center gap-0.5 text-xs font-semibold hover:underline"
+                  >
+                    Detail
+                    <ArrowUpRight className="size-3" />
+                  </Link>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

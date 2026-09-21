@@ -86,6 +86,7 @@ export type NavKey =
   | "akademik"
   | "onboarding"
   | "perkembangan"
+  | "obrolan"
   | "saran"
   | "pengaturan";
 
@@ -129,6 +130,7 @@ const NAV_GROUP_OF: Record<NavKey, NavGroupKey> = {
   prestasi: "laporan",
   pantauan: "pembelajaran",
   infak: "keuangan",
+  obrolan: "komunitas",
   saran: "komunitas",
   pengaturan: "pengaturan",
 };
@@ -136,8 +138,8 @@ const NAV_GROUP_OF: Record<NavKey, NavGroupKey> = {
 const GROUP_ORDER: NavGroupKey[] = [
   "utama",
   "master",
-  "pembelajaran",
   "presensi",
+  "pembelajaran",
   "laporan",
   "keuangan",
   "komunitas",
@@ -161,6 +163,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "raport", label: "Raport", href: "/admin/raport" },
     { key: "akademik", label: "Akademik", href: "/admin/akademik" },
     { key: "onboarding", label: "Onboarding", href: "/admin/onboarding" },
+    // V20 — obrolan 1 lembaga, pesan otomatis terhapus 24 jam.
+    { key: "obrolan", label: "Obrolan", href: "/admin/obrolan" },
     { key: "saran", label: "Kritik & Saran", href: "/admin/saran" },
     { key: "pengaturan", label: "Pengaturan", href: "/admin/pengaturan" },
   ],
@@ -173,6 +177,7 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "doa", label: "Doa Harian", href: "/koordinator/doa" },
     { key: "perkembangan", label: "Riwayat Perkembangan", href: "/koordinator/perkembangan" },
     { key: "raport", label: "Raport", href: "/koordinator/raport" },
+    { key: "obrolan", label: "Obrolan", href: "/koordinator/obrolan" },
     { key: "saran", label: "Kritik & Saran", href: "/koordinator/saran" },
     { key: "pengaturan", label: "Pengaturan", href: "/koordinator/pengaturan" },
   ],
@@ -192,6 +197,7 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "presensi", label: "Presensi", href: "/ustadz/presensi" },
     { key: "perkembangan", label: "Riwayat Perkembangan", href: "/ustadz/perkembangan" },
     { key: "raport", label: "Raport", href: "/ustadz/raport" },
+    { key: "obrolan", label: "Obrolan", href: "/ustadz/obrolan" },
     { key: "saran", label: "Kritik & Saran", href: "/ustadz/saran" },
     { key: "pengaturan", label: "Pengaturan", href: "/ustadz/pengaturan" },
   ],
@@ -205,6 +211,7 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "prestasi", label: "Kartu Prestasi", href: "/santri/prestasi" },
     { key: "perkembangan", label: "Riwayat Perkembangan", href: "/santri/perkembangan" },
     { key: "infak", label: "Infak Pengembangan", href: "/santri/infak" },
+    { key: "obrolan", label: "Obrolan", href: "/santri/obrolan" },
     { key: "saran", label: "Kritik & Saran", href: "/santri/saran" },
     { key: "pengaturan", label: "Pengaturan", href: "/santri/pengaturan" },
   ],
