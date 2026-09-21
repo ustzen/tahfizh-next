@@ -51,7 +51,14 @@ export function AssessmentForm({
     [existing, surahId]
   );
 
-  const [status, setStatus] = useState<Existing["status"]>(existingForSurah?.status ?? "DINILAI");
+  // V25: mode Centang tidak lagi punya tahap "Dipelajari" — data lama dengan
+  // status itu diperlakukan sebagai "Belum menguasai" di form ini.
+  function normalizeStatus(s: Existing["status"] | undefined): Existing["status"] {
+    const st = s ?? "DINILAI";
+    return mode === "CENTANG" && st === "DIPELAJARI" ? "BELUM" : st;
+  }
+
+  const [status, setStatus] = useState<Existing["status"]>(normalizeStatus(existingForSurah?.status));
   const [scoreLabel, setScoreLabel] = useState<string>(existingForSurah?.scoreLabel ?? grades[0]?.label ?? "");
   const [scoreValue, setScoreValue] = useState<string>(
     existingForSurah?.scoreValue !== null && existingForSurah?.scoreValue !== undefined
@@ -64,7 +71,7 @@ export function AssessmentForm({
   function onSurahChange(next: string) {
     setSurahId(next);
     const ex = existing.find((e) => e.tenantSurahId === next);
-    setStatus(ex?.status ?? "DINILAI");
+    setStatus(normalizeStatus(ex?.status));
     setScoreLabel(ex?.scoreLabel ?? grades[0]?.label ?? "");
     setScoreValue(
       ex?.scoreValue !== null && ex?.scoreValue !== undefined ? String(ex.scoreValue) : ""
@@ -130,9 +137,9 @@ export function AssessmentForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="DINILAI">Sudah dinilai</SelectItem>
-              <SelectItem value="DIPELAJARI">Sedang dipelajari</SelectItem>
-              <SelectItem value="BELUM">Belum mulai</SelectItem>
+              <SelectItem value="DINILAI">{mode === "CENTANG" ? "Menguasai" : "Sudah dinilai"}</SelectItem>
+              {mode !== "CENTANG" && <SelectItem value="DIPELAJARI">Sedang dipelajari</SelectItem>}
+              <SelectItem value="BELUM">{mode === "CENTANG" ? "Belum menguasai" : "Belum mulai"}</SelectItem>
             </SelectContent>
           </Select>
         </div>

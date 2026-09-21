@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -20,7 +21,6 @@ import { cn } from "@/lib/utils";
 import { saveAttendanceBatchAction } from "@/app/actions/halaqah";
 import {
   ATTENDANCE_STATUSES,
-  STATUS_LETTER,
   STATUS_META,
   countStatuses,
   formatDateID,
@@ -62,7 +62,6 @@ export function AttendanceSheet({
   const [date, setDate] = useState(initialDate);
   const [generalNote, setGeneralNote] = useState(initialGeneralNote);
   const [entries, setEntries] = useState<Record<string, AttendanceEntry>>(initialEntries);
-  const [expandedNote, setExpandedNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -202,94 +201,95 @@ export function AttendanceSheet({
       </Card>
       )}
 
-      {/* Per-student status list (rule #22/#23/#28) */}
+      {/* Per-student status table (rule #22/#23/#28) — ramping, satu baris per santri */}
       {students.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground/80">
           Belum ada santri dalam kelompok ini. Tambahkan anggota lewat menu Halaqah.
         </p>
       ) : (
-        <div className="space-y-2">
-          {students.map((s) => {
-            const entry = entries[s.id] ?? { status: null, note: "" };
-            return (
-              <Card key={s.id} className="shadow-card">
-                <CardContent className="space-y-2 p-3.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{s.name}</p>
-                    </div>
-                    <span
-                      className={cn(
-                        "inline-flex h-8 min-w-8 items-center justify-center rounded-lg border px-2 text-sm font-bold",
-                        entry.status ? STATUS_META[entry.status].chip : "border-slate-200 bg-slate-50 text-slate-400"
-                      )}
-                      aria-label={
-                        entry.status ? `Status: ${STATUS_META[entry.status].label}` : "Belum dipilih"
-                      }
-                    >
-                      {entry.status ? STATUS_META[entry.status].letter : "–"}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1.5" role="group" aria-label={`Status ${s.name}`}>
-                    {ATTENDANCE_STATUSES.map((st) => {
-                      const active = entry.status === st;
-                      if (readOnly) {
+        <Card className="shadow-card overflow-hidden py-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10 px-3">No.</TableHead>
+                  <TableHead>Nama</TableHead>
+                  {ATTENDANCE_STATUSES.map((st) => (
+                    <TableHead key={st} className="w-11 px-1 text-center" title={STATUS_META[st].label}>
+                      {STATUS_META[st].letter}
+                    </TableHead>
+                  ))}
+                  <TableHead className="min-w-[160px]">Catatan (opsional)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {students.map((s, i) => {
+                  const entry = entries[s.id] ?? { status: null, note: "" };
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="px-3 text-xs text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                        {s.name}
+                      </TableCell>
+                      {ATTENDANCE_STATUSES.map((st) => {
+                        const active = entry.status === st;
+                        if (readOnly) {
+                          return (
+                            <TableCell key={st} className="px-1 text-center">
+                              <span
+                                aria-hidden
+                                className={cn(
+                                  "mx-auto flex size-8 items-center justify-center rounded-lg border text-xs font-bold",
+                                  active
+                                    ? cn(STATUS_META[st].solid, "border-transparent")
+                                    : "border-slate-100 bg-slate-50 text-slate-300"
+                                )}
+                              >
+                                {STATUS_META[st].letter}
+                              </span>
+                            </TableCell>
+                          );
+                        }
                         return (
-                          <span
-                            key={st}
-                            aria-hidden
-                            className={cn(
-                              "flex min-h-[44px] items-center justify-center rounded-lg border text-sm font-bold",
-                              active
-                                ? cn(STATUS_META[st].solid, "border-transparent")
-                                : "border-slate-100 bg-slate-50 text-slate-300"
-                            )}
-                          >
-                            {STATUS_META[st].letter}
-                          </span>
+                          <TableCell key={st} className="px-1 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setOne(s.id, st)}
+                              aria-pressed={active}
+                              aria-label={`${STATUS_META[st].label} — ${s.name}`}
+                              className={cn(
+                                "mx-auto flex size-8 items-center justify-center rounded-lg border text-xs font-bold transition active:scale-95",
+                                active
+                                  ? cn(STATUS_META[st].solid, "border-transparent shadow-sm")
+                                  : cn("bg-white", STATUS_META[st].chip, "hover:bg-slate-50")
+                              )}
+                            >
+                              {STATUS_META[st].letter}
+                            </button>
+                          </TableCell>
                         );
-                      }
-                      return (
-                        <button
-                          key={st}
-                          type="button"
-                          onClick={() => setOne(s.id, st)}
-                          aria-pressed={active}
-                          aria-label={STATUS_META[st].label}
-                          className={cn(
-                            "min-h-[44px] rounded-lg border text-sm font-bold transition active:scale-95",
-                            active
-                              ? cn(STATUS_META[st].solid, "border-transparent shadow-sm")
-                              : cn("bg-white", STATUS_META[st].chip, "hover:bg-slate-50")
-                          )}
-                        >
-                          {STATUS_META[st].letter}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {readOnly ? null : expandedNote === s.id ? (
-                    <Textarea
-                      value={entry.note}
-                      onChange={(e) => setNote(s.id, e.target.value)}
-                      placeholder="Catatan (opsional) — mis. demam, acara keluarga"
-                      className="min-h-[56px] text-xs"
-                      aria-label={`Catatan untuk ${s.name}`}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className="text-[11px] font-medium text-role hover:underline"
-                      onClick={() => setExpandedNote(expandedNote === s.id ? null : s.id)}
-                    >
-                      {entry.note ? `Catatan: “${entry.note}”` : "+ Tambah catatan (opsional)"}
-                    </button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                      })}
+                      <TableCell className="px-2">
+                        {readOnly ? (
+                          <span className="text-xs text-muted-foreground">{entry.note || "—"}</span>
+                        ) : (
+                          <input
+                            type="text"
+                            value={entry.note}
+                            onChange={(e) => setNote(s.id, e.target.value)}
+                            placeholder="Opsional"
+                            aria-label={`Catatan untuk ${s.name}`}
+                            className="w-full min-w-[140px] rounded-md border border-border bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-role"
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
       )}
 
       {/* Catatan pertemuan umum (rule #30) */}

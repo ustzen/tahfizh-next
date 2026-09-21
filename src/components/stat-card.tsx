@@ -11,6 +11,7 @@ import {
   MessageSquareText,
   Receipt,
   Target,
+  TrendingUp,
   Users,
   Users2,
   Wallet,
@@ -35,6 +36,7 @@ const ICONS = {
   invoice: Receipt,
   feedback: MessageSquareText,
   target: Target,
+  achievement: TrendingUp,
 } as const;
 
 export type StatIcon = keyof typeof ICONS;
@@ -120,6 +122,11 @@ const TONES: Record<StatIcon, Tone> = {
     chip: "bg-lime-100 text-lime-700 dark:bg-lime-500/15 dark:text-lime-300",
     strip: "bg-lime-500",
     bar: "bg-lime-500",
+  },
+  achievement: {
+    chip: "bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300",
+    strip: "bg-purple-500",
+    bar: "bg-purple-500",
   },
 };
 

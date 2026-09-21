@@ -182,7 +182,7 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "pengaturan", label: "Pengaturan", href: "/koordinator/pengaturan" },
   ],
   USTADZ: [
-    { key: "dashboard", label: "Dashboard", href: "/ustadz" },
+    { key: "dashboard", label: "Overview", href: "/ustadz" },
     { key: "santri", label: "Santri", href: "/ustadz/santri" },
     { key: "tahfidz", label: "Tahfidz", href: "/ustadz/tahfidz" },
     { key: "tartil", label: "Tartil", href: "/ustadz/tartil" },

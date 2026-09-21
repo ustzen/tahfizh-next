@@ -113,15 +113,19 @@ export function TahfidzGridClient({
     setCells((prev) => {
       const cur = prev[k] ?? { status: "BELUM" as const, scoreLabel: null, scoreValue: null };
       let next: CellState;
-      if (cur.status === "BELUM") {
+      if (mode === "CENTANG") {
+        // V25: mode Centang hanya 2 tahap — Menguasai / Belum Menguasai (Dipelajari dihilangkan).
+        next =
+          cur.status === "DINILAI"
+            ? { status: "BELUM", scoreLabel: null, scoreValue: null }
+            : { status: "DINILAI", scoreLabel: "✓", scoreValue: null };
+      } else if (cur.status === "BELUM") {
         next = { status: "DIPELAJARI", scoreLabel: null, scoreValue: null };
       } else if (cur.status === "DIPELAJARI") {
         next =
-          mode === "CENTANG"
-            ? { status: "DINILAI", scoreLabel: "✓", scoreValue: null }
-            : mode === "HURUF"
-              ? { status: "DINILAI", scoreLabel: gradeOptions[0], scoreValue: null }
-              : { status: "DINILAI", scoreLabel: null, scoreValue: 80 };
+          mode === "HURUF"
+            ? { status: "DINILAI", scoreLabel: gradeOptions[0], scoreValue: null }
+            : { status: "DINILAI", scoreLabel: null, scoreValue: 80 };
       } else {
         next = { status: "BELUM", scoreLabel: null, scoreValue: null };
       }
@@ -328,13 +332,17 @@ export function TahfidzGridClient({
 
         <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-3 px-3 text-xs">
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block size-3 rounded border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15" /> Dinilai
+            <span className="inline-block size-3 rounded border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15" />
+            {mode === "CENTANG" ? "Menguasai" : "Dinilai"}
           </span>
+          {mode !== "CENTANG" && (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block size-3 rounded border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15" /> Dipelajari
+            </span>
+          )}
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block size-3 rounded border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15" /> Dipelajari
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block size-3 rounded border border-border bg-muted/50" /> Belum
+            <span className="inline-block size-3 rounded border border-border bg-muted/50" />
+            {mode === "CENTANG" ? "Belum Menguasai" : "Belum"}
           </span>
           <span>Klik sel: ganti status. Mode Angka/Huruf: isi nilai di sel. Simpan sekali untuk semua perubahan.</span>
         </div>

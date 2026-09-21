@@ -230,6 +230,7 @@ export async function getTeacherV8Dashboard(): Promise<{
   students: number;
   presentToday: number;
   totalToday: number;
+  avgAchievement: number | null;
 }> {
   const supabase = await createClient();
   const { data } = await supabase.rpc("v8_teacher_dashboard");
@@ -239,6 +240,7 @@ export async function getTeacherV8Dashboard(): Promise<{
     students: Number(d.students ?? 0),
     presentToday: Number(d.presentToday ?? 0),
     totalToday: Number(d.totalToday ?? 0),
+    avgAchievement: d.avgAchievement === null || d.avgAchievement === undefined ? null : Number(d.avgAchievement),
   };
 }
 

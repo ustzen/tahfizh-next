@@ -155,18 +155,16 @@ export async function GuruManager() {
 
           {teachers && teachers.length > 0 ? (
             <div className="overflow-x-auto">
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <ColoredHead index={0} label="No." className="px-3" />
-                  <ColoredHead index={1} label="Nama" className="px-5" />
-                  <ColoredHead index={2} label="Panggilan" />
-                  <ColoredHead index={3} label="Username" />
-                  <ColoredHead index={4} label="Gender" />
-                  <ColoredHead index={5} label="WhatsApp" />
-                  <ColoredHead index={6} label="Status" />
-                  <ColoredHead index={7} label="Halaqah Diampu" />
-                  <TableHead className="px-5 text-right">Aksi</TableHead>
+                  <ColoredHead index={0} label="No." className="w-10 px-2" />
+                  <ColoredHead index={1} label="Nama" className="w-[22%] px-3" />
+                  <ColoredHead index={3} label="Username / WA" className="w-[16%]" />
+                  <ColoredHead index={4} label="Gender" className="w-16" />
+                  <ColoredHead index={6} label="Status" className="w-20" />
+                  <ColoredHead index={7} label="Halaqah Diampu" className="w-[24%] whitespace-normal" />
+                  <TableHead className="w-16 px-3 text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -175,37 +173,43 @@ export async function GuruManager() {
                   const binaan = binaanCount.get(t.id)?.size ?? 0;
                   return (
                     <TableRow key={t.id}>
-                      <TableCell className="tabular px-3 text-muted-foreground text-xs">{i + 1}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2.5">
-                          <span className="bg-role-soft text-role-strong flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold">
+                      <TableCell className="tabular px-2 text-muted-foreground text-xs">{i + 1}</TableCell>
+                      <TableCell className="px-3 whitespace-normal">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-role-soft text-role-strong flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold">
                             {t.full_name?.[0]?.toUpperCase() ?? "?"}
                           </span>
-                          <span className="font-medium">{t.full_name}</span>
+                          <div className="min-w-0 leading-tight">
+                            <p className="truncate font-medium">{t.full_name}</p>
+                            {t.nickname ? (
+                              <p className="text-muted-foreground truncate text-xs">{t.nickname}</p>
+                            ) : null}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{t.nickname ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{t.login_username ?? "—"}</TableCell>
+                      <TableCell className="whitespace-normal">
+                        <p className="font-mono text-xs">{t.login_username ?? "—"}</p>
+                        <p className="text-muted-foreground text-xs">{t.whatsapp ?? "—"}</p>
+                      </TableCell>
                       <TableCell>
                         <Badge variant={t.gender === "L" ? "info" : "violet"}>{genderLabel(t.gender)}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{t.whatsapp ?? "—"}</TableCell>
                       <TableCell><StatusBadge status={t.status} /></TableCell>
-                      <TableCell>
-                        <div className="flex max-w-56 flex-wrap items-center gap-1">
+                      <TableCell className="whitespace-normal">
+                        <div className="flex flex-wrap items-center gap-1">
                           {subs.length === 0 ? (
                             <span className="text-muted-foreground text-xs">—</span>
                           ) : (
                             <>
                               <Badge variant="role" className="font-medium">{subs.length} halaqah • {binaan} santri</Badge>
-                              <span className="text-muted-foreground max-w-40 truncate text-xs">
+                              <span className="text-muted-foreground text-xs">
                                 {subs.map((s) => s.name).join(", ")}
                               </span>
                             </>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="px-5">
+                      <TableCell className="px-3">
                         <div className="flex items-center justify-end gap-1">
                           <TeacherDialog
                             teacher={{
@@ -375,19 +379,17 @@ export async function SantriManager({
 
           {students && totalStudents > 0 ? (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <ColoredHead index={0} label="No." className="px-3" />
-                    <ColoredHead index={1} label="NIS" className="px-5" />
-                    <ColoredHead index={2} label="NISN" />
-                    <ColoredHead index={3} label="Nama" />
-                    <ColoredHead index={4} label="Panggilan" />
-                    <ColoredHead index={5} label="Gender" />
-                    <ColoredHead index={6} label={terms.halaqah} />
-                    <ColoredHead index={7} label="Wali" />
-                    <ColoredHead index={9} label="Username" />
-                    <TableHead className="px-5 text-right">Aksi</TableHead>
+                    <ColoredHead index={0} label="No." className="w-10 px-2" />
+                    <ColoredHead index={1} label="NIS / NISN" className="w-24" />
+                    <ColoredHead index={3} label="Nama" className="w-[22%] px-3" />
+                    <ColoredHead index={5} label="Gender" className="w-16" />
+                    <ColoredHead index={6} label={terms.halaqah} className="w-[16%] whitespace-normal" />
+                    <ColoredHead index={7} label="Wali" className="w-[18%] whitespace-normal" />
+                    <ColoredHead index={9} label="Username" className="w-24" />
+                    <TableHead className="w-16 px-3 text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -396,24 +398,30 @@ export async function SantriManager({
                     const hName = hId ? halaqahName.get(hId) ?? null : null;
                     return (
                     <TableRow key={s.id}>
-                      <TableCell className="px-3 text-muted-foreground text-xs">
+                      <TableCell className="px-2 text-muted-foreground text-xs">
                         {(currentPage - 1) * SANTRI_PAGE_SIZE + i + 1}
                       </TableCell>
-                      <TableCell className="px-5 font-mono text-xs text-muted-foreground">{s.nis ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{s.nisn ?? "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2.5">
-                          <span className="bg-role-soft text-role-strong flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold">
+                      <TableCell className="whitespace-normal">
+                        <p className="font-mono text-xs text-muted-foreground">{s.nis ?? "—"}</p>
+                        <p className="font-mono text-xs text-muted-foreground/80">{s.nisn ?? "—"}</p>
+                      </TableCell>
+                      <TableCell className="px-3 whitespace-normal">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-role-soft text-role-strong flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold">
                             {s.full_name?.[0]?.toUpperCase() ?? "?"}
                           </span>
-                          <span className="font-medium">{s.full_name}</span>
+                          <div className="min-w-0 leading-tight">
+                            <p className="truncate font-medium">{s.full_name}</p>
+                            {s.nickname ? (
+                              <p className="text-muted-foreground truncate text-xs">{s.nickname}</p>
+                            ) : null}
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{s.nickname ?? "—"}</TableCell>
                       <TableCell>
                         <Badge variant={s.gender === "L" ? "info" : "violet"}>{genderLabel(s.gender)}</Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-normal">
                         {hName ? (
                           <Badge variant="role" className="font-medium">{hName}</Badge>
                         ) : (
@@ -422,10 +430,10 @@ export async function SantriManager({
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-normal">
                         {s.guardian_name ? (
                           <div className="leading-tight">
-                            <p className="text-sm text-foreground/85">{s.guardian_name}</p>
+                            <p className="truncate text-sm text-foreground/85">{s.guardian_name}</p>
                             {s.guardian_whatsapp ? (
                               <p className="mt-0.5 font-mono text-[0.7rem] text-muted-foreground/80">{s.guardian_whatsapp}</p>
                             ) : null}
@@ -434,8 +442,8 @@ export async function SantriManager({
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{s.login_username ?? "—"}</TableCell>
-                      <TableCell className="px-5">
+                      <TableCell className="font-mono text-xs whitespace-normal">{s.login_username ?? "—"}</TableCell>
+                      <TableCell className="px-3">
                         <div className="flex items-center justify-end gap-1">
                           <StudentDialog
                             student={{

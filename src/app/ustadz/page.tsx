@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
 import { getLearningTeacherForSession, getTeacherTodayActivity, type TodayActivity } from "@/lib/learning";
 import { getTeacherStudentsDetailed } from "@/lib/teacher-students";
 import { getV7TeacherCounts } from "@/lib/v7";
 import { getTeacherV8Dashboard } from "@/lib/halaqah";
 import { getScheduleReminders } from "@/lib/schedule-reminder";
+import { getTerminology } from "@/lib/terminology";
 import { ScheduleReminderBanner } from "@/components/dashboard/schedule-reminder-banner";
 import { WaChatButton } from "@/components/santri/wa-chat-button";
 
@@ -40,46 +40,22 @@ export const metadata = { title: "Dashboard Ustadz" };
 
 export default async function UstadzDashboardPage() {
   const profile = await requireRole(["USTADZ"], "/ustadz");
-  const supabase = await createClient();
 
-  // Dua resolusi mandiri dijalankan paralel: baris guru (V12.11: link UUID
-  // profil dulu, fallback pencocokan nama untuk data lama) dan guru modul
-  // pembelajaran.
-  const [teacher, learningTeacher] = await Promise.all([
-    (async () => {
-      const byId = await supabase
-        .from("teachers")
-        .select("id, full_name")
-        .eq("tenant_id", profile.tenantId!)
-        .eq("profile_id", profile.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (byId.data) return byId.data;
-      const byName = await supabase
-        .from("teachers")
-        .select("id, full_name")
-        .eq("tenant_id", profile.tenantId!)
-        .ilike("full_name", profile.fullName)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return byName.data;
-    })(),
+  // Guru modul pembelajaran + terminologi tenant (untuk sapaan ustadz/ustadzah).
+  const [learningTeacher, terms] = await Promise.all([
     getLearningTeacherForSession(),
+    getTerminology(profile.tenantId),
   ]);
 
+  // Sapaan: tambahkan gelar Ustadz/Ustadzah sesuai gender & terminologi tenant.
+  const honorific = profile.gender === "P" ? terms.ustadzah || "Ustadzah" : terms.ustadz || "Ustadz";
+  const greetingName = `${honorific} ${profile.fullName.split(" ")[0]}`;
+
   // Semua data dasbor selanjutnya paralel (rule #27 + V8 + V12.10).
-  const [{ count: assignedCount }, today, v7Counts, v8Stats, students, reminders] = await Promise.all([
-    teacher
-      ? supabase
-          .from("teacher_students")
-          .select("id", { count: "exact", head: true })
-          .eq("teacher_id", teacher.id)
-      : Promise.resolve({ count: 0 } as { count: number | null }),
+  const [today, v7Counts, v8Stats, students, reminders] = await Promise.all([
     learningTeacher ? getTeacherTodayActivity(learningTeacher.id) : Promise.resolve([]),
     learningTeacher ? getV7TeacherCounts(learningTeacher.id) : Promise.resolve({ targets: 0, tasks: 0, journals: 0 }),
-    // V8 (rule #39): halaqah saya + presensi hari ini (data aktual).
+    // V8 (rule #39): halaqah saya + presensi hari ini + rata-rata capaian.
     getTeacherV8Dashboard(),
     // V12.10: Data Santri (kolom lengkap) via helper bersama — RPC
     // `teacher_students_list` + fallback jalur halaqah bila RPC kosong/gagal.
@@ -91,7 +67,7 @@ export default async function UstadzDashboardPage() {
   return (
     <div>
       <PageHeader
-        title={`Assalamu'alaikum, ${profile.fullName.split(" ")[0]} 👋`}
+        title={`Assalamu'alaikum, ${greetingName} 👋`}
         description="Ringkasan aktivitas mengajar Anda."
         icon={<LayoutDashboard className="size-6" />}
         action={
@@ -103,20 +79,21 @@ export default async function UstadzDashboardPage() {
 
       {reminders.length > 0 && <ScheduleReminderBanner reminders={reminders} />}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard icon="student" label="Santri Halaqah Saya" value={assignedCount ?? 0} hint="anggota halaqah yang Anda ampu" />
-        <StatCard icon="teacher" label="Guru" value={teacher?.full_name ?? "—"} hint={profile.tenantName ?? undefined} />
-      </div>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        {/* V8 (rule #39) */}
-        <StatCard icon="halaqah" label="Halaqah Saya" value={v8Stats.halaqah} hint="halaqah diampu" />
+      {/* V8 (rule #39) + V25: hanya 4 kartu inti, 2 kolom di mobile. */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatCard icon="halaqah" label="Halaqah" value={v8Stats.halaqah} hint="halaqah diampu" />
         <StatCard icon="people" label="Santri Halaqah" value={v8Stats.students} hint="anggota halaqah Anda" />
         <StatCard
           icon="attendance"
           label="Presensi Hari Ini"
           value={v8Stats.totalToday > 0 ? `${v8Stats.presentToday}/${v8Stats.totalToday}` : "—"}
           hint="hadir / dicatat"
+        />
+        <StatCard
+          icon="achievement"
+          label="Rata-Rata Capaian Halaqah"
+          value={v8Stats.avgAchievement !== null ? `${v8Stats.avgAchievement}%` : "—"}
+          hint="rata-rata capaian santri"
         />
       </div>
 
