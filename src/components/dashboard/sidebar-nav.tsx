@@ -135,7 +135,6 @@ function NavLinks({
           <div key={group.key} className="mb-3 last:mb-0">
             {style.label && (
               <p className="text-muted-foreground mb-1 flex items-center gap-1.5 px-3 text-[0.66rem] font-bold uppercase tracking-widest">
-                <span className={cn("size-1.5 rounded-full", style.dot)} aria-hidden />
                 {style.label}
               </p>
             )}

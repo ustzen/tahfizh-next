@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  TASK_STATUS_DOTS,
   TASK_STATUS_LABELS,
   TASK_STATUSES,
   TASK_MODULE_OPTIONS,
@@ -172,7 +171,6 @@ export function TaskListClient({
       <div className="text-muted-foreground flex flex-wrap items-center gap-3 px-1 text-[11px]">
         {TASK_STATUSES.map((s) => (
           <span key={s} className="flex items-center gap-1.5">
-            <span className={cn("size-2 rounded-full", TASK_STATUS_DOTS[s])} />
             {TASK_STATUS_LABELS[s]}
           </span>
         ))}

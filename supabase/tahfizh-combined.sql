@@ -20816,3 +20816,1358 @@ drop table if exists public.targets;
 
 drop function if exists public.target_record_history();
 drop type if exists public.target_status;
+-- ============================================================================
+-- SOURCE: 20260921020000_tahfizh_v18_santri_pantauan.sql
+-- ============================================================================
+-- ============================================================================
+-- TAHFIZH V18 — PANTAUAN SANTRI
+--
+-- Dasbor santri (role DB: WALI_SANTRI) sebelumnya hanya punya blok ringkas di
+-- halaman utama. V18 menambahkan menu pantauan mandiri yang SINKRON dengan
+-- penilaian guru:
+--   1. santri_prestasi_card()    → Kartu Prestasi (rekap + rata-rata + presensi)
+--   2. santri_pantauan_feed()    → Pantauan Pembelajaran (semua modul, kronologis)
+--   3. santri_presensi_rekap()   → Rekap Presensi per bulan
+--   4. santri_target_progress()  → Target halaqah + progres pencapaian
+--   5. santri_raport_list()      → Daftar raport yang sudah FINAL
+--
+-- Semua fungsi SECURITY DEFINER dan HANYA mengembalikan data anak yang benar-
+-- benar terhubung dengan akun ini (guardian_students) di tenant-nya sendiri.
+-- Tidak ada tabel/kolom yang diubah (rule #38) dan tidak ada policy yang
+-- dilonggarkan — akses baca raport tetap tertutup di RLS, dibuka terbatas
+-- lewat RPC ini saja.
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- Helper: validasi sesi wali/santri + kembalikan tenant.
+-- ----------------------------------------------------------------------------
+create or replace function public.santri_guard()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_tenant uuid;
+  v_role   text;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  select tenant_id, role::text into v_tenant, v_role
+  from public.profiles where id = v_uid;
+
+  if v_tenant is null or v_role <> 'WALI_SANTRI' then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  return v_tenant;
+end;
+$$;
+grant execute on function public.santri_guard() to authenticated;
+
+-- ============================================================================
+-- 1. KARTU PRESTASI
+-- ============================================================================
+create or replace function public.santri_prestasi_card()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid         uuid := auth.uid();
+  v_tenant      uuid := public.santri_guard();
+  v_total_surah integer;
+  v_out         jsonb;
+begin
+  select count(*) into v_total_surah
+  from public.tahfidz_tenant_surahs
+  where tenant_id = v_tenant and is_active;
+
+  with anak as (
+    select s.id as student_id, s.full_name as student_name, s.business_code
+    from public.guardian_students gs
+    join public.guardians g on g.id = gs.guardian_id
+    join public.students s on s.id = gs.student_id
+    where g.profile_id = v_uid and s.tenant_id = v_tenant
+  ),
+  halaqah as (
+    select distinct on (hs.student_id)
+      hs.student_id, h.name as halaqah_name
+    from public.halaqah_students hs
+    join public.halaqahs h on h.id = hs.halaqah_id
+    join anak a on a.student_id = hs.student_id
+    where hs.left_at is null
+    order by hs.student_id, hs.joined_at desc
+  ),
+  nilai as (
+    select a.student_id, x.modul, x.score_value, x.tgl, x.title
+    from anak a
+    join lateral (
+      select 'TAHFIDZ'::text as modul, t.score_value, t.assessed_at::date as tgl,
+             coalesce(ts.name_override, ms.name, 'Surat') as title
+        from public.tahfidz_assessments t
+        left join public.tahfidz_tenant_surahs ts on ts.id = t.tenant_surah_id
+        left join public.tahfidz_surahs ms on ms.id = ts.surah_id
+        where t.student_id = a.student_id and t.tenant_id = v_tenant and t.status = 'DINILAI'
+      union all
+      select 'TARTIL', t.score_value, t.assessed_at::date, coalesce(m.name, 'Materi Tartil')
+        from public.tartil_assessments t
+        left join public.tartil_materials m on m.id = t.material_id
+        where t.student_id = a.student_id and t.tenant_id = v_tenant and t.deleted_at is null
+      union all
+      select l.module_type::text, l.score_value, l.assessed_date,
+             coalesce(h.title, p2.title, tj.title, 'Materi')
+        from public.learning_assessments l
+        left join public.hadith_materials h on h.id = l.hadith_id
+        left join public.daily_prayer_materials p2 on p2.id = l.prayer_id
+        left join public.tajwid_materials tj on tj.id = l.tajwid_id
+        where l.student_id = a.student_id and l.tenant_id = v_tenant and l.deleted_at is null
+      union all
+      select 'TUGAS', sc.score_value, sc.assessed_at::date, coalesce(tg.title, 'Tugas')
+        from public.tugas_halaqah_scores sc
+        left join public.tugas_halaqah tg on tg.id = sc.tugas_id
+        where sc.student_id = a.student_id and sc.tenant_id = v_tenant
+      union all
+      select 'TAJWID', sc.score_value, sc.assessed_at::date, coalesce(tm.title, 'Materi Tajwid')
+        from public.tajwid_materi_scores sc
+        left join public.tajwid_materi tm on tm.id = sc.materi_id
+        where sc.student_id = a.student_id and sc.tenant_id = v_tenant
+      union all
+      select 'SETORAN', sb.score_value, sb.assessed_date,
+             coalesce(ts2.name_override, ms2.name, 'Surat')
+        from public.tahfidz_submissions sb
+        left join public.tahfidz_tenant_surahs ts2 on ts2.id = sb.tenant_surah_id
+        left join public.tahfidz_surahs ms2 on ms2.id = ts2.surah_id
+        where sb.student_id = a.student_id and sb.tenant_id = v_tenant and sb.deleted_at is null
+    ) x on true
+  ),
+  per_modul as (
+    select student_id, modul,
+           count(*) as jml,
+           round(avg(score_value) filter (where score_value is not null))::int as avg_score,
+           max(tgl) as last_tgl,
+           (array_agg(title order by tgl desc nulls last))[1] as last_title
+    from nilai group by student_id, modul
+  ),
+  per_modul_json as (
+    select student_id,
+           jsonb_object_agg(modul, jsonb_build_object(
+             'count', jml, 'avgScore', avg_score,
+             'lastDate', last_tgl, 'lastTitle', last_title
+           )) as obj
+    from per_modul group by student_id
+  ),
+  agg as (
+    select
+      student_id,
+      count(*)                                                     as total_penilaian,
+      count(*) filter (where score_value is not null)              as ber_nilai,
+      round(avg(score_value) filter (where score_value is not null))::int as avg_score,
+      max(tgl)                                                     as last_tgl,
+      count(*) filter (where modul = 'TAHFIDZ')                    as c_tahfidz,
+      count(*) filter (where modul = 'TARTIL')                     as c_tartil,
+      count(*) filter (where modul = 'HADITS')                     as c_hadits,
+      count(*) filter (where modul = 'DOA')                        as c_doa,
+      count(*) filter (where modul = 'TAJWID')                     as c_tajwid,
+      count(*) filter (where modul = 'TUGAS')                      as c_tugas,
+      count(*) filter (where modul = 'SETORAN')                    as c_setoran,
+      count(*) filter (where tgl >= current_date - 30)             as c_30hari
+    from nilai
+    group by student_id
+  ),
+  hafalan as (
+    select t.student_id, count(*) as surah_selesai
+    from public.tahfidz_assessments t
+    join anak a on a.student_id = t.student_id
+    where t.tenant_id = v_tenant and t.status = 'DINILAI'
+    group by t.student_id
+  ),
+  presensi as (
+    select
+      r.student_id,
+      count(*)                                  as total,
+      count(*) filter (where r.status = 'HADIR') as hadir,
+      count(*) filter (where r.status = 'IZIN')  as izin,
+      count(*) filter (where r.status = 'SAKIT') as sakit,
+      count(*) filter (where r.status = 'ALPA')  as alpa
+    from public.attendance_records r
+    join anak a on a.student_id = r.student_id
+    where r.tenant_id = v_tenant
+    group by r.student_id
+  ),
+  apresiasi as (
+    select distinct on (a.student_id)
+      a.student_id, n.catatan, n.tgl
+    from anak a
+    join lateral (
+      select t.free_note as catatan, t.assessed_at::date as tgl
+        from public.tartil_assessments t
+        where t.student_id = a.student_id and t.deleted_at is null
+          and coalesce(t.free_note, '') <> ''
+      union all
+      select sb.free_note, sb.assessed_date
+        from public.tahfidz_submissions sb
+        where sb.student_id = a.student_id and sb.deleted_at is null
+          and coalesce(sb.free_note, '') <> ''
+      union all
+      select l.free_note, l.assessed_date
+        from public.learning_assessments l
+        where l.student_id = a.student_id and l.deleted_at is null
+          and coalesce(l.free_note, '') <> ''
+    ) n on true
+    order by a.student_id, n.tgl desc
+  )
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'studentId',      a.student_id,
+        'studentName',    a.student_name,
+        'businessCode',   a.business_code,
+        'halaqahName',    hq.halaqah_name,
+        'surahSelesai',   coalesce(hf.surah_selesai, 0),
+        'surahTotal',     coalesce(v_total_surah, 0),
+        'avgScore',       ag.avg_score,
+        'totalPenilaian', coalesce(ag.total_penilaian, 0),
+        'penilaian30Hari', coalesce(ag.c_30hari, 0),
+        'lastAssessedAt', ag.last_tgl,
+        'modules', jsonb_build_object(
+          'TAHFIDZ', coalesce(ag.c_tahfidz, 0),
+          'TARTIL',  coalesce(ag.c_tartil, 0),
+          'HADITS',  coalesce(ag.c_hadits, 0),
+          'DOA',     coalesce(ag.c_doa, 0),
+          'TAJWID',  coalesce(ag.c_tajwid, 0),
+          'TUGAS',   coalesce(ag.c_tugas, 0),
+          'SETORAN', coalesce(ag.c_setoran, 0)
+        ),
+        'presensi', jsonb_build_object(
+          'total', coalesce(pr.total, 0),
+          'hadir', coalesce(pr.hadir, 0),
+          'izin',  coalesce(pr.izin, 0),
+          'sakit', coalesce(pr.sakit, 0),
+          'alpa',  coalesce(pr.alpa, 0)
+        ),
+        'moduleStats', coalesce(pm.obj, '{}'::jsonb),
+        'catatanApresiasi', ap.catatan
+      ) order by a.student_name
+    ), '[]'::jsonb)
+  into v_out
+  from anak a
+  left join halaqah   hq on hq.student_id = a.student_id
+  left join agg       ag on ag.student_id = a.student_id
+  left join hafalan   hf on hf.student_id = a.student_id
+  left join presensi  pr on pr.student_id = a.student_id
+  left join per_modul_json pm on pm.student_id = a.student_id
+  left join apresiasi ap on ap.student_id = a.student_id;
+
+  return v_out;
+end;
+$$;
+grant execute on function public.santri_prestasi_card() to authenticated;
+
+-- ============================================================================
+-- 2. PANTAUAN PEMBELAJARAN — semua modul, kronologis
+-- ============================================================================
+create or replace function public.santri_pantauan_feed(
+  p_student_id uuid default null,
+  p_limit      integer default 60
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_tenant uuid := public.santri_guard();
+  v_limit  integer := least(greatest(coalesce(p_limit, 60), 1), 200);
+  v_out    jsonb;
+begin
+  with anak as (
+    select s.id as student_id, s.full_name as student_name
+    from public.guardian_students gs
+    join public.guardians g on g.id = gs.guardian_id
+    join public.students s on s.id = gs.student_id
+    where g.profile_id = v_uid
+      and s.tenant_id = v_tenant
+      and (p_student_id is null or s.id = p_student_id)
+  ),
+  feed as (
+    -- Hafalan tahfidz (penilaian surat)
+    select a.student_id, a.student_name, 'TAHFIDZ'::text as module,
+           coalesce(ts.name_override, ms.name, 'Surat') as title,
+           'Penilaian hafalan surat'::text as detail,
+           t.status::text as status, t.score_label, t.score_value, t.note as free_note,
+           tc.full_name as teacher_name, t.assessed_at::date as tgl
+    from public.tahfidz_assessments t
+    join anak a on a.student_id = t.student_id
+    left join public.tahfidz_tenant_surahs ts on ts.id = t.tenant_surah_id
+    left join public.tahfidz_surahs ms on ms.id = ts.surah_id
+    left join public.teachers tc on tc.id = t.teacher_id
+    where t.tenant_id = v_tenant
+
+    union all
+    -- Setoran hafalan / murojaah
+    select a.student_id, a.student_name, 'SETORAN',
+           coalesce(ts.name_override, ms.name, 'Surat'),
+           concat_ws(' · ',
+             case sb.kind when 'HAFALAN_BARU' then 'Hafalan Baru' else 'Murojaah' end,
+             nullif(sb.ayat_label, '')),
+           sb.result::text, sb.score_label, sb.score_value, sb.free_note,
+           tc.full_name, sb.assessed_date
+    from public.tahfidz_submissions sb
+    join anak a on a.student_id = sb.student_id
+    left join public.tahfidz_tenant_surahs ts on ts.id = sb.tenant_surah_id
+    left join public.tahfidz_surahs ms on ms.id = ts.surah_id
+    left join public.teachers tc on tc.id = sb.teacher_id
+    where sb.tenant_id = v_tenant and sb.deleted_at is null
+
+    union all
+    -- Tartil (mengaji)
+    select a.student_id, a.student_name, 'TARTIL',
+           coalesce(m.name, 'Materi Tartil'),
+           nullif(concat_ws(' ', 'Hal.', coalesce(tr.pages_label, m.pages_label)), 'Hal.'),
+           tr.status::text, tr.score_label, tr.score_value, tr.free_note,
+           tc.full_name, tr.assessed_at::date
+    from public.tartil_assessments tr
+    join anak a on a.student_id = tr.student_id
+    left join public.tartil_materials m on m.id = tr.material_id
+    left join public.teachers tc on tc.id = tr.teacher_id
+    where tr.tenant_id = v_tenant and tr.deleted_at is null
+
+    union all
+    -- Hadits / Doa / Tajwid (modul pembelajaran)
+    select a.student_id, a.student_name, l.module_type::text,
+           coalesce(h.title, p.title, tj.title, 'Materi'),
+           null::text,
+           l.status::text, l.score_label, l.score_value, l.free_note,
+           tc.full_name, l.assessed_date
+    from public.learning_assessments l
+    join anak a on a.student_id = l.student_id
+    left join public.hadith_materials h on h.id = l.hadith_id
+    left join public.daily_prayer_materials p on p.id = l.prayer_id
+    left join public.tajwid_materials tj on tj.id = l.tajwid_id
+    left join public.teachers tc on tc.id = l.teacher_id
+    where l.tenant_id = v_tenant and l.deleted_at is null
+
+    union all
+    -- Tajwid (grid materi)
+    select a.student_id, a.student_name, 'TAJWID',
+           coalesce(tm.title, 'Materi Tajwid'), null::text,
+           'DINILAI'::text, sc.score_label, sc.score_value, null::text,
+           null::text, sc.assessed_at::date
+    from public.tajwid_materi_scores sc
+    join anak a on a.student_id = sc.student_id
+    left join public.tajwid_materi tm on tm.id = sc.materi_id
+    where sc.tenant_id = v_tenant
+
+    union all
+    -- Tugas halaqah
+    select a.student_id, a.student_name, 'TUGAS',
+           coalesce(tg.title, 'Tugas'),
+           case when tg.due_date is not null
+                then 'Batas: ' || to_char(tg.due_date, 'DD Mon YYYY') end,
+           'DINILAI'::text, sc.score_label, sc.score_value, sc.note,
+           tc.full_name, sc.assessed_at::date
+    from public.tugas_halaqah_scores sc
+    join anak a on a.student_id = sc.student_id
+    left join public.tugas_halaqah tg on tg.id = sc.tugas_id
+    left join public.teachers tc on tc.id = tg.teacher_id
+    where sc.tenant_id = v_tenant and coalesce(tg.deleted_at, null) is null
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'studentId',   student_id,
+           'studentName', student_name,
+           'module',      module,
+           'title',       title,
+           'detail',      detail,
+           'status',      status,
+           'scoreLabel',  score_label,
+           'scoreValue',  score_value,
+           'freeNote',    free_note,
+           'teacherName', teacher_name,
+           'assessedDate', tgl
+         ) order by tgl desc nulls last), '[]'::jsonb)
+  into v_out
+  from (select * from feed order by tgl desc nulls last limit v_limit) x;
+
+  return v_out;
+end;
+$$;
+grant execute on function public.santri_pantauan_feed(uuid, integer) to authenticated;
+
+-- ============================================================================
+-- 3. REKAP PRESENSI
+-- ============================================================================
+create or replace function public.santri_presensi_rekap(p_months integer default 6)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_tenant uuid := public.santri_guard();
+  v_months integer := least(greatest(coalesce(p_months, 6), 1), 24);
+  v_since  date;
+  v_out    jsonb;
+begin
+  v_since := date_trunc('month', current_date)::date - ((v_months - 1) || ' months')::interval;
+
+  with anak as (
+    select s.id as student_id, s.full_name as student_name
+    from public.guardian_students gs
+    join public.guardians g on g.id = gs.guardian_id
+    join public.students s on s.id = gs.student_id
+    where g.profile_id = v_uid and s.tenant_id = v_tenant
+  ),
+  rec as (
+    select a.student_id, a.student_name, r.status::text as status,
+           r.note, se.session_date, h.name as halaqah_name
+    from public.attendance_records r
+    join anak a on a.student_id = r.student_id
+    join public.attendance_sessions se on se.id = r.session_id
+    left join public.halaqahs h on h.id = r.halaqah_id
+    where r.tenant_id = v_tenant and se.session_date >= v_since
+  ),
+  per_bulan as (
+    select student_id,
+           to_char(session_date, 'YYYY-MM') as ym,
+           min(session_date) as anchor,
+           count(*) as total,
+           count(*) filter (where status = 'HADIR') as hadir,
+           count(*) filter (where status = 'IZIN')  as izin,
+           count(*) filter (where status = 'SAKIT') as sakit,
+           count(*) filter (where status = 'ALPA')  as alpa
+    from rec group by student_id, to_char(session_date, 'YYYY-MM')
+  ),
+  total as (
+    select student_id,
+           count(*) as total,
+           count(*) filter (where status = 'HADIR') as hadir,
+           count(*) filter (where status = 'IZIN')  as izin,
+           count(*) filter (where status = 'SAKIT') as sakit,
+           count(*) filter (where status = 'ALPA')  as alpa
+    from rec group by student_id
+  ),
+  terakhir as (
+    select student_id, jsonb_agg(jsonb_build_object(
+             'date', session_date, 'status', status,
+             'note', note, 'halaqahName', halaqah_name
+           ) order by session_date desc) as items
+    from (
+      select *, row_number() over (partition by student_id order by session_date desc) as rn
+      from rec
+    ) z where rn <= 10
+    group by student_id
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'studentId',   a.student_id,
+           'studentName', a.student_name,
+           'summary', jsonb_build_object(
+             'total', coalesce(t.total, 0), 'hadir', coalesce(t.hadir, 0),
+             'izin',  coalesce(t.izin, 0),  'sakit', coalesce(t.sakit, 0),
+             'alpa',  coalesce(t.alpa, 0)
+           ),
+           'months', coalesce((
+             select jsonb_agg(jsonb_build_object(
+                      'ym', pb.ym, 'anchor', pb.anchor, 'total', pb.total,
+                      'hadir', pb.hadir, 'izin', pb.izin,
+                      'sakit', pb.sakit, 'alpa', pb.alpa
+                    ) order by pb.ym desc)
+             from per_bulan pb where pb.student_id = a.student_id
+           ), '[]'::jsonb),
+           'recent', coalesce(tk.items, '[]'::jsonb)
+         ) order by a.student_name), '[]'::jsonb)
+  into v_out
+  from anak a
+  left join total t     on t.student_id = a.student_id
+  left join terakhir tk on tk.student_id = a.student_id;
+
+  return v_out;
+end;
+$$;
+grant execute on function public.santri_presensi_rekap(integer) to authenticated;
+
+-- ============================================================================
+-- 4. TARGET HALAQAH + PROGRES ANAK
+-- ============================================================================
+create or replace function public.santri_target_progress()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_tenant uuid := public.santri_guard();
+  v_out    jsonb;
+begin
+  with anak as (
+    select s.id as student_id, s.full_name as student_name
+    from public.guardian_students gs
+    join public.guardians g on g.id = gs.guardian_id
+    join public.students s on s.id = gs.student_id
+    where g.profile_id = v_uid and s.tenant_id = v_tenant
+  ),
+  anak_halaqah as (
+    select distinct on (hs.student_id)
+      hs.student_id, hs.halaqah_id, h.name as halaqah_name
+    from public.halaqah_students hs
+    join public.halaqahs h on h.id = hs.halaqah_id
+    join anak a on a.student_id = hs.student_id
+    where hs.left_at is null and h.tenant_id = v_tenant
+    order by hs.student_id, hs.joined_at desc
+  ),
+  target as (
+    select a.student_id, a.student_name, ah.halaqah_name,
+           ht.id as target_id, ht.category, ht.target_value,
+           ht.start_date, ht.end_date, ht.description,
+           tc.full_name as teacher_name
+    from anak a
+    join anak_halaqah ah on ah.student_id = a.student_id
+    join public.halaqah_targets ht on ht.halaqah_id = ah.halaqah_id
+    left join public.teachers tc on tc.id = ht.teacher_id
+    where ht.tenant_id = v_tenant
+  ),
+  progres as (
+    select t.student_id, t.target_id,
+           case t.category
+             when 'TAHFIDZ' then (
+               select count(*) from public.tahfidz_assessments x
+               where x.student_id = t.student_id and x.tenant_id = v_tenant
+                 and x.status = 'DINILAI'
+                 and x.assessed_at::date between t.start_date and t.end_date
+             )
+             else (
+               select count(*) from public.learning_assessments l
+               where l.student_id = t.student_id and l.tenant_id = v_tenant
+                 and l.deleted_at is null
+                 and l.module_type::text = t.category
+                 and l.status::text = 'LULUS'
+                 and l.assessed_date between t.start_date and t.end_date
+             )
+           end as capaian
+    from target t
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'studentId',   t.student_id,
+           'studentName', t.student_name,
+           'halaqahName', t.halaqah_name,
+           'targetId',    t.target_id,
+           'category',    t.category,
+           'targetValue', t.target_value,
+           'capaian',     coalesce(p.capaian, 0),
+           'startDate',   t.start_date,
+           'endDate',     t.end_date,
+           'description', t.description,
+           'teacherName', t.teacher_name
+         ) order by t.student_name, t.end_date), '[]'::jsonb)
+  into v_out
+  from target t
+  left join progres p on p.target_id = t.target_id and p.student_id = t.student_id;
+
+  return v_out;
+end;
+$$;
+grant execute on function public.santri_target_progress() to authenticated;
+
+-- ============================================================================
+-- 5. DAFTAR RAPORT FINAL
+-- ============================================================================
+create or replace function public.santri_raport_list()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_tenant uuid := public.santri_guard();
+  v_out    jsonb;
+begin
+  with anak as (
+    select s.id as student_id, s.full_name as student_name
+    from public.guardian_students gs
+    join public.guardians g on g.id = gs.guardian_id
+    join public.students s on s.id = gs.student_id
+    where g.profile_id = v_uid and s.tenant_id = v_tenant
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'reportId',      r.id,
+           'studentId',     r.student_id,
+           'studentName',   a.student_name,
+           'title',         r.title,
+           'academicYear',  r.academic_year,
+           'semesterLabel', r.semester_label,
+           'periodLabel',   r.period_label,
+           'periodStart',   r.period_start,
+           'periodEnd',     r.period_end,
+           'finalizedAt',   r.finalized_at,
+           'teacherName',   tc.full_name
+         ) order by r.finalized_at desc nulls last), '[]'::jsonb)
+  into v_out
+  from public.reports r
+  join anak a on a.student_id = r.student_id
+  left join public.teachers tc on tc.id = r.teacher_id
+  where r.tenant_id = v_tenant and r.status = 'FINAL';
+
+  return v_out;
+end;
+$$;
+grant execute on function public.santri_raport_list() to authenticated;
+-- ============================================================================
+-- SOURCE: 20260921030000_tahfizh_v19_santri_autolink.sql
+-- ============================================================================
+-- ============================================================================
+-- TAHFIZH V19 — Akun santri SELALU tertaut ke datanya sendiri
+--
+-- V16 sudah menautkan otomatis lewat trigger pada students.login_username,
+-- tapi masih menyisakan celah: bila profil akun dibuat/diubah SETELAH baris
+-- santri tersimpan (import, pendaftaran mandiri, login Google, perbaikan
+-- username), atau bila login_username santri belum pernah diisi sama sekali,
+-- akun tetap tampil "belum terhubung".
+--
+-- V19 menutup celah itu dengan tiga lapis:
+--   1. Trigger pada public.profiles — arah sebaliknya dari V16.
+--   2. RPC santri_ensure_self_link() — self-heal saat halaman santri dibuka,
+--      termasuk pencocokan nama bila username belum tersimpan di baris santri.
+--   3. Backfill satu kali untuk akun yang sudah ada.
+--
+-- Prinsipnya: akun santri pasti milik satu lembaga dan satu baris santri, jadi
+-- penautan tidak pernah butuh langkah manual admin. Idempoten & repair-safe.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- Helper: tautkan satu profil santri ke baris students yang sesuai.
+-- Mengembalikan jumlah anak yang tertaut untuk profil tersebut.
+-- ---------------------------------------------------------------------------
+create or replace function public.santri_link_profile(p_profile_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_profile    public.profiles;
+  v_guardian   uuid;
+  v_student    uuid;
+  v_count      integer := 0;
+begin
+  select * into v_profile from public.profiles where id = p_profile_id;
+  if v_profile is null or v_profile.role <> 'WALI_SANTRI' or v_profile.tenant_id is null then
+    return 0;
+  end if;
+
+  -- Pastikan baris guardian untuk profil ini ada.
+  insert into public.guardians (tenant_id, profile_id)
+  values (v_profile.tenant_id, v_profile.id)
+  on conflict (profile_id) do nothing;
+
+  select id into v_guardian from public.guardians where profile_id = v_profile.id;
+  if v_guardian is null then
+    return 0;
+  end if;
+
+  -- (a) Cocokkan lewat username login santri — jalur utama.
+  insert into public.guardian_students (tenant_id, guardian_id, student_id)
+  select s.tenant_id, v_guardian, s.id
+  from public.students s
+  where s.tenant_id = v_profile.tenant_id
+    and v_profile.username is not null
+    and s.login_username = v_profile.username
+  on conflict (guardian_id, student_id) do nothing;
+
+  select count(*) into v_count
+  from public.guardian_students where guardian_id = v_guardian;
+
+  -- (b) Belum ketemu: cocokkan lewat nama lengkap, HANYA bila persis satu
+  --     santri di lembaga ini bernama sama dan belum punya akun lain.
+  if v_count = 0 then
+    select s.id into v_student
+    from public.students s
+    where s.tenant_id = v_profile.tenant_id
+      and lower(btrim(s.full_name)) = lower(btrim(v_profile.full_name))
+      and coalesce(s.login_username, '') in ('', coalesce(v_profile.username, ''))
+    limit 2;
+
+    if (
+      select count(*) from public.students s
+      where s.tenant_id = v_profile.tenant_id
+        and lower(btrim(s.full_name)) = lower(btrim(v_profile.full_name))
+        and coalesce(s.login_username, '') in ('', coalesce(v_profile.username, ''))
+    ) = 1 and v_student is not null then
+      insert into public.guardian_students (tenant_id, guardian_id, student_id)
+      values (v_profile.tenant_id, v_guardian, v_student)
+      on conflict (guardian_id, student_id) do nothing;
+
+      -- Sekalian simpan username-nya agar jalur (a) berlaku seterusnya.
+      if v_profile.username is not null then
+        update public.students
+        set login_username = v_profile.username
+        where id = v_student and coalesce(login_username, '') = '';
+      end if;
+    end if;
+
+    select count(*) into v_count
+    from public.guardian_students where guardian_id = v_guardian;
+  end if;
+
+  return v_count;
+end;
+$$;
+grant execute on function public.santri_link_profile(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 1. Trigger pada profiles — arah kebalikan dari trigger V16.
+-- ---------------------------------------------------------------------------
+create or replace function public.profiles_self_guardian_link()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.role = 'WALI_SANTRI' and new.tenant_id is not null then
+    perform public.santri_link_profile(new.id);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_self_guardian_link_trg on public.profiles;do $tfx$  -- idempotent: skip bila trigger sudah ada (aman dijalankan berulang)
+begin
+  execute 'create trigger profiles_self_guardian_link_trg
+  after insert or update of username, role, tenant_id, full_name on public.profiles
+  for each row execute function public.profiles_self_guardian_link()';
+exception
+  when duplicate_object then null;
+end
+$tfx$;
+
+-- ---------------------------------------------------------------------------
+-- 2. Self-heal saat halaman santri dibuka (dipanggil dari layout /santri).
+-- ---------------------------------------------------------------------------
+create or replace function public.santri_ensure_self_link()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    return 0;
+  end if;
+  return public.santri_link_profile(v_uid);
+end;
+$$;
+grant execute on function public.santri_ensure_self_link() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3. Backfill semua akun santri yang sudah ada.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  r record;
+begin
+  for r in
+    select id from public.profiles
+    where role = 'WALI_SANTRI' and tenant_id is not null
+  loop
+    perform public.santri_link_profile(r.id);
+  end loop;
+end $$;
+-- ============================================================================
+-- SOURCE: 20260921040000_tahfizh_v20_obrolan_chat.sql
+-- ============================================================================
+-- ============================================================================
+-- TAHFIZH V20 — OBROLAN (chat 1 lembaga, otomatis terhapus 24 jam)
+--
+-- Ruang obrolan tunggal per lembaga — semua peran di tenant yang sama
+-- (Admin/Koordinator/Ustadz/Santri) berbagi satu ruang, TIDAK PERNAH lintas
+-- lembaga. Pesan hanya bertahan 24 jam:
+--   1. Setiap kali seseorang mengirim pesan, pesan tenant tsb yang sudah
+--      lewat 24 jam langsung dibersihkan (self-purging, tidak bergantung
+--      pg_cron).
+--   2. Semua pembacaan (chat_list) memfilter created_at >= now() - 24 jam,
+--      jadi walau baris lama sempat tersisa, tidak akan pernah tampil.
+--   3. Bila ekstensi pg_cron tersedia, dijadwalkan pembersihan tambahan tiap
+--      jam untuk SEMUA tenant sekaligus (mengikuti pola V12 invoice cron).
+--
+-- Role DEVELOPER (platform, tidak terikat satu lembaga) TIDAK diberi menu
+-- Obrolan — current_tenant_id() developer bernilai NULL, sehingga secara
+-- alami tidak cocok dengan tenant_id manapun (bukan pengecualian khusus).
+-- ============================================================================
+
+create table if not exists public.chat_messages (
+  id          uuid primary key default gen_random_uuid(),
+  tenant_id   uuid not null references public.tenants (id) on delete cascade,
+  sender_id   uuid not null references public.profiles (id) on delete cascade,
+  sender_name text not null check (char_length(sender_name) between 1 and 120),
+  sender_role public.app_role not null,
+  content     text not null check (char_length(btrim(content)) between 1 and 1000),
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists chat_messages_tenant_created_idx
+  on public.chat_messages (tenant_id, created_at desc);
+
+alter table public.chat_messages enable row level security;
+
+-- Baca/tulis hanya di tenant sendiri — batas "1 lembaga" ditegakkan di RLS,
+-- bukan hanya di RPC, supaya tidak bisa dilewati lewat jalur lain.
+drop policy if exists chat_messages_select on public.chat_messages;
+create policy chat_messages_select on public.chat_messages
+  for select to authenticated
+  using (tenant_id = public.current_tenant_id());
+
+drop policy if exists chat_messages_insert on public.chat_messages;
+create policy chat_messages_insert on public.chat_messages
+  for insert to authenticated
+  with check (tenant_id = public.current_tenant_id() and sender_id = auth.uid());
+
+-- Hapus: pengirim sendiri, atau ADMIN/KOORDINATOR tenant tsb (moderasi).
+drop policy if exists chat_messages_delete on public.chat_messages;
+create policy chat_messages_delete on public.chat_messages
+  for delete to authenticated
+  using (
+    tenant_id = public.current_tenant_id()
+    and (sender_id = auth.uid() or public.current_role() in ('ADMIN', 'KOORDINATOR'))
+  );
+
+-- ---------------------------------------------------------------------------
+-- Kirim pesan — validasi, purge pesan >24 jam milik tenant sendiri, insert.
+-- ---------------------------------------------------------------------------
+create or replace function public.chat_send(p_content text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_tenant  uuid;
+  v_name    text;
+  v_role    public.app_role;
+  v_content text := btrim(coalesce(p_content, ''));
+  v_row     public.chat_messages;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+  if char_length(v_content) < 1 then
+    raise exception 'PESAN_KOSONG';
+  end if;
+  if char_length(v_content) > 1000 then
+    v_content := left(v_content, 1000);
+  end if;
+
+  select tenant_id, full_name, role into v_tenant, v_name, v_role
+  from public.profiles where id = v_uid;
+
+  if v_tenant is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  -- Self-purging: setiap pesan baru sekalian membersihkan pesan tenant ini
+  -- yang sudah lewat 24 jam. Tidak bergantung pg_cron untuk tetap ringkas.
+  delete from public.chat_messages
+  where tenant_id = v_tenant and created_at < now() - interval '24 hours';
+
+  insert into public.chat_messages (tenant_id, sender_id, sender_name, sender_role, content)
+  values (v_tenant, v_uid, v_name, v_role, v_content)
+  returning * into v_row;
+
+  return jsonb_build_object(
+    'id', v_row.id, 'senderId', v_row.sender_id, 'senderName', v_row.sender_name,
+    'senderRole', v_row.sender_role, 'content', v_row.content, 'createdAt', v_row.created_at,
+    'isSelf', true
+  );
+end;
+$$;
+grant execute on function public.chat_send(text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Ambil pesan — hanya 24 jam terakhir. p_since untuk polling inkremental
+-- (hanya pesan setelah timestamp itu); tanpa p_since = muat awal (maks 200).
+-- ---------------------------------------------------------------------------
+create or replace function public.chat_list(p_since timestamptz default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_tenant uuid;
+  v_out    jsonb;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  select tenant_id into v_tenant from public.profiles where id = v_uid;
+  if v_tenant is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  if p_since is not null then
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'id', m.id, 'senderId', m.sender_id, 'senderName', m.sender_name,
+             'senderRole', m.sender_role, 'content', m.content, 'createdAt', m.created_at,
+             'isSelf', m.sender_id = v_uid
+           ) order by m.created_at asc), '[]'::jsonb)
+    into v_out
+    from public.chat_messages m
+    where m.tenant_id = v_tenant
+      and m.created_at >= now() - interval '24 hours'
+      and m.created_at > p_since;
+  else
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'id', m.id, 'senderId', m.sender_id, 'senderName', m.sender_name,
+             'senderRole', m.sender_role, 'content', m.content, 'createdAt', m.created_at,
+             'isSelf', m.sender_id = v_uid
+           ) order by m.created_at asc), '[]'::jsonb)
+    into v_out
+    from (
+      select * from public.chat_messages m
+      where m.tenant_id = v_tenant and m.created_at >= now() - interval '24 hours'
+      order by m.created_at desc
+      limit 200
+    ) m;
+  end if;
+
+  return v_out;
+end;
+$$;
+grant execute on function public.chat_list(timestamptz) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Hapus pesan sendiri (atau moderasi ADMIN/KOORDINATOR) — RLS di atas yang
+-- menegakkan siapa boleh menghapus apa; fungsi ini hanya pembungkus praktis.
+-- ---------------------------------------------------------------------------
+create or replace function public.chat_delete(p_message_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.chat_messages where id = p_message_id;
+  return found;
+end;
+$$;
+grant execute on function public.chat_delete(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Pembersihan lintas-tenant (jaring pengaman tambahan bila pg_cron ada).
+-- ---------------------------------------------------------------------------
+create or replace function public.chat_purge_all_expired()
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  delete from public.chat_messages where created_at < now() - interval '24 hours';
+$$;
+grant execute on function public.chat_purge_all_expired() to authenticated;
+
+do $$
+begin
+  if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
+    create extension if not exists pg_cron;
+    perform cron.unschedule(jobid) from cron.job where jobname = 'tahfizh-chat-purge';
+    perform cron.schedule('tahfizh-chat-purge', '5 * * * *', 'select public.chat_purge_all_expired()');
+  else
+    raise notice 'pg_cron tidak tersedia — pembersihan Obrolan tetap berjalan otomatis lewat chat_send() setiap ada pesan masuk.';
+  end if;
+exception when others then
+  raise notice 'Jadwal pg_cron Obrolan dilewati (%) — fallback self-purge di chat_send() tetap berjalan.', sqlerrm;
+end $$;
+-- ============================================================================
+-- SOURCE: 20260921050000_tahfizh_v21_obrolan_halaqah_rooms.sql
+-- ============================================================================
+-- ============================================================================
+-- TAHFIZH V21 — Obrolan: ruang per Halaqah + batas 160 karakter
+--
+-- V20 hanya punya satu ruang per lembaga. V21 menambahkan ruang tambahan per
+-- Halaqah (halaqah_id NULL tetap berarti ruang "Lembaga" — semua anggota
+-- tenant). Siapa boleh masuk ruang Halaqah mana ditentukan oleh peran:
+--   - ADMIN/KOORDINATOR : semua Halaqah aktif di lembaganya (pengawasan).
+--   - USTADZ             : Halaqah yang ia ajar (halaqah_teachers).
+--   - WALI_SANTRI         : Halaqah tempat anaknya terdaftar aktif.
+-- Batas "1 lembaga" dari V20 tetap berlaku penuh untuk kedua jenis ruang.
+-- Panjang pesan diperketat dari 1000 -> 160 karakter.
+-- ============================================================================
+
+alter table public.chat_messages
+  add column if not exists halaqah_id uuid references public.halaqahs (id) on delete cascade;
+
+create index if not exists chat_messages_room_idx
+  on public.chat_messages (tenant_id, halaqah_id, created_at desc);
+
+-- Perketat batas panjang pesan: 1000 -> 160 karakter.
+alter table public.chat_messages drop constraint if exists chat_messages_content_check;
+alter table public.chat_messages
+  add constraint chat_messages_content_check check (char_length(btrim(content)) between 1 and 160);
+
+-- ---------------------------------------------------------------------------
+-- Helper: apakah pengguna saat ini boleh mengakses ruang Halaqah tertentu.
+-- ---------------------------------------------------------------------------
+create or replace function public.chat_can_access_halaqah(p_halaqah_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid           uuid := auth.uid();
+  v_tenant        uuid := public.current_tenant_id();
+  v_role          public.app_role := public.current_role();
+  v_halaqah_tenant uuid;
+begin
+  if v_uid is null or v_tenant is null or p_halaqah_id is null then
+    return false;
+  end if;
+
+  select tenant_id into v_halaqah_tenant from public.halaqahs where id = p_halaqah_id;
+  if v_halaqah_tenant is null or v_halaqah_tenant <> v_tenant then
+    return false;
+  end if;
+
+  if v_role in ('ADMIN', 'KOORDINATOR') then
+    return true;
+  end if;
+
+  if v_role = 'USTADZ' then
+    return exists (
+      select 1 from public.halaqah_teachers ht
+      join public.teachers t on t.id = ht.teacher_id
+      where ht.halaqah_id = p_halaqah_id and t.profile_id = v_uid
+    );
+  end if;
+
+  if v_role = 'WALI_SANTRI' then
+    return exists (
+      select 1 from public.halaqah_students hs
+      join public.guardian_students gs on gs.student_id = hs.student_id
+      join public.guardians g on g.id = gs.guardian_id
+      where hs.halaqah_id = p_halaqah_id and hs.left_at is null and g.profile_id = v_uid
+    );
+  end if;
+
+  return false;
+end;
+$$;
+grant execute on function public.chat_can_access_halaqah(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RLS — tambahkan syarat akses ruang Halaqah di atas syarat 1-tenant lama.
+-- ---------------------------------------------------------------------------
+drop policy if exists chat_messages_select on public.chat_messages;
+create policy chat_messages_select on public.chat_messages
+  for select to authenticated
+  using (
+    tenant_id = public.current_tenant_id()
+    and (halaqah_id is null or public.chat_can_access_halaqah(halaqah_id))
+  );
+
+drop policy if exists chat_messages_insert on public.chat_messages;
+create policy chat_messages_insert on public.chat_messages
+  for insert to authenticated
+  with check (
+    tenant_id = public.current_tenant_id()
+    and sender_id = auth.uid()
+    and (halaqah_id is null or public.chat_can_access_halaqah(halaqah_id))
+  );
+
+-- ---------------------------------------------------------------------------
+-- Daftar ruang yang boleh dibuka pengguna saat ini: "Lembaga" + Halaqah yang
+-- relevan dengan perannya.
+-- ---------------------------------------------------------------------------
+create or replace function public.chat_rooms()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_tenant uuid;
+  v_role   public.app_role;
+  v_out    jsonb;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  select tenant_id, role into v_tenant, v_role from public.profiles where id = v_uid;
+  if v_tenant is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  with halaqah_list as (
+    select h.id, h.name
+    from public.halaqahs h
+    where h.tenant_id = v_tenant and h.status = 'ACTIVE'
+      and (
+        v_role in ('ADMIN', 'KOORDINATOR')
+        or (
+          v_role = 'USTADZ' and exists (
+            select 1 from public.halaqah_teachers ht
+            join public.teachers t on t.id = ht.teacher_id
+            where ht.halaqah_id = h.id and t.profile_id = v_uid
+          )
+        )
+        or (
+          v_role = 'WALI_SANTRI' and exists (
+            select 1 from public.halaqah_students hs
+            join public.guardian_students gs on gs.student_id = hs.student_id
+            join public.guardians g on g.id = gs.guardian_id
+            where hs.halaqah_id = h.id and hs.left_at is null and g.profile_id = v_uid
+          )
+        )
+      )
+  )
+  select
+    jsonb_build_array(jsonb_build_object('id', null, 'label', 'Lembaga', 'kind', 'tenant'))
+    || coalesce(
+         (select jsonb_agg(jsonb_build_object('id', id, 'label', name, 'kind', 'halaqah') order by name)
+          from halaqah_list),
+         '[]'::jsonb
+       )
+  into v_out;
+
+  return v_out;
+end;
+$$;
+grant execute on function public.chat_rooms() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- chat_send / chat_list — tambah parameter ruang (p_halaqah_id) + batas 160.
+-- Signature berubah (parameter baru), jadi fungsi lama dibuang dulu.
+-- ---------------------------------------------------------------------------
+drop function if exists public.chat_send(text);
+drop function if exists public.chat_list(timestamptz);
+
+create or replace function public.chat_send(p_content text, p_halaqah_id uuid default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_tenant  uuid;
+  v_name    text;
+  v_role    public.app_role;
+  v_content text := btrim(coalesce(p_content, ''));
+  v_row     public.chat_messages;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+  if char_length(v_content) < 1 then
+    raise exception 'PESAN_KOSONG';
+  end if;
+  if char_length(v_content) > 160 then
+    v_content := left(v_content, 160);
+  end if;
+
+  select tenant_id, full_name, role into v_tenant, v_name, v_role
+  from public.profiles where id = v_uid;
+
+  if v_tenant is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  if p_halaqah_id is not null and not public.chat_can_access_halaqah(p_halaqah_id) then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  -- Self-purging: setiap pesan baru sekalian membersihkan pesan tenant ini
+  -- (semua ruang) yang sudah lewat 24 jam.
+  delete from public.chat_messages
+  where tenant_id = v_tenant and created_at < now() - interval '24 hours';
+
+  insert into public.chat_messages (tenant_id, halaqah_id, sender_id, sender_name, sender_role, content)
+  values (v_tenant, p_halaqah_id, v_uid, v_name, v_role, v_content)
+  returning * into v_row;
+
+  return jsonb_build_object(
+    'id', v_row.id, 'halaqahId', v_row.halaqah_id, 'senderId', v_row.sender_id,
+    'senderName', v_row.sender_name, 'senderRole', v_row.sender_role,
+    'content', v_row.content, 'createdAt', v_row.created_at, 'isSelf', true
+  );
+end;
+$$;
+grant execute on function public.chat_send(text, uuid) to authenticated;
+
+create or replace function public.chat_list(p_since timestamptz default null, p_halaqah_id uuid default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_tenant uuid;
+  v_out    jsonb;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  select tenant_id into v_tenant from public.profiles where id = v_uid;
+  if v_tenant is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  if p_halaqah_id is not null and not public.chat_can_access_halaqah(p_halaqah_id) then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  if p_since is not null then
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'id', m.id, 'halaqahId', m.halaqah_id, 'senderId', m.sender_id,
+             'senderName', m.sender_name, 'senderRole', m.sender_role,
+             'content', m.content, 'createdAt', m.created_at, 'isSelf', m.sender_id = v_uid
+           ) order by m.created_at asc), '[]'::jsonb)
+    into v_out
+    from public.chat_messages m
+    where m.tenant_id = v_tenant
+      and m.halaqah_id is not distinct from p_halaqah_id
+      and m.created_at >= now() - interval '24 hours'
+      and m.created_at > p_since;
+  else
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'id', m.id, 'halaqahId', m.halaqah_id, 'senderId', m.sender_id,
+             'senderName', m.sender_name, 'senderRole', m.sender_role,
+             'content', m.content, 'createdAt', m.created_at, 'isSelf', m.sender_id = v_uid
+           ) order by m.created_at asc), '[]'::jsonb)
+    into v_out
+    from (
+      select * from public.chat_messages m
+      where m.tenant_id = v_tenant
+        and m.halaqah_id is not distinct from p_halaqah_id
+        and m.created_at >= now() - interval '24 hours'
+      order by m.created_at desc
+      limit 200
+    ) m;
+  end if;
+
+  return v_out;
+end;
+$$;
+grant execute on function public.chat_list(timestamptz, uuid) to authenticated;
+-- ============================================================================
+-- SOURCE: 20260921060000_tahfizh_v21_fix_target_halaqah_status.sql
+-- ============================================================================
+-- ============================================================================
+-- TAHFIZH V21.1 — PERBAIKAN: menu Target guru kosong padahal sudah mengampu
+-- ============================================================================
+-- Bug: target_halaqah_overview() (V17) memfilter `h.status = 'ACTIVE'` saat
+-- mengambil daftar halaqah yang diampu guru. Halaman lain yang menampilkan
+-- "halaqah yang diampu" (mis. halaqah_teacher_list — menu "Halaqah Saya")
+-- TIDAK memfilter status ini, jadi begitu admin menonaktifkan sebuah halaqah
+-- (tombol "Nonaktifkan" di manajer halaqah admin) guru yang masih tercatat
+-- sebagai pengampu (baris di halaqah_teachers tidak dihapus saat nonaktif)
+-- tetap melihat halaqah itu di "Halaqah Saya", tapi menu Target menampilkan
+-- "Belum ada halaqah yang Anda ampu" — tidak konsisten dan membingungkan guru
+-- yang yakin sudah mengampu.
+--
+-- Perbaikan: samakan perilaku dengan halaqah_teacher_list — tampilkan semua
+-- halaqah yang diampu guru (aktif maupun nonaktif) di overview Target. Guru
+-- tetap bisa membuat/mengubah target untuk halaqah tersebut (target_halaqah_save
+-- tidak pernah memfilter status halaqah, hanya keanggotaan pengampu), jadi
+-- menghapus filter ini juga menghilangkan ketidakcocokan submit vs tampilan.
+-- Idempoten: create or replace, aman dijalankan ulang.
+-- ============================================================================
+
+create or replace function public.target_halaqah_overview()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_tenant  uuid;
+  v_role    text;
+  v_teacher uuid;
+  v_halaqah jsonb;
+  v_targets jsonb;
+begin
+  if v_uid is null then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  select p.tenant_id, p.role::text into v_tenant, v_role
+  from public.profiles p where p.id = v_uid;
+
+  if v_tenant is null or v_role <> 'USTADZ' then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  v_teacher := public.halaqah_current_teacher();
+  if v_teacher is null then
+    return jsonb_build_object('halaqah', '[]'::jsonb, 'targets', '[]'::jsonb);
+  end if;
+
+  -- V21.1: halaqah yang diampu guru (aktif maupun nonaktif — sama seperti
+  -- halaqah_teacher_list / menu "Halaqah Saya") + jumlah santri aktif yang
+  -- masih tergabung.
+  select coalesce(jsonb_agg(
+           jsonb_build_object(
+             'id', h.id,
+             'name', h.name,
+             'studentCount', (
+               select count(*) from public.halaqah_students hs
+               join public.students s on s.id = hs.student_id
+               where hs.halaqah_id = h.id and hs.left_at is null and s.status = 'ACTIVE'
+             )
+           ) order by h.name), '[]'::jsonb)
+  into v_halaqah
+  from public.halaqahs h
+  join public.halaqah_teachers ht on ht.halaqah_id = h.id and ht.teacher_id = v_teacher
+  where h.tenant_id = v_tenant;
+
+  select coalesce(jsonb_agg(
+           jsonb_build_object(
+             'id', t.id,
+             'halaqahId', t.halaqah_id,
+             'category', t.category,
+             'targetValue', t.target_value,
+             'startDate', t.start_date,
+             'endDate', t.end_date,
+             'description', t.description,
+             'updatedAt', t.updated_at
+           ) order by t.category), '[]'::jsonb)
+  into v_targets
+  from public.halaqah_targets t
+  where t.tenant_id = v_tenant
+    and t.halaqah_id in (
+      select ht.halaqah_id from public.halaqah_teachers ht where ht.teacher_id = v_teacher
+    );
+
+  return jsonb_build_object('halaqah', v_halaqah, 'targets', v_targets);
+end;
+$$;
+
+grant execute on function public.target_halaqah_overview() to authenticated;

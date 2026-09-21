@@ -26,6 +26,7 @@ export type TeacherStudentRow = {
   status: "ACTIVE" | "INACTIVE";
   guardian_name: string | null;
   guardian_whatsapp: string | null;
+  halaqah_id: string | null;
   halaqah_name: string | null;
 };
 
@@ -152,6 +153,7 @@ export const getTeacherStudentsDetailed = cache(async (): Promise<TeacherStudent
       status: st.status,
       guardian_name: st.guardian_name,
       guardian_whatsapp: st.guardian_whatsapp,
+      halaqah_id: row.halaqah_id,
       halaqah_name: nameById.get(row.halaqah_id) ?? null,
     });
   }

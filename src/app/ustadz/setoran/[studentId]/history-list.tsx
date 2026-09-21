@@ -73,7 +73,6 @@ export function SetoranHistoryList({ items }: { items: HistoryItem[] }) {
     <ol className="space-y-3">
       {items.map((h) => (
         <li key={h.id} className="flex items-start gap-3">
-          <span className="bg-gradient-brand mt-1.5 size-2 shrink-0 rounded-full" />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-muted-foreground">{formatDate(h.assessedDate)}</p>
             <div className="mt-0.5 flex flex-wrap items-center gap-2">

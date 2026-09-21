@@ -16,8 +16,8 @@ const nextConfig: NextConfig = {
     // server action tetap meng-invalidate cache ini, jadi data tidak basi
     // setelah simpan/edit.
     staleTimes: {
-      dynamic: 600,
-      static: 600,
+      dynamic: 3600,
+      static: 3600,
     },
   },
 };

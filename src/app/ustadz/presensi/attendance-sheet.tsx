@@ -316,7 +316,6 @@ export function AttendanceSheet({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
               {ATTENDANCE_STATUSES.map((s) => (
                 <span key={s} className="inline-flex items-center gap-1.5">
-                  <span className={cn("h-2.5 w-2.5 rounded-full", STATUS_META[s].dot)} aria-hidden />
                   <span className="text-muted-foreground">{STATUS_META[s].label}:</span>
                   <span className="font-bold text-foreground">{counts[s]}</span>
                 </span>

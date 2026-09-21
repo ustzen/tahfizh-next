@@ -64,7 +64,6 @@ export function TartilHistoryList({ items }: { items: HistoryItem[] }) {
     <ol className="space-y-3">
       {items.map((h) => (
         <li key={h.id} className="flex items-start gap-3">
-          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-role" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">

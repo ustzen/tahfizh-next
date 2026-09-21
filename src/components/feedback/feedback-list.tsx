@@ -115,7 +115,6 @@ export function FeedbackFilterTabs({
                 : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-500/20 dark:bg-slate-500/5 dark:text-slate-300 dark:hover:bg-slate-500/10"
             )}
           >
-            <span className={cn("size-1.5 rounded-full", active ? "bg-white/80" : t.dot)} aria-hidden />
             {t.label}
             <span
               className={cn(
@@ -242,7 +241,6 @@ function FeedbackCard({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className={cn("gap-1.5", categoryTone(row.category).badge)}>
-                <span className={cn("size-1.5 rounded-full", categoryTone(row.category).dot)} aria-hidden />
                 {FEEDBACK_CATEGORY_LABEL[row.category] ?? row.category}
               </Badge>
               <Badge variant="outline" className={statusTone(row.status)}>

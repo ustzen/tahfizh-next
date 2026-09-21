@@ -44,7 +44,6 @@ export function HistoryList({ items }: { items: HistoryItem[] }) {
         const kind = KIND_LABEL[h.changeKind] ?? KIND_LABEL.UPDATE;
         return (
           <li key={h.id} className="flex items-start gap-3">
-            <span className="bg-blue-100 dark:bg-blue-500/15 mt-1.5 size-2 shrink-0 rounded-full" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-medium text-foreground">{h.surahName}</p>

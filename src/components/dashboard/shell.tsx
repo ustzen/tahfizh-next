@@ -65,7 +65,6 @@ export async function DashboardShell({
           <Logo />
         </Link>
         <p className="bg-role-soft text-role-strong mx-1 mb-3 inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-[0.72rem] font-bold">
-          <span className="bg-role size-2 rounded-full" aria-hidden />
           {roleLabel}
         </p>
         <div className="flex-1 overflow-y-auto">
