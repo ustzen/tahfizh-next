@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CalendarPlus, ChevronDown, FileUp, HandHeart, QrCode, Search, X } from "lucide-react";
+import { Banknote, CalendarPlus, CheckCircle2, ChevronDown, FileUp, HandCoins, HandHeart, QrCode, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -210,36 +210,49 @@ export function WaliPaymentPanel({
 
   return (
     <div className="space-y-6">
-      <Card className="shadow-card rounded-2xl">
-        <CardContent className="space-y-5 pt-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="font-semibold">Tagihan Infak Pengembangan</h3>
-              <p className="text-muted-foreground text-xs">
-                Tahun ajaran {academicYear} · dana untuk pengembangan platform TAHFIZH
-              </p>
+      <Card className="shadow-card overflow-hidden rounded-2xl">
+        <div className="bg-gradient-brand relative overflow-hidden px-5 py-6 sm:px-7 sm:py-7">
+          <span
+            aria-hidden
+            className="bg-dots text-role/20 pointer-events-none absolute -top-4 -right-4 h-32 w-52 [mask-image:linear-gradient(to_left,black,transparent)]"
+          />
+          <div className="relative flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white shadow-card backdrop-blur-sm sm:size-14">
+                <HandCoins className="size-6 sm:size-7" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-lg font-bold text-white sm:text-xl">Tagihan Infak Pengembangan</h3>
+                <p className="mt-0.5 text-sm text-white/85">
+                  Tahun ajaran {academicYear} · dana untuk pengembangan platform TAHFIZH
+                </p>
+              </div>
             </div>
             {selectedCount > 0 && (
-              <Badge className="bg-role text-role-ink">
-                {selectedCount} dipilih · {rupiah(total)}
-              </Badge>
+              <div className="rounded-2xl bg-white/15 px-4 py-3 text-right shadow-card backdrop-blur-sm sm:px-5">
+                <p className="text-xs font-medium text-white/80">
+                  {selectedCount} tagihan dipilih
+                </p>
+                <p className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">{rupiah(total)}</p>
+              </div>
             )}
           </div>
-
+        </div>
+        <CardContent className="space-y-6 pt-6">
           {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">{error}</p>
+            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">{error}</p>
           )}
 
           {pendingTx && (
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
               Anda memiliki transaksi yang sedang berjalan ({pendingTx.reference} · {rupiah(pendingTx.total_amount)}).
               Selesaikan atau batalkan terlebih dahulu.
             </p>
           )}
 
           {/* ---------------- Anak sendiri ---------------- */}
-          <section className="space-y-3">
-            <h4 className="text-sm font-semibold text-foreground">Tagihan Saya</h4>
+          <section className="space-y-3.5">
+            <h4 className="text-base font-semibold text-foreground">Tagihan Saya</h4>
             {kids.length === 0 && (
               <p className="text-muted-foreground py-4 text-center text-sm">
                 Tagihan infak bulan ini belum diterbitkan lembaga. Anda tetap dapat berinfak untuk santri lain di daftar bawah.
@@ -254,10 +267,13 @@ export function WaliPaymentPanel({
                 const aheadSelected = child.ahead.filter((i) => keyOf(child.studentId, i.y, i.m) in selected).length;
                 const isAheadOpen = aheadOpen[child.studentId] === true;
                 return (
-                  <div key={child.studentId} className="rounded-xl border border-slate-200 p-4 dark:border-slate-500/20">
-                    <div className="mb-3 flex items-start justify-between gap-2">
+                  <div
+                    key={child.studentId}
+                    className="shadow-card rounded-2xl border border-slate-200 p-5 transition-shadow hover:shadow-md dark:border-slate-500/20"
+                  >
+                    <div className="mb-4 flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-foreground">{child.name}</p>
+                        <p className="truncate text-base font-semibold text-foreground">{child.name}</p>
                         <p className="text-muted-foreground font-mono text-xs">{child.code}</p>
                       </div>
                       {openSelectable.length > 1 && (
@@ -511,14 +527,14 @@ export function WaliPaymentPanel({
 
           {/* ---------------- Ringkasan pilihan + nominal ---------------- */}
           {selectedCount > 0 && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-500/5">
+            <div className="rounded-2xl border-2 border-blue-200 bg-blue-50/60 p-5 dark:border-blue-500/20 dark:bg-blue-500/5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">
+                  <p className="text-base font-semibold text-foreground">
                     {selectedCount} tagihan dipilih · {studentCount} santri
                   </p>
-                  <p className="text-muted-foreground text-xs">
-                    Total <span className="font-semibold text-foreground">{rupiah(total)}</span>
+                  <p className="text-muted-foreground mt-0.5 text-sm">
+                    Total <span className="text-lg font-bold text-foreground">{rupiah(total)}</span>
                   </p>
                 </div>
                 <Button type="button" variant="ghost" size="sm" onClick={clearAll} disabled={pending}>
@@ -600,36 +616,41 @@ export function WaliPaymentPanel({
           )}
 
           {/* ---------------- Metode pembayaran ---------------- */}
-          <div className="grid gap-3 border-t pt-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-500/20">
-              <div className="flex items-center gap-2">
-                <Banknote className="size-4 text-role" />
-                <p className="text-sm font-semibold">Transfer Manual</p>
+          <div className="grid gap-4 border-t pt-5 sm:grid-cols-2">
+            <div className="shadow-card rounded-2xl border border-slate-200 p-5 transition-shadow hover:shadow-md dark:border-slate-500/20">
+              <div className="flex items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-role-soft text-role-strong">
+                  <Banknote className="size-5" />
+                </span>
+                <p className="text-base font-semibold">Transfer Manual</p>
               </div>
               {bank && (bank.bankName || bank.bankNo) ? (
-                <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
+                <div className="text-muted-foreground mt-3 space-y-1 text-sm">
                   {bank.bankName && <p>Bank: <span className="font-semibold text-foreground/85">{bank.bankName}</span></p>}
-                  {bank.bankNo && <p>No. rekening: <span className="font-mono font-semibold text-foreground/85">{bank.bankNo}</span></p>}
+                  {bank.bankNo && <p>No. rekening: <span className="font-mono text-[0.95rem] font-semibold text-foreground/85">{bank.bankNo}</span></p>}
                   {bank.bankAccount && <p>a.n. {bank.bankAccount}</p>}
                 </div>
               ) : (
-                <p className="text-muted-foreground mt-2 text-xs">Rekening penerima infak belum diatur. Silakan hubungi pengelola TAHFIZH.</p>
+                <p className="text-muted-foreground mt-3 text-sm">Rekening penerima infak belum diatur. Silakan hubungi pengelola TAHFIZH.</p>
               )}
               <Button
                 onClick={() => handlePay("MANUAL")}
                 disabled={pending || selectedCount === 0 || pendingTx !== undefined}
-                className="mt-3 w-full bg-gradient-brand hover:opacity-90"
+                size="lg"
+                className="mt-4 w-full bg-gradient-brand text-base hover:opacity-90"
               >
                 {pending ? "Memproses…" : selectedCount > 0 ? `Bayar ${rupiah(total)} via Transfer` : "Bayar via Transfer"}
               </Button>
             </div>
 
-            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-500/20">
-              <div className="flex items-center gap-2">
-                <QrCode className="size-4 text-role" />
-                <p className="text-sm font-semibold">Otomatis (QRIS / e-wallet)</p>
+            <div className="shadow-card rounded-2xl border border-slate-200 p-5 transition-shadow hover:shadow-md dark:border-slate-500/20">
+              <div className="flex items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-role-soft text-role-strong">
+                  <QrCode className="size-5" />
+                </span>
+                <p className="text-base font-semibold">Otomatis (QRIS / e-wallet)</p>
               </div>
-              <p className="text-muted-foreground mt-2 text-xs">
+              <p className="text-muted-foreground mt-3 text-sm">
                 {autoEnabled
                   ? `Bayar langsung via QRIS, VA, atau e-wallet. Minimal ${rupiah(IPAYMU_MIN_TOTAL)}.`
                   : "Pembayaran otomatis belum diaktifkan."}
@@ -638,7 +659,8 @@ export function WaliPaymentPanel({
                 onClick={() => handlePay("IPAYMU")}
                 disabled={pending || selectedCount === 0 || pendingTx !== undefined || !autoEnabled}
                 variant="outline"
-                className="mt-3 w-full"
+                size="lg"
+                className="mt-4 w-full text-base"
               >
                 {pending ? "Memproses…" : "Bayar Otomatis"}
               </Button>
@@ -653,7 +675,7 @@ export function WaliPaymentPanel({
       {/* Riwayat transaksi */}
       <Card className="shadow-card rounded-2xl">
         <CardContent className="pt-6">
-          <h3 className="mb-3 font-semibold text-foreground">Riwayat Pembayaran Saya</h3>
+          <h3 className="mb-4 text-base font-semibold text-foreground">Riwayat Pembayaran Saya</h3>
           {transactions.length === 0 ? (
             <p className="text-muted-foreground py-6 text-center text-sm">Belum ada transaksi.</p>
           ) : (
@@ -791,37 +813,37 @@ function MonthRow({
       onClick={onToggle}
       aria-pressed={checked}
       className={cn(
-        "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition-colors",
+        "flex w-full items-center justify-between rounded-xl border-2 px-4 py-3.5 text-left text-sm transition-all",
         checked
-          ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10"
-          : "border-slate-200 bg-white hover:border-blue-300 dark:border-slate-500/20 dark:bg-transparent",
+          ? "border-blue-500 bg-blue-50 shadow-sm dark:bg-blue-500/10"
+          : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/40 dark:border-slate-500/20 dark:bg-transparent",
         disabled && "cursor-not-allowed opacity-60"
       )}
     >
       <span className="min-w-0">
-        <span className="flex flex-wrap items-center gap-1.5 font-medium text-foreground">
+        <span className="flex flex-wrap items-center gap-2 text-[0.95rem] font-semibold text-foreground">
           {monthYearLabel(inv.y, inv.m)}
           {open && overdue && (
-            <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[0.65rem] font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
+            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[0.7rem] font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
               Menunggak
             </span>
           )}
         </span>
-        <span className="text-muted-foreground text-xs">
+        <span className="text-muted-foreground mt-0.5 block text-xs">
           {INVOICE_STATUS_LABEL[inv.status] ?? (inv.status === "NONE" ? "Belum Bayar" : inv.status)}
           {open && ` · min ${rupiah(inv.amount)}`}
           {open && !overdue && ` · jatuh tempo ${String(DUE_DAY).padStart(2, "0")}/${String(inv.m).padStart(2, "0")}/${inv.y}`}
         </span>
       </span>
-      <span className="ml-3 flex shrink-0 items-center gap-2">
-        <span className="font-semibold text-foreground">{rupiah(inv.amount)}</span>
+      <span className="ml-3 flex shrink-0 items-center gap-3">
+        <span className="text-base font-bold text-foreground">{rupiah(inv.amount)}</span>
         <span
           className={cn(
-            "flex size-5 items-center justify-center rounded-md border",
+            "flex size-6 items-center justify-center rounded-full border-2 transition-colors",
             checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"
           )}
         >
-          {checked ? "✓" : ""}
+          {checked && <CheckCircle2 className="size-4" strokeWidth={2.5} />}
         </span>
       </span>
     </button>

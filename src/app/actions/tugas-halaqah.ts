@@ -40,7 +40,7 @@ export type TugasGridData = {
   error?: string;
   halaqah?: TugasHalaqah[];
   tasks?: TugasItem[];
-  students?: { id: string; name: string; nickname: string | null }[];
+  students?: { id: string; name: string; nickname: string | null; code?: string | null }[];
   scores?: Record<string, TugasScore>;
 };
 
@@ -59,7 +59,7 @@ export async function fetchTugasGridAction(): Promise<TugasGridData> {
   const data = res.data as {
     halaqah: TugasHalaqah[];
     tasks: TugasItem[];
-    students: { id: string; name: string; nickname: string | null }[];
+    students: { id: string; name: string; nickname: string | null; code?: string | null }[];
     scores: { tugasId: string; studentId: string; mode: string; scoreValue: number | null; scoreLabel: string | null; note: string | null }[];
   };
 

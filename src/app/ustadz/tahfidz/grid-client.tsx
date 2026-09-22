@@ -27,7 +27,7 @@ import {
  * DIPELAJARI → BELUM. Simpan = SATU batch call (RPC tahfidz_save_grid).
  */
 
-type Student = { id: string; name: string; nickname: string | null; kelas?: string | null };
+type Student = { id: string; name: string; nickname: string | null; code?: string | null };
 type Surah = { surahId: string; name: string; sortOrder: number };
 type CellState = { status: "BELUM" | "DIPELAJARI" | "DINILAI"; scoreLabel: string | null; scoreValue: number | null };
 type Mode = "CENTANG" | "HURUF" | "ANGKA";
@@ -62,7 +62,7 @@ function cellDisplay(cell: CellState | undefined, mode: Mode): string {
 function VerticalSurahName({ name }: { name: string }) {
   return (
     <span
-      className="inline-block whitespace-nowrap text-[0.65rem] font-bold text-white"
+      className="inline-block whitespace-nowrap text-[0.55rem] font-bold text-white"
       style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
     >
       {name}
@@ -96,6 +96,30 @@ export function TahfidzGridClient({
   const gradeOptions = grades.length > 0 ? grades : FALLBACK_GRADES;
 
   const key = (surahId: string, studentId: string) => `${surahId}:${studentId}`;
+
+  /** Jumlah surat yang sudah DINILAI untuk satu santri (dihitung dari state sel saat ini). */
+  function countDinilai(studentId: string): number {
+    return surahs.reduce((acc, s) => {
+      const c = cells[key(s.surahId, studentId)];
+      return acc + (c?.status === "DINILAI" ? 1 : 0);
+    }, 0);
+  }
+
+  /**
+   * Urutan baris: jumlah hafalan (DINILAI) TERBANYAK dulu; bila sama, NIS
+   * LEBIH BESAR tampil lebih atas (mis. NIS 025 di atas NIS 012).
+   */
+  const sortedStudents = useMemo(() => {
+    return [...students].sort((a, b) => {
+      const diff = countDinilai(b.id) - countDinilai(a.id);
+      if (diff !== 0) return diff;
+      const an = Number(a.code ?? "");
+      const bn = Number(b.code ?? "");
+      if (Number.isFinite(an) && Number.isFinite(bn) && an !== bn) return bn - an;
+      return (b.code ?? "").localeCompare(a.code ?? "");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, cells, surahs]);
 
   const changedKeys = useMemo(() => {
     const dirty = new Set<string>();
@@ -246,14 +270,13 @@ export function TahfidzGridClient({
           <Table>
             <TableHeader className="sticky top-0 z-20 [&_tr]:hover:bg-violet-600">
               <TableRow className="bg-violet-600">
-                <TableHead className="w-10 bg-violet-600 px-2 text-center text-xs font-bold text-white">No</TableHead>
-                <TableHead className="sticky left-0 z-30 min-w-40 bg-violet-600 px-3 text-xs font-bold text-white">Nama</TableHead>
-                <TableHead className="w-14 bg-violet-600 px-2 text-center text-xs font-bold text-white">Kelas</TableHead>
-                <TableHead className="w-12 bg-violet-600 px-1 text-center text-xs font-bold text-white">Jml</TableHead>
+                <TableHead className="w-8 bg-violet-600 px-1 text-center text-xs font-bold text-white">No</TableHead>
+                <TableHead className="sticky left-0 z-30 w-14 bg-violet-600 px-1 text-center text-xs font-bold text-white">NIS</TableHead>
+                <TableHead className="sticky left-14 z-30 min-w-32 bg-violet-600 px-2 text-xs font-bold text-white">Nama</TableHead>
                 {surahs.map((s) => (
                   <TableHead
                     key={s.surahId}
-                    className="w-8 min-w-8 max-w-8 border-l border-violet-400/50 px-1 pb-2 pt-2 text-center"
+                    className="w-6 min-w-6 max-w-6 border-l border-violet-400/50 px-0 pb-1.5 pt-1.5 text-center"
                     title={s.name}
                   >
                     <VerticalSurahName name={s.name} />
@@ -262,23 +285,19 @@ export function TahfidzGridClient({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {students.map((st, rowIdx) => (
+              {sortedStudents.map((st, rowIdx) => (
                 <TableRow key={st.id} className="odd:bg-white even:bg-violet-50/40">
-                  <TableCell className="px-2 text-center text-xs text-muted-foreground">{rowIdx + 1}</TableCell>
-                  <TableCell className="sticky left-0 z-10 bg-inherit px-3">
+                  <TableCell className="px-1 text-center text-xs text-muted-foreground">{rowIdx + 1}</TableCell>
+                  <TableCell className="sticky left-0 z-10 bg-inherit px-1 text-center font-mono text-xs text-muted-foreground">
+                    {st.code ?? "—"}
+                  </TableCell>
+                  <TableCell className="sticky left-14 z-10 bg-inherit px-2">
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium text-foreground">{st.name}</span>
+                      <span className="text-xs font-medium text-foreground">{st.name}</span>
                       {st.nickname && st.nickname !== st.name && (
-                        <span className="text-muted-foreground text-xs">{st.nickname}</span>
+                        <span className="text-muted-foreground text-[0.65rem]">{st.nickname}</span>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell className="px-2 text-center text-xs text-muted-foreground">{st.kelas ?? "—"}</TableCell>
-                  <TableCell className="px-1 text-center text-xs font-bold text-violet-700 dark:text-violet-300">
-                    {surahs.reduce((acc, s) => {
-                      const c = cells[key(s.surahId, st.id)];
-                      return acc + (c?.status === "DINILAI" ? 1 : 0);
-                    }, 0)}
                   </TableCell>
                   {surahs.map((s) => {
                     const cell = cells[key(s.surahId, st.id)];
@@ -297,14 +316,14 @@ export function TahfidzGridClient({
                               setCell(s.surahId, st.id, { scoreValue: v !== null && !Number.isNaN(v) ? v : null });
                             }}
                             onDoubleClick={() => cycleCell(s.surahId, st.id)}
-                            className={`h-8 w-9 rounded-md border px-0 text-center text-xs font-bold outline-none focus:ring-2 ${CELL_STYLES[variant]}`}
+                            className={`h-7 w-6 rounded border px-0 text-center text-[0.65rem] font-bold outline-none focus:ring-2 ${CELL_STYLES[variant]}`}
                           />
                         ) : mode === "HURUF" && cell?.status === "DINILAI" ? (
                           <select
                             value={cell.scoreLabel ?? gradeOptions[0]}
                             onChange={(e) => setCell(s.surahId, st.id, { scoreLabel: e.target.value })}
                             onDoubleClick={() => cycleCell(s.surahId, st.id)}
-                            className={`h-8 w-9 rounded-md border text-center text-[0.6rem] font-bold outline-none focus:ring-2 ${CELL_STYLES[variant]}`}
+                            className={`h-7 w-6 rounded border text-center text-[0.55rem] font-bold outline-none focus:ring-2 ${CELL_STYLES[variant]}`}
                           >
                             {gradeOptions.map((g) => (
                               <option key={g} value={g}>{g}</option>
@@ -315,7 +334,7 @@ export function TahfidzGridClient({
                             type="button"
                             onClick={() => cycleCell(s.surahId, st.id)}
                             title={`${s.name} — ${st.name}`}
-                            className={`h-8 w-9 rounded-md border text-sm font-bold transition ${CELL_STYLES[variant]}`}
+                            className={`h-7 w-6 rounded border text-xs font-bold transition ${CELL_STYLES[variant]}`}
                           >
                             {cellDisplay(cell, mode)}
                           </button>

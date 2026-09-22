@@ -116,7 +116,6 @@ export const ROLE_NAV: Record<AppRole, NavItem[]> = {
   ],
   WALI_SANTRI: [
     { label: "Dashboard", href: "/santri" },
-    { label: "Data Saya", href: "/santri/anak" },
     { label: "Pantauan Pembelajaran", href: "/santri/pantauan" },
     { label: "Target", href: "/santri/target" },
     { label: "Presensi", href: "/santri/presensi" },

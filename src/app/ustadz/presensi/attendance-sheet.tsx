@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { CalendarDays, Check, Users } from "lucide-react";
+import { Fragment, useMemo, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { CalendarDays, Check, NotebookPen, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -58,14 +58,59 @@ export function AttendanceSheet({
   readOnly?: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
   const [halaqahId, setHalaqahId] = useState(initialHalaqahId);
   const [date, setDate] = useState(initialDate);
   const [generalNote, setGeneralNote] = useState(initialGeneralNote);
   const [entries, setEntries] = useState<Record<string, AttendanceEntry>>(initialEntries);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  // Baris catatan diciutkan secara default (rapat di mobile); dibuka per-santri saat dibutuhkan.
+  const [openNote, setOpenNote] = useState<Record<string, boolean>>({});
 
   const counts = useMemo(() => countStatuses(entries), [entries]);
+
+  /**
+   * Ganti tanggal/halaqah HARUS netral dulu (bukan warisan klik sebelumnya).
+   * 1) Kosongkan state lokal seketika (biar tidak kelihatan "sudah ter-klik").
+   * 2) Dorong ?tanggal=/?halaqah= baru lewat router agar server component
+   *    refetch getAttendanceDay untuk kombinasi yang benar-benar baru;
+   *    key={halaqahId}-${date} di page.tsx akan remount AttendanceSheet
+   *    dengan initialEntries yang sesuai (kosong jika memang belum diisi).
+   */
+  function resetToNeutral() {
+    setEntries({});
+    setGeneralNote("");
+    setOpenNote({});
+    setMessage(null);
+  }
+
+  function goTo(nextHalaqahId: string, nextDate: string) {
+    const params = new URLSearchParams(searchParams?.toString());
+    params.set("tanggal", nextDate);
+    if (halaqahOptions.length > 1) {
+      params.set("halaqah", nextHalaqahId);
+    }
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`);
+    });
+  }
+
+  function handleDateChange(nextDate: string) {
+    if (nextDate === date) return;
+    setDate(nextDate);
+    resetToNeutral();
+    goTo(halaqahId, nextDate);
+  }
+
+  function handleHalaqahChange(nextHalaqahId: string) {
+    if (nextHalaqahId === halaqahId) return;
+    setHalaqahId(nextHalaqahId);
+    resetToNeutral();
+    goTo(nextHalaqahId, date);
+  }
 
   /** Mass action — pure client state, zero requests (rule #15-#20). */
   function setAll(status: AttendanceStatus) {
@@ -128,13 +173,7 @@ export function AttendanceSheet({
         <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Halaqah</Label>
-            <Select
-              value={halaqahId}
-              onValueChange={(v) => {
-                setHalaqahId(v);
-                setMessage(null);
-              }}
-            >
+            <Select value={halaqahId} onValueChange={handleHalaqahChange} disabled={isPending}>
               <SelectTrigger aria-label="Pilih halaqah">
                 <SelectValue placeholder="Pilih halaqah" />
               </SelectTrigger>
@@ -153,7 +192,8 @@ export function AttendanceSheet({
               type="date"
               value={date}
               max={todayISO()}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => handleDateChange(e.target.value)}
+              disabled={isPending}
               aria-label="Tanggal presensi"
             />
           </div>
@@ -184,9 +224,10 @@ export function AttendanceSheet({
                 key={s}
                 type="button"
                 onClick={() => setAll(s)}
+                disabled={isPending}
                 aria-label={`${STATUS_META[s].label} semua`}
                 className={cn(
-                  "flex min-h-[56px] flex-col items-center justify-center rounded-xl border-2 border-white/40 bg-white/15 font-bold text-white backdrop-blur transition hover:bg-white/30 active:scale-95",
+                  "flex min-h-[56px] flex-col items-center justify-center rounded-xl border-2 border-white/40 bg-white/15 font-bold text-white backdrop-blur transition hover:bg-white/30 active:scale-95 disabled:opacity-50",
                   "touch-manipulation"
                 )}
               >
@@ -201,45 +242,48 @@ export function AttendanceSheet({
       </Card>
       )}
 
-      {/* Per-student status table (rule #22/#23/#28) — ramping, satu baris per santri */}
+      {/* Per-student status table (rule #22/#23/#28) — rapat di mobile, tanpa geser ke kanan */}
       {students.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground/80">
           Belum ada santri dalam kelompok ini. Tambahkan anggota lewat menu Halaqah.
         </p>
       ) : (
         <Card className="shadow-card overflow-hidden py-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10 px-3">No.</TableHead>
-                  <TableHead>Nama</TableHead>
-                  {ATTENDANCE_STATUSES.map((st) => (
-                    <TableHead key={st} className="w-11 px-1 text-center" title={STATUS_META[st].label}>
-                      {STATUS_META[st].letter}
-                    </TableHead>
-                  ))}
-                  <TableHead className="min-w-[160px]">Catatan (opsional)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((s, i) => {
-                  const entry = entries[s.id] ?? { status: null, note: "" };
-                  return (
-                    <TableRow key={s.id}>
-                      <TableCell className="px-3 text-xs text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="text-sm font-medium text-slate-800 dark:text-slate-100">
+          <Table className="table-fixed text-[0.8rem]">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-7 px-1 text-center text-[0.65rem]">No</TableHead>
+                <TableHead className="w-14 px-1 text-[0.65rem]">NIS</TableHead>
+                <TableHead className="px-1.5">Nama</TableHead>
+                {ATTENDANCE_STATUSES.map((st) => (
+                  <TableHead key={st} className="w-7 px-0.5 text-center" title={STATUS_META[st].label}>
+                    {STATUS_META[st].letter}
+                  </TableHead>
+                ))}
+                <TableHead className="w-7 px-0.5 text-center text-[0.65rem]">Ket</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {students.map((s, i) => {
+                const entry = entries[s.id] ?? { status: null, note: "" };
+                const noteOpen = openNote[s.id] === true;
+                return (
+                  <Fragment key={s.id}>
+                    <TableRow>
+                      <TableCell className="px-1 text-center text-[0.65rem] text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="px-1 font-mono text-[0.65rem] text-muted-foreground">{s.code}</TableCell>
+                      <TableCell className="truncate px-1.5 text-xs font-medium text-slate-800 dark:text-slate-100">
                         {s.name}
                       </TableCell>
                       {ATTENDANCE_STATUSES.map((st) => {
                         const active = entry.status === st;
                         if (readOnly) {
                           return (
-                            <TableCell key={st} className="px-1 text-center">
+                            <TableCell key={st} className="px-0.5 text-center">
                               <span
                                 aria-hidden
                                 className={cn(
-                                  "mx-auto flex size-8 items-center justify-center rounded-lg border text-xs font-bold",
+                                  "mx-auto flex size-7 items-center justify-center rounded-md border text-[0.7rem] font-bold",
                                   active
                                     ? cn(STATUS_META[st].solid, "border-transparent")
                                     : "border-slate-100 bg-slate-50 text-slate-300"
@@ -251,14 +295,15 @@ export function AttendanceSheet({
                           );
                         }
                         return (
-                          <TableCell key={st} className="px-1 text-center">
+                          <TableCell key={st} className="px-0.5 text-center">
                             <button
                               type="button"
                               onClick={() => setOne(s.id, st)}
+                              disabled={isPending}
                               aria-pressed={active}
                               aria-label={`${STATUS_META[st].label} — ${s.name}`}
                               className={cn(
-                                "mx-auto flex size-8 items-center justify-center rounded-lg border text-xs font-bold transition active:scale-95",
+                                "mx-auto flex size-7 items-center justify-center rounded-md border text-[0.7rem] font-bold transition active:scale-95 disabled:opacity-50",
                                 active
                                   ? cn(STATUS_META[st].solid, "border-transparent shadow-sm")
                                   : cn("bg-white", STATUS_META[st].chip, "hover:bg-slate-50")
@@ -269,26 +314,46 @@ export function AttendanceSheet({
                           </TableCell>
                         );
                       })}
-                      <TableCell className="px-2">
-                        {readOnly ? (
-                          <span className="text-xs text-muted-foreground">{entry.note || "—"}</span>
-                        ) : (
-                          <input
-                            type="text"
-                            value={entry.note}
-                            onChange={(e) => setNote(s.id, e.target.value)}
-                            placeholder="Opsional"
-                            aria-label={`Catatan untuk ${s.name}`}
-                            className="w-full min-w-[140px] rounded-md border border-border bg-transparent px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-role"
-                          />
-                        )}
+                      <TableCell className="px-0.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setOpenNote((prev) => ({ ...prev, [s.id]: !prev[s.id] }))}
+                          aria-expanded={noteOpen}
+                          aria-label={`Catatan untuk ${s.name}`}
+                          title="Catatan (opsional)"
+                          className={cn(
+                            "mx-auto flex size-7 items-center justify-center rounded-md border text-muted-foreground transition",
+                            entry.note ? "border-role/40 bg-role-soft text-role-strong" : "border-slate-200 bg-white hover:bg-slate-50"
+                          )}
+                        >
+                          <NotebookPen className="size-3.5" />
+                        </button>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                    {noteOpen && (
+                      <TableRow key={`${s.id}-note`} className="bg-slate-50/60 hover:bg-slate-50/60">
+                        <TableCell colSpan={4 + ATTENDANCE_STATUSES.length} className="px-2 py-1.5">
+                          {readOnly ? (
+                            <span className="text-xs text-muted-foreground">{entry.note || "Tidak ada catatan."}</span>
+                          ) : (
+                            <input
+                              type="text"
+                              value={entry.note}
+                              onChange={(e) => setNote(s.id, e.target.value)}
+                              placeholder={`Catatan untuk ${s.name} (opsional)`}
+                              aria-label={`Catatan untuk ${s.name}`}
+                              autoFocus
+                              className="w-full rounded-md border border-border bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-role"
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
         </Card>
       )}
 
@@ -324,7 +389,11 @@ export function AttendanceSheet({
                 <span className="text-muted-foreground/80">Belum: {counts.unset}</span>
               ) : null}
             </div>
-            {message ? (
+            {isPending ? (
+              <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-muted-foreground" role="status">
+                Memuat presensi untuk tanggal/halaqah terpilih...
+              </p>
+            ) : message ? (
               <p
                 className={cn(
                   "rounded-lg px-3 py-2 text-sm",
@@ -337,7 +406,7 @@ export function AttendanceSheet({
             ) : null}
             <Button
               className="w-full bg-primary text-white"
-              disabled={saving || students.length === 0 || !halaqahId || readOnly}
+              disabled={saving || isPending || students.length === 0 || !halaqahId || readOnly}
               onClick={() => void save()}
             >
               <Check className="mr-1.5 h-4 w-4" />

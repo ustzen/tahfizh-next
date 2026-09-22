@@ -86,7 +86,9 @@ begin
 
   -- Kolom = santri (binaan guru via halaqah yang diampu / seluruh santri
   -- lembaga untuk ADMIN & KOORDINATOR), diurut nama.
-  select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'name', s.full_name, 'nickname', s.nickname) order by lower(btrim(s.full_name))), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', s.id, 'name', s.full_name, 'nickname', s.nickname, 'code', s.business_code
+         ) order by lower(btrim(s.full_name))), '[]'::jsonb)
   into v_students
   from public.students s
   where s.tenant_id = v_tenant::uuid

@@ -27,7 +27,7 @@ export type GridSaveResult = { error?: string; saved?: number };
 
 export async function fetchTahfidzGridAction(): Promise<{
   error?: string;
-  students?: { id: string; name: string; nickname: string | null }[];
+  students?: { id: string; name: string; nickname: string | null; code?: string | null }[];
   rows?: { surahId: string; name: string; sortOrder: number }[];
   grades?: string[];
   cells?: Record<string, { status: string; scoreLabel: string | null; scoreValue: number | null }>;
@@ -52,7 +52,7 @@ export async function fetchTahfidzGridAction(): Promise<{
   }
 
   const grades: string[] = (gradesRes.data ?? []).map((g) => g.label);
-  const data = gridRes.data as { students: { id: string; name: string; nickname: string | null }[]; rows: { surahId: string; name: string; sortOrder: number }[] };
+  const data = gridRes.data as { students: { id: string; name: string; nickname: string | null; code?: string | null }[]; rows: { surahId: string; name: string; sortOrder: number }[] };
 
   // Nilai tersimpan per (surat, santri) — hanya binaan guru (SECURITY DEFINER
   // memverifikasi relasi halaqah di dalam RPC).

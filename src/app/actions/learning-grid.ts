@@ -30,7 +30,7 @@ export type LearningGridSaveResult = { error?: string; saved?: number };
 export async function fetchLearningGridAction(module: LearningModule): Promise<{
   error?: string;
   materials?: { materialId: string; title: string; sortOrder: number }[];
-  students?: { id: string; name: string; nickname: string | null }[];
+  students?: { id: string; name: string; nickname: string | null; code?: string | null }[];
   grades?: string[];
   cells?: Record<
     string,
@@ -66,7 +66,7 @@ export async function fetchLearningGridAction(module: LearningModule): Promise<{
 
   const data = res.data as {
     materials: { materialId: string; title: string; sortOrder: number }[];
-    students: { id: string; name: string; nickname: string | null }[];
+    students: { id: string; name: string; nickname: string | null; code?: string | null }[];
     cells: {
       materialId: string;
       studentId: string;

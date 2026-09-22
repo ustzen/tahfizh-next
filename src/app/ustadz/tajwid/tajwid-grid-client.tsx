@@ -51,7 +51,7 @@ import {
  * Huruf / Angka — langsung dari menu.
  */
 
-type Student = { id: string; name: string; nickname: string | null };
+type Student = { id: string; name: string; nickname: string | null; code?: string | null };
 type CellState = { mode: TajwidMode; scoreLabel: string | null; scoreValue: number | null };
 
 const MODE_OPTIONS: { key: TajwidMode; label: string }[] = [
@@ -231,8 +231,11 @@ export function TajwidGridClient({
           <Table>
             <TableHeader>
               <TableRow className="bg-role text-role-ink hover:bg-transparent">
-                <TableHead className="w-14 bg-role text-role-ink py-3.5 text-center font-bold">NO</TableHead>
-                <TableHead className="sticky left-14 z-10 min-w-56 bg-role text-role-ink py-3.5 font-bold">
+                <TableHead className="w-10 bg-role text-role-ink py-3.5 text-center font-bold">NO</TableHead>
+                <TableHead className="sticky left-10 z-10 w-16 bg-role text-role-ink py-3.5 text-center font-bold">
+                  NIS
+                </TableHead>
+                <TableHead className="sticky left-[6.5rem] z-10 min-w-56 bg-role text-role-ink py-3.5 font-bold">
                   NAMA SANTRI
                 </TableHead>
                 {materi.map((m) => (
@@ -255,8 +258,11 @@ export function TajwidGridClient({
             <TableBody>
               {students.map((st, i) => (
                 <TableRow key={st.id} className="hover:bg-slate-50/60">
-                  <TableCell className="text-center text-sm text-muted-foreground">{i + 1}</TableCell>
-                  <TableCell className="sticky left-14 z-10 bg-white px-4">
+                  <TableCell className="w-10 text-center text-sm text-muted-foreground">{i + 1}</TableCell>
+                  <TableCell className="sticky left-10 z-10 w-16 bg-white px-1 text-center text-xs font-mono text-muted-foreground">
+                    {st.code ?? "—"}
+                  </TableCell>
+                  <TableCell className="sticky left-[6.5rem] z-10 bg-white px-4">
                     <span className="text-sm font-semibold text-foreground">{st.name}</span>
                     {st.nickname && st.nickname !== st.name && (
                       <span className="text-muted-foreground ml-2 text-xs">{st.nickname}</span>

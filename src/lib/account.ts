@@ -163,9 +163,9 @@ export async function createLoginAccount(input: {
   // V16 — untuk kind "student": trigger DB students_self_guardian_link (lihat
   // migrasi 20260920220000) otomatis membuat baris guardians +
   // guardian_students begitu login_username di atas tersimpan, menjadikan
-  // akun ini "wali dari dirinya sendiri". Tanpa ini, /santri/infak,
-  // /santri/anak, dan dasbor /santri akan selalu tampak "belum terhubung"
-  // walau akun sudah jelas tertaut ke datanya sendiri via login_username —
-  // JANGAN hapus trigger tersebut tanpa mengganti mekanismenya di sini.
+  // akun ini "wali dari dirinya sendiri". Tanpa ini, /santri/infak dan
+  // dasbor /santri akan selalu tampak "belum terhubung" walau akun sudah
+  // jelas tertaut ke datanya sendiri via login_username — JANGAN hapus
+  // trigger tersebut tanpa mengganti mekanismenya di sini.
   return null;
 }

@@ -12,7 +12,7 @@ import {
 import { getTerminology } from "@/lib/terminology";
 import { TartilJurnalForm } from "./tartil-jurnal";
 import { PageHeader } from "@/components/dashboard/section";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { StatusBadge } from "@/components/status-badge";
@@ -41,14 +41,7 @@ export default async function UstadzTartilPage() {
       {/* V12.14 — JURNAL MENGAJI: form penilaian utama (sesuai desain guru) */}
       {config && teacher && (
         <Card className="shadow-card rounded-2xl">
-          <CardHeader>
-            <CardTitle>Jurnal Mengaji</CardTitle>
-            <CardDescription>
-              Pilih santri lalu catat jilid, halaman, dan nilai — penilaian otomatis tampil di
-              dasbor santri & Riwayat Perkembangan.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <TartilJurnalForm
               students={summaries.map((s) => ({
                 studentId: s.studentId,

@@ -32,7 +32,7 @@ export type TajwidScore = {
 export type TajwidGridData = {
   error?: string;
   materi?: TajwidMateri[];
-  students?: { id: string; name: string; nickname: string | null }[];
+  students?: { id: string; name: string; nickname: string | null; code?: string | null }[];
   scores?: Record<string, TajwidScore>;
 };
 
@@ -50,7 +50,7 @@ export async function fetchTajwidGridAction(): Promise<TajwidGridData> {
 
   const data = res.data as {
     materi: TajwidMateri[];
-    students: { id: string; name: string; nickname: string | null }[];
+    students: { id: string; name: string; nickname: string | null; code?: string | null }[];
     scores: { materiId: string; studentId: string; mode: string; scoreValue: number | null; scoreLabel: string | null }[];
   };
 

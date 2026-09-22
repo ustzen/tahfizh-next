@@ -1,4 +1,4 @@
-import { Info, Lock } from "lucide-react";
+import { HandCoins, Info, Lock } from "lucide-react";
 
 import { PageHeader, CardBox } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
@@ -34,6 +34,7 @@ export default async function SantriInfakPage() {
         <PageHeader
           title="Infak Pengembangan"
           description="Akses Anda dibatasi hingga pembayaran bulan ini terkonfirmasi."
+          icon={<HandCoins className="size-6" />}
         />
 
         <CardBox className="border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10">
@@ -79,6 +80,7 @@ export default async function SantriInfakPage() {
       <PageHeader
         title="Infak Pengembangan"
         description="Dukung pengembangan TAHFIZH — mulai Rp1.000 per bulan per santri. Bisa untuk beberapa bulan sekaligus dan untuk santri lain di lembaga Anda."
+        icon={<HandCoins className="size-6" />}
       />
 
       {/* V18 — panel infak SELALU tampil. Bila RPC tagihan sedang tidak dapat

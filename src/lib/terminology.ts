@@ -203,7 +203,6 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
   ],
   WALI_SANTRI: [
     { key: "dashboard", label: "Dashboard", href: "/santri" },
-    { key: "anak", label: "Data Saya", href: "/santri/anak" },
     // V18 — pantauan mandiri santri, sinkron dengan penilaian guru.
     { key: "pantauan", label: "Pantauan Pembelajaran", href: "/santri/pantauan" },
     { key: "target", label: "Target", href: "/santri/target" },

@@ -182,7 +182,6 @@ function invalidateSantri() {
     "/koordinator/halaqah",
     "/ustadz/santri",
     "/ustadz",
-    "/santri/anak",
     "/santri",
   ]) {
     revalidatePath(path);

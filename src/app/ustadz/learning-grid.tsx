@@ -43,7 +43,7 @@ import {
  * (RPC learning_save_grid); tiap perubahan tersimpan sebagai riwayat baru.
  */
 
-type Student = { id: string; name: string; nickname: string | null };
+type Student = { id: string; name: string; nickname: string | null; code?: string | null };
 type Material = { materialId: string; title: string; sortOrder: number };
 type CellState = { status: "BELUM" | "DIPELAJARI" | "DINILAI"; scoreLabel: string | null; scoreValue: number | null };
 type Mode = "CENTANG" | "HURUF" | "ANGKA";
@@ -315,7 +315,8 @@ export function LearningGridClient({
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="sticky left-0 z-10 bg-white px-4 text-foreground/85">Nama Anak</TableHead>
+                <TableHead className="sticky left-0 z-10 bg-white px-3 text-foreground/85">NIS</TableHead>
+                <TableHead className="sticky left-14 z-10 bg-white px-4 text-foreground/85">Nama Anak</TableHead>
                 {materials.map((m, i) => (
                   <TableHead
                     key={m.materialId}
@@ -344,7 +345,10 @@ export function LearningGridClient({
             <TableBody>
               {students.map((st) => (
                 <TableRow key={st.id}>
-                  <TableCell className="sticky left-0 z-10 bg-white px-4">
+                  <TableCell className="sticky left-0 z-10 bg-white px-3 text-xs font-mono text-muted-foreground">
+                    {st.code ?? "—"}
+                  </TableCell>
+                  <TableCell className="sticky left-14 z-10 bg-white px-4">
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-foreground">{st.name}</span>
                       {st.nickname && st.nickname !== st.name && (
