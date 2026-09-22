@@ -35,7 +35,8 @@ import {
   rupiah,
   statusTone,
 } from "@/lib/v10-shared";
-import type { WaliChild, WaliInvoiceItem, WaliOtherStudent, WaliTxRow, WaliBankInfo } from "@/lib/v10";
+import type { WaiverRequestRow, WaliChild, WaliInvoiceItem, WaliOtherStudent, WaliTxRow, WaliBankInfo } from "@/lib/v10";
+import { WaiverRequestLink } from "@/components/infak/waiver-request-link";
 import { cn } from "@/lib/utils";
 
 type DialogState =
@@ -64,6 +65,8 @@ export function WaliPaymentPanel({
   autoEnabled,
   currentY,
   currentM,
+  waiverKids,
+  waiverRequests,
 }: {
   kids: WaliChild[];
   others: WaliOtherStudent[];
@@ -74,6 +77,8 @@ export function WaliPaymentPanel({
   autoEnabled: boolean;
   currentY: number;
   currentM: number;
+  waiverKids: { studentId: string; name: string; code: string }[];
+  waiverRequests: WaiverRequestRow[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -226,6 +231,9 @@ export function WaliPaymentPanel({
                 <p className="mt-0.5 text-sm text-white/85">
                   Tahun ajaran {academicYear} · dana untuk pengembangan platform TAHFIZH
                 </p>
+                {waiverKids.length > 0 && (
+                  <WaiverRequestLink kids={waiverKids} requests={waiverRequests} />
+                )}
               </div>
             </div>
             {selectedCount > 0 && (

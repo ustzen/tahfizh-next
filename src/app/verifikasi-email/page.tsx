@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MailCheck } from "lucide-react";
 
 import { requireRole } from "@/lib/auth";
+import { ROLE_HOME } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { VerificationResendButton } from "./resend-button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,7 +46,7 @@ export default async function VerifikasiEmailPage() {
           {!verified && <VerificationResendButton />}
 
           <Link
-            href={profile.role === "DEVELOPER" ? "/developer" : `/${profile.role.toLowerCase()}`}
+            href={ROLE_HOME[profile.role]}
             className="text-sm font-semibold text-blue-700 hover:underline"
           >
             ← Kembali ke Dashboard

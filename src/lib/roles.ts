@@ -130,10 +130,14 @@ export const ROLE_NAV: Record<AppRole, NavItem[]> = {
 
 /** Settings sections available to a role (rule #24). */
 export function settingsSectionsFor(role: AppRole) {
+  // Basis path route mengikuti ROLE_HOME (bukan role.toLowerCase()), karena
+  // beberapa role (mis. WALI_SANTRI) punya nama enum yang berbeda dari nama
+  // segmen route-nya (/santri, bukan /wali_santri).
+  const base_path = ROLE_HOME[role];
   const base = [
-    { key: "profil", label: "Profil", href: `/${role.toLowerCase()}/pengaturan/profil` },
-    { key: "keamanan", label: "Keamanan", href: `/${role.toLowerCase()}/pengaturan/keamanan` },
-    { key: "menu", label: "Tampilan & Menu", href: `/${role.toLowerCase()}/pengaturan/menu` },
+    { key: "profil", label: "Profil", href: `${base_path}/pengaturan/profil` },
+    { key: "keamanan", label: "Keamanan", href: `${base_path}/pengaturan/keamanan` },
+    { key: "menu", label: "Tampilan & Menu", href: `${base_path}/pengaturan/menu` },
   ];
   if (role === "ADMIN") {
     base.push(

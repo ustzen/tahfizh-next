@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionProfile } from "@/lib/auth";
+import { ROLE_HOME } from "@/lib/roles";
 
 /**
  * TAHFIZH V12 — keamanan akun (ganti password sendiri).
@@ -41,7 +42,7 @@ export async function changeOwnPasswordAction(
 
   // V12.11: kartu kini dirender DashboardShell (semua role) — revalidasi
   // segmen role agar kartu langsung hilang tanpa login ulang.
-  revalidatePath(`/${sessionProfile.role.toLowerCase()}`, "layout");
+  revalidatePath(ROLE_HOME[sessionProfile.role], "layout");
   return { success: "Password berhasil diperbarui." };
 }
 

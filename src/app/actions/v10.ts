@@ -1,10 +1,20 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
-import { dbErrorMessage, isValidWaNumber, MAX_PAYMENT_ITEMS, MAX_SETTLE_ITEMS } from "@/lib/v10-shared";
+import {
+  dbErrorMessage,
+  isValidWaNumber,
+  MAX_PAYMENT_ITEMS,
+  MAX_SETTLE_ITEMS,
+  WAIVER_CERTIFICATE_TYPES,
+  WAIVER_MAX_AGE_DAYS,
+  WAIVER_MAX_MONTHS,
+} from "@/lib/v10-shared";
 import { createRedirectPayment, isIpaymuConfigured } from "@/lib/ipaymu";
 
 export type V10Result = { error?: string; success?: string; data?: Record<string, unknown> };
@@ -12,6 +22,12 @@ export type V10Result = { error?: string; success?: string; data?: Record<string
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_PROOF_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_QRIS_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_CERTIFICATE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+/** Tanggal hari ini (YYYY-MM-DD) menurut zona Asia/Jakarta. */
+function todayJakarta(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+}
 
 /* ------------------------------------------------------------------------ */
 /* DEVELOPER — payment settings (Infak Pengembangan level platform)         */
@@ -169,6 +185,111 @@ export async function settleInvoicesAction(
   return {
     success: `${Number(res.invoices ?? 0)} tagihan (${Number(res.students ?? 0)} santri) dilunasi atas nama ${name}.`,
     data: res as Record<string, unknown>,
+  };
+}
+
+/* ------------------------------------------------------------------------ */
+/* V29 — PENGAJUAN TIDAK MAMPU (keringanan infak)                           */
+/* ------------------------------------------------------------------------ */
+
+const DEV_WAIVER_PATHS = ["/developer/infak", "/developer/infak/pengajuan"];
+
+/**
+ * WALI mengajukan tidak mampu untuk anaknya: unggah Surat Keterangan Tidak
+ * Mampu yang tertanggal maksimal 7 hari terakhir, lalu kirim ke Developer.
+ */
+export async function submitWaiverRequestAction(
+  _prev: V10Result | null,
+  formData: FormData
+): Promise<V10Result> {
+  const session = await getSessionProfile();
+  if (!session || session.role !== "WALI_SANTRI") return { error: "Akses ditolak." };
+
+  const studentId = String(formData.get("studentId") ?? "").trim();
+  const certDate = String(formData.get("certificateDate") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+  const file = formData.get("certificate");
+
+  if (!studentId) return { error: "Pilih santri terlebih dahulu." };
+  if (!(file instanceof File) || file.size === 0)
+    return { error: "Unggah Surat Keterangan Tidak Mampu terlebih dahulu." };
+  if (!WAIVER_CERTIFICATE_TYPES.includes(file.type))
+    return { error: "Format surat harus JPG, PNG, WebP, atau PDF." };
+  if (file.size > MAX_CERTIFICATE_BYTES) return { error: "Ukuran surat maksimal 5 MB." };
+  if (reason.length > 1000) return { error: "Alasan maksimal 1000 karakter." };
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(certDate)) return { error: "Isi tanggal surat keterangan." };
+  const today = todayJakarta();
+  if (certDate > today) return { error: "Tanggal surat tidak boleh di masa depan." };
+  const ageDays = Math.round((Date.parse(today) - Date.parse(certDate)) / 86_400_000);
+  if (ageDays > WAIVER_MAX_AGE_DAYS)
+    return { error: "Surat keterangan harus tertanggal maksimal 7 hari terakhir." };
+
+  const supabase = await createClient();
+  const ext =
+    file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : file.type === "application/pdf" ? "pdf" : "jpg";
+  const path = `${session.tenantId}/waiver-${randomUUID()}.${ext}`;
+
+  const { error: upErr } = await supabase.storage
+    .from("payment-proofs")
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (upErr) return { error: "Gagal mengunggah surat keterangan." };
+
+  const { error: rpcErr } = await supabase.rpc("waiver_submit_request", {
+    p_student_id: studentId,
+    p_certificate_path: path,
+    p_certificate_date: certDate,
+    p_reason: reason || null,
+  });
+  if (rpcErr) {
+    await supabase.storage.from("payment-proofs").remove([path]);
+    return { error: dbErrorMessage(rpcErr.message) };
+  }
+
+  revalidatePath("/santri/infak");
+  for (const p of DEV_WAIVER_PATHS) revalidatePath(p);
+  return { success: "Pengajuan terkirim. Developer akan meninjau permohonan Anda." };
+}
+
+/**
+ * DEVELOPER memutuskan pengajuan tidak mampu: setujui (gratis N bulan) atau
+ * tolak beserta alasan.
+ */
+export async function decideWaiverRequestAction(
+  _prev: V10Result | null,
+  formData: FormData
+): Promise<V10Result> {
+  const session = await getSessionProfile();
+  if (!session || session.role !== "DEVELOPER") return { error: "Akses ditolak." };
+
+  const requestId = String(formData.get("requestId") ?? "").trim();
+  const decision = String(formData.get("decision") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+  const monthsRaw = String(formData.get("months") ?? "").replace(/[^0-9]/g, "");
+  const months = monthsRaw ? Number(monthsRaw) : null;
+
+  if (!requestId || !["APPROVE", "REJECT"].includes(decision))
+    return { error: "Permintaan tidak valid." };
+  if (decision === "APPROVE" && (months === null || months < 1 || months > WAIVER_MAX_MONTHS))
+    return { error: `Durasi keringanan harus 1-${WAIVER_MAX_MONTHS} bulan.` };
+  if (decision === "REJECT" && !reason) return { error: "Tuliskan alasan penolakan." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("waiver_dev_decide", {
+    p_request_id: requestId,
+    p_decision: decision,
+    p_months: months,
+    p_reason: reason || null,
+  });
+  if (error) return { error: dbErrorMessage(error.message) };
+
+  for (const p of DEV_WAIVER_PATHS) revalidatePath(p);
+  revalidatePath("/santri/infak");
+  return {
+    success:
+      decision === "APPROVE"
+        ? `Infak santri digratiskan selama ${months} bulan.`
+        : "Pengajuan ditolak.",
   };
 }
 

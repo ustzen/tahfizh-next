@@ -7,12 +7,12 @@ import { getSessionProfile } from "@/lib/auth";
 import { invalidateTenantConfig, CACHE_KEYS, invalidateTags } from "@/lib/cache";
 import { slugifyIdentity, parseIdentityTypes } from "@/lib/identity";
 import { TERMINOLOGY_KEYS, type TerminologyKey } from "@/lib/terminology";
-import type { AppRole } from "@/lib/roles";
+import { ROLE_HOME, type AppRole } from "@/lib/roles";
 
 export type SettingsResult = { error?: string; success?: string };
 
 function sectionPath(role: AppRole) {
-  return `/${role.toLowerCase()}/pengaturan`;
+  return `${ROLE_HOME[role]}/pengaturan`;
 }
 
 /** Only ADMIN may mutate tenant configuration (rule #24/#29). */
@@ -245,7 +245,7 @@ export async function saveMenuOrderAction(keys: string[]): Promise<SettingsResul
 
   invalidateTags(CACHE_KEYS.menuOrder(session.id));
   revalidatePath(sectionPath(session.role));
-  revalidatePath(`/${session.role.toLowerCase()}`);
+  revalidatePath(ROLE_HOME[session.role]);
   return { success: "Urutan menu tersimpan." };
 }
 
@@ -263,6 +263,45 @@ export async function resetMenuOrderAction(): Promise<SettingsResult> {
 
   invalidateTags(CACHE_KEYS.menuOrder(session.id));
   revalidatePath(sectionPath(session.role));
-  revalidatePath(`/${session.role.toLowerCase()}`);
+  revalidatePath(ROLE_HOME[session.role]);
   return { success: "Urutan menu kembali ke default." };
+}
+
+/* ------------------------------------------------------------------------ */
+/* DASHBOARD QUICK MENU — per user, urutan + tampil/sembunyi (V31)          */
+/* ------------------------------------------------------------------------ */
+export async function saveDashboardQuickMenuAction(keys: string[]): Promise<SettingsResult> {
+  const session = await getSessionProfile();
+  if (!session) return { error: "Sesi berakhir." };
+
+  if (!Array.isArray(keys) || keys.length > 30 || keys.some((k) => typeof k !== "string" || k.length > 60)) {
+    return { error: "Konfigurasi Menu Cepat tidak valid." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ dashboard_quick_menu: keys })
+    .eq("id", session.id);
+
+  if (error) return { error: "Gagal menyimpan Menu Cepat." };
+
+  revalidatePath(ROLE_HOME[session.role]);
+  return { success: "Menu Cepat tersimpan." };
+}
+
+export async function resetDashboardQuickMenuAction(): Promise<SettingsResult> {
+  const session = await getSessionProfile();
+  if (!session) return { error: "Sesi berakhir." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ dashboard_quick_menu: null })
+    .eq("id", session.id);
+
+  if (error) return { error: "Gagal mengembalikan Menu Cepat ke default." };
+
+  revalidatePath(ROLE_HOME[session.role]);
+  return { success: "Menu Cepat kembali ke default." };
 }

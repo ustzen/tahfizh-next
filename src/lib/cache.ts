@@ -2,7 +2,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { revalidateTag } from "next/cache";
-import type { AppRole } from "@/lib/roles";
+import { ROLE_HOME, type AppRole } from "@/lib/roles";
 
 /**
  * Tenant-aware cache invalidation. Every mutation path in the app calls one
@@ -165,7 +165,7 @@ export function invalidateTags(...tags: string[]) {
 }
 
 export function revalidateRoleSection(role: AppRole, tenantCode: string | null) {
-  revalidatePath(`/${role.toLowerCase()}`);
+  revalidatePath(ROLE_HOME[role]);
 }
 
 export function revalidateSection(...paths: string[]) {
@@ -175,8 +175,8 @@ export function revalidateSection(...paths: string[]) {
 /** Full invalidation after a profile mutation (own data only). */
 export function invalidateProfile(userId: string, role: AppRole, tenantCode: string | null) {
   invalidateTags(CACHE_KEYS.profile(userId));
-  revalidatePath(`/${role.toLowerCase()}/pengaturan`);
-  revalidatePath(`/${role.toLowerCase()}`);
+  revalidatePath(`${ROLE_HOME[role]}/pengaturan`);
+  revalidatePath(ROLE_HOME[role]);
 }
 
 /** Full invalidation after tenant config mutation (ADMIN only). */
@@ -186,7 +186,7 @@ export function invalidateTenantConfig(tenantCode: string | null, role: AppRole 
     CACHE_KEYS.tenantSettings(tenantCode),
     CACHE_KEYS.tenant(tenantCode)
   );
-  revalidatePath(`/${role.toLowerCase()}/pengaturan`);
+  revalidatePath(`${ROLE_HOME[role]}/pengaturan`);
 }
 
 /* ------------------------------------------------------------------------ */

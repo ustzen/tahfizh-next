@@ -131,6 +131,30 @@ export type WaliHistoryChild = {
   items: WaliHistoryItem[];
 };
 
+/** V29 — satu pengajuan tidak mampu (keringanan infak). */
+export type WaiverRequestRow = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentCode: string;
+  certificateDate: string;
+  reason: string | null;
+  status: string; // PENDING | APPROVED | REJECTED
+  months: number | null;
+  fromYear: number | null;
+  fromMonth: number | null;
+  decidedAt: string | null;
+  rejectReason: string | null;
+  createdAt: string;
+  // Khusus daftar Developer
+  tenantName?: string;
+  tenantCode?: string;
+  guardianName?: string | null;
+  requestedByName?: string | null;
+  certificatePath?: string;
+  certificateUrl?: string;
+};
+
 /** Satu santri menunggak (sudut pandang Developer, lintas lembaga). */
 export type DevArrearStudent = {
   studentId: string;
@@ -384,6 +408,13 @@ export const getWaliHistory = cache(async (limit: number = 12): Promise<WaliHist
   return callRpcSafe<WaliHistoryChild[]>("payment_wali_history", { p_limit: limit }, []);
 });
 
+/** V29 — pengajuan tidak mampu milik wali yang login. */
+export const getWaliWaiverRequests = cache(async (): Promise<WaiverRequestRow[]> => {
+  const profile = await getSessionProfile();
+  if (!profile || profile.role !== "WALI_SANTRI") return [];
+  return callRpcSafe<WaiverRequestRow[]>("waiver_wali_list", {}, []);
+});
+
 /* ------------------------------------------------------------------------ */
 /* PAYMENTS — developer (platform)                                          */
 /* Infak Pengembangan dikelola Developer untuk SEMUA lembaga, bukan Admin.  */
@@ -440,6 +471,33 @@ export async function getDevArrears(
   } catch {
     return null;
   }
+}
+
+/** V29 — daftar pengajuan tidak mampu untuk Developer (+ tautan surat). */
+export async function getDevWaiverRequests(
+  status: string = "PENDING",
+  query: string = ""
+): Promise<WaiverRequestRow[]> {
+  const profile = await getSessionProfile();
+  if (!profile || profile.role !== "DEVELOPER") return [];
+  const rows = await callRpcSafe<WaiverRequestRow[]>(
+    "waiver_dev_list",
+    { p_status: status || "ALL", p_query: query || null },
+    []
+  );
+  if (rows.length > 0) {
+    const supabase = await createClient();
+    await Promise.all(
+      rows.map(async (r) => {
+        if (!r.certificatePath) return;
+        const { data } = await supabase.storage
+          .from("payment-proofs")
+          .createSignedUrl(r.certificatePath, 60 * 60);
+        if (data?.signedUrl) r.certificateUrl = data.signedUrl;
+      })
+    );
+  }
+  return rows;
 }
 
 /** Pengaturan infak level platform (nominal min Rp1.000, rekening, QRIS). */

@@ -42,6 +42,25 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   MANUAL: "Transfer Manual",
   IPAYMU: "Otomatis (iPaymu)",
   OFFLINE: "Pelunasan Dicatat Developer",
+  WAIVER: "Digratiskan (tidak mampu)",
+};
+
+/* ------------------------------------------------------------------------ */
+/* V29 — Pengajuan Tidak Mampu (keringanan infak)                           */
+/* ------------------------------------------------------------------------ */
+
+/** Surat keterangan tidak mampu wajib tertanggal maksimal 7 hari terakhir. */
+export const WAIVER_MAX_AGE_DAYS = 7;
+/** Durasi maksimum keringanan yang dapat diberikan Developer (bulan). */
+export const WAIVER_MAX_MONTHS = 24;
+/** Format surat keterangan yang diterima. */
+export const WAIVER_CERTIFICATE_ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
+export const WAIVER_CERTIFICATE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+export const WAIVER_STATUS_LABEL: Record<string, string> = {
+  PENDING: "Menunggu Keputusan",
+  APPROVED: "Disetujui",
+  REJECTED: "Ditolak",
 };
 
 /** Batas santri yang boleh dilunasi Developer dalam satu kali proses. */
@@ -88,6 +107,7 @@ export function statusTone(status: string): string {
   switch (status) {
     case "PAID":
     case "SELESAI":
+    case "APPROVED":
       return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300";
     case "WAITING_CONFIRM":
     case "DIPROSES":
@@ -192,6 +212,10 @@ export function paidNote(p: {
   paidVia?: string | null;
 }): string {
   const parts: string[] = [];
+  if (p.paidVia === "WAIVER") {
+    const d = formatDateId(p.paidAt);
+    return d ? `Digratiskan (pengajuan tidak mampu) tanggal ${d}` : "Digratiskan (pengajuan tidak mampu)";
+  }
   const date = formatDateId(p.paidAt);
   parts.push(date ? `Dibayarkan tanggal ${date}` : "Sudah dibayarkan");
   if (p.paidInAdvance) parts.push("dibayar di muka");
@@ -232,6 +256,14 @@ export const DB_ERROR_MESSAGE: Record<string, string> = {
   NAMA_TERLALU_PANJANG: "Nama pembayar maksimal 60 karakter.",
   NAMA_PEMBAYAR_WAJIB: "Tuliskan nama pembayar infak terlebih dahulu.",
   NAMA_PEMBAYAR_TIDAK_VALID: "Nama pembayar harus 2-120 karakter.",
+  // V29 — pengajuan tidak mampu
+  SURAT_WAJIB: "Unggah Surat Keterangan Tidak Mampu terlebih dahulu.",
+  TANGGAL_SURAT_WAJIB: "Isi tanggal surat keterangan.",
+  TANGGAL_SURAT_MASA_DEPAN: "Tanggal surat tidak boleh di masa depan.",
+  SURAT_KEDALUWARSA: "Surat keterangan harus tertanggal maksimal 7 hari terakhir.",
+  SUDAH_DIAJUKAN: "Sudah ada pengajuan yang sedang menunggu keputusan untuk santri ini.",
+  PENGAJUAN_TIDAK_DITEMUKAN: "Pengajuan tidak ditemukan.",
+  DURASI_TIDAK_VALID: "Durasi keringanan harus 1-24 bulan.",
 };
 
 /** Map a DB error (message or code prefix) to a friendly Indonesian message. */

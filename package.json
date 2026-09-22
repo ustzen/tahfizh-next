@@ -11,7 +11,9 @@
     "db:check": "node scripts/sql-parse-check.mjs",
     "db:seed-dummy": "bun supabase/seed-dummy.ts",
     "test:import": "node scripts/verify-import.mjs",
-    "test:infak": "node scripts/verify-infak-platform.mjs && node scripts/verify-infak-bayar-bersama.mjs"
+    "test:infak": "node scripts/verify-infak-platform.mjs && node scripts/verify-infak-bayar-bersama.mjs",
+    "test:infak-tidak-mampu": "node scripts/verify-infak-tidak-mampu.mjs",
+    "test:nis-lembaga": "node scripts/verify-nis-lembaga-grid.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

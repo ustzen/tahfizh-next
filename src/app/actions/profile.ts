@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionProfile } from "@/lib/auth";
 import { invalidateProfile } from "@/lib/cache";
-import type { AppRole } from "@/lib/roles";
+import { ROLE_HOME, type AppRole } from "@/lib/roles";
 
 export type ProfileResult = { error?: string; success?: string };
 
@@ -13,14 +13,14 @@ const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2 MB
 
 function sectionPath(role: AppRole) {
-  return `/${role.toLowerCase()}/pengaturan`;
+  return `${ROLE_HOME[role]}/pengaturan`;
 }
 
 function revalidateSettings(role: AppRole) {
   revalidatePath(sectionPath(role));
   revalidatePath(sectionPath(role) + "/profil");
   revalidatePath(sectionPath(role) + "/keamanan");
-  revalidatePath(`/${role.toLowerCase()}`);
+  revalidatePath(ROLE_HOME[role]);
 }
 
 /* ------------------------------------------------------------------------ */

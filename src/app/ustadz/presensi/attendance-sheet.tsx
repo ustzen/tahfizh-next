@@ -249,18 +249,22 @@ export function AttendanceSheet({
         </p>
       ) : (
         <Card className="shadow-card overflow-hidden py-0">
-          <Table className="table-fixed text-[0.8rem]">
+          <Table className="table-fixed text-[0.8rem] sm:text-sm">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-7 px-1 text-center text-[0.65rem]">No</TableHead>
-                <TableHead className="w-14 px-1 text-[0.65rem]">NIS</TableHead>
-                <TableHead className="px-1.5">Nama</TableHead>
+                <TableHead className="w-7 px-1 text-center text-[0.65rem] sm:w-10 sm:px-2 sm:text-xs">No</TableHead>
+                <TableHead className="w-14 px-1 text-[0.65rem] sm:w-20 sm:px-2 sm:text-xs">NIS</TableHead>
+                <TableHead className="px-1.5 sm:px-3 sm:text-sm">Nama</TableHead>
                 {ATTENDANCE_STATUSES.map((st) => (
-                  <TableHead key={st} className="w-7 px-0.5 text-center" title={STATUS_META[st].label}>
+                  <TableHead
+                    key={st}
+                    className="w-7 px-0.5 text-center sm:w-14 sm:px-1 sm:text-sm"
+                    title={STATUS_META[st].label}
+                  >
                     {STATUS_META[st].letter}
                   </TableHead>
                 ))}
-                <TableHead className="w-7 px-0.5 text-center text-[0.65rem]">Ket</TableHead>
+                <TableHead className="w-7 px-0.5 text-center text-[0.65rem] sm:w-14 sm:px-1 sm:text-xs">Ket</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -270,20 +274,24 @@ export function AttendanceSheet({
                 return (
                   <Fragment key={s.id}>
                     <TableRow>
-                      <TableCell className="px-1 text-center text-[0.65rem] text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="px-1 font-mono text-[0.65rem] text-muted-foreground">{s.code}</TableCell>
-                      <TableCell className="truncate px-1.5 text-xs font-medium text-slate-800 dark:text-slate-100">
+                      <TableCell className="px-1 text-center text-[0.65rem] text-muted-foreground sm:px-2 sm:text-xs">
+                        {i + 1}
+                      </TableCell>
+                      <TableCell className="px-1 font-mono text-[0.65rem] text-muted-foreground sm:px-2 sm:text-xs">
+                        {s.code}
+                      </TableCell>
+                      <TableCell className="truncate px-1.5 text-xs font-medium text-slate-800 sm:px-3 sm:text-sm dark:text-slate-100">
                         {s.name}
                       </TableCell>
                       {ATTENDANCE_STATUSES.map((st) => {
                         const active = entry.status === st;
                         if (readOnly) {
                           return (
-                            <TableCell key={st} className="px-0.5 text-center">
+                            <TableCell key={st} className="px-0.5 text-center sm:px-1">
                               <span
                                 aria-hidden
                                 className={cn(
-                                  "mx-auto flex size-7 items-center justify-center rounded-md border text-[0.7rem] font-bold",
+                                  "mx-auto flex size-7 items-center justify-center rounded-md border text-[0.7rem] font-bold sm:size-10 sm:rounded-lg sm:text-base",
                                   active
                                     ? cn(STATUS_META[st].solid, "border-transparent")
                                     : "border-slate-100 bg-slate-50 text-slate-300"
@@ -295,7 +303,7 @@ export function AttendanceSheet({
                           );
                         }
                         return (
-                          <TableCell key={st} className="px-0.5 text-center">
+                          <TableCell key={st} className="px-0.5 text-center sm:px-1">
                             <button
                               type="button"
                               onClick={() => setOne(s.id, st)}
@@ -303,7 +311,7 @@ export function AttendanceSheet({
                               aria-pressed={active}
                               aria-label={`${STATUS_META[st].label} — ${s.name}`}
                               className={cn(
-                                "mx-auto flex size-7 items-center justify-center rounded-md border text-[0.7rem] font-bold transition active:scale-95 disabled:opacity-50",
+                                "mx-auto flex size-7 items-center justify-center rounded-md border text-[0.7rem] font-bold transition active:scale-95 disabled:opacity-50 sm:size-10 sm:rounded-lg sm:text-base",
                                 active
                                   ? cn(STATUS_META[st].solid, "border-transparent shadow-sm")
                                   : cn("bg-white", STATUS_META[st].chip, "hover:bg-slate-50")
@@ -314,7 +322,7 @@ export function AttendanceSheet({
                           </TableCell>
                         );
                       })}
-                      <TableCell className="px-0.5 text-center">
+                      <TableCell className="px-0.5 text-center sm:px-1">
                         <button
                           type="button"
                           onClick={() => setOpenNote((prev) => ({ ...prev, [s.id]: !prev[s.id] }))}
@@ -322,19 +330,19 @@ export function AttendanceSheet({
                           aria-label={`Catatan untuk ${s.name}`}
                           title="Catatan (opsional)"
                           className={cn(
-                            "mx-auto flex size-7 items-center justify-center rounded-md border text-muted-foreground transition",
+                            "mx-auto flex size-7 items-center justify-center rounded-md border text-muted-foreground transition sm:size-10 sm:rounded-lg",
                             entry.note ? "border-role/40 bg-role-soft text-role-strong" : "border-slate-200 bg-white hover:bg-slate-50"
                           )}
                         >
-                          <NotebookPen className="size-3.5" />
+                          <NotebookPen className="size-3.5 sm:size-5" />
                         </button>
                       </TableCell>
                     </TableRow>
                     {noteOpen && (
                       <TableRow key={`${s.id}-note`} className="bg-slate-50/60 hover:bg-slate-50/60">
-                        <TableCell colSpan={4 + ATTENDANCE_STATUSES.length} className="px-2 py-1.5">
+                        <TableCell colSpan={4 + ATTENDANCE_STATUSES.length} className="px-2 py-1.5 sm:px-3 sm:py-2">
                           {readOnly ? (
-                            <span className="text-xs text-muted-foreground">{entry.note || "Tidak ada catatan."}</span>
+                            <span className="text-xs text-muted-foreground sm:text-sm">{entry.note || "Tidak ada catatan."}</span>
                           ) : (
                             <input
                               type="text"
@@ -343,7 +351,7 @@ export function AttendanceSheet({
                               placeholder={`Catatan untuk ${s.name} (opsional)`}
                               aria-label={`Catatan untuk ${s.name}`}
                               autoFocus
-                              className="w-full rounded-md border border-border bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-role"
+                              className="w-full rounded-md border border-border bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-role sm:px-3 sm:py-1.5 sm:text-sm"
                             />
                           )}
                         </TableCell>

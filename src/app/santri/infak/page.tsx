@@ -2,7 +2,13 @@ import { HandCoins, Info, Lock } from "lucide-react";
 
 import { PageHeader, CardBox } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
-import { getPaymentGate, getWaliHistory, getWaliInvoices, getWaliTransactions } from "@/lib/v10";
+import {
+  getPaymentGate,
+  getWaliHistory,
+  getWaliInvoices,
+  getWaliTransactions,
+  getWaliWaiverRequests,
+} from "@/lib/v10";
 import { WaliPaymentPanel } from "@/components/infak/wali-payment-panel";
 import { InfakHistoryCard } from "@/components/infak/infak-history-card";
 import { isIpaymuConfigured } from "@/lib/ipaymu";
@@ -18,15 +24,21 @@ export const metadata = { title: "Infak Pengembangan" };
 export default async function SantriInfakPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/infak");
 
-  const [gate, invoices, transactions, history] = await Promise.all([
+  const [gate, invoices, transactions, history, waiverRequests] = await Promise.all([
     getPaymentGate(),
     getWaliInvoices(),
     getWaliTransactions(),
     getWaliHistory(12),
+    getWaliWaiverRequests(),
   ]);
 
   const locked = gate?.locked === true;
   const bank = invoices?.bank ?? null;
+  const waiverKids = (invoices?.children ?? []).map((c) => ({
+    studentId: c.studentId,
+    name: c.name,
+    code: c.code,
+  }));
 
   if (locked) {
     return (
@@ -67,6 +79,8 @@ export default async function SantriInfakPage() {
             autoEnabled={isIpaymuConfigured()}
             currentY={gate?.year ?? new Date().getFullYear()}
             currentM={gate?.month ?? new Date().getMonth() + 1}
+            waiverKids={waiverKids}
+            waiverRequests={waiverRequests}
           />
         </div>
 
@@ -112,6 +126,8 @@ export default async function SantriInfakPage() {
           autoEnabled={isIpaymuConfigured()}
           currentY={invoices?.y ?? new Date().getFullYear()}
           currentM={invoices?.m ?? new Date().getMonth() + 1}
+          waiverKids={waiverKids}
+          waiverRequests={waiverRequests}
         />
         <InfakHistoryCard history={history} />
       </div>

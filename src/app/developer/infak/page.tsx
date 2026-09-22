@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, Coins, HandCoins, Hourglass, Landmark } from "lucide-react";
+import { ArrowRight, Building2, Coins, HandCoins, HeartHandshake, Hourglass, Landmark } from "lucide-react";
 
 import { StatCard } from "@/components/stat-card";
 import { PageHeader, CardBox, SectionTitle } from "@/components/dashboard/section";
@@ -8,7 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireRole } from "@/lib/auth";
-import { getDevSummary, getDevTenantInvoices, getDevTransactions, getPaymentSettings } from "@/lib/v10";
+import {
+  getDevSummary,
+  getDevTenantInvoices,
+  getDevTransactions,
+  getDevWaiverRequests,
+  getPaymentSettings,
+} from "@/lib/v10";
 import { rupiah, statusTone, TRANSACTION_STATUS_LABEL, DUE_DAY } from "@/lib/v10-shared";
 import { formatDate } from "@/lib/utils";
 import { GenerateInvoicesButton } from "@/components/infak/generate-invoices-button";
@@ -18,11 +24,12 @@ export const metadata = { title: "Infak Pengembangan" };
 export default async function DeveloperInfakPage() {
   await requireRole(["DEVELOPER"], "/developer/infak");
 
-  const [summary, waiting, settings, tenants] = await Promise.all([
+  const [summary, waiting, settings, tenants, waiverPending] = await Promise.all([
     getDevSummary(),
     getDevTransactions("WAITING_CONFIRM", ""),
     getPaymentSettings(),
     getDevTenantInvoices(),
+    getDevWaiverRequests("PENDING", ""),
   ]);
 
   return (
@@ -38,6 +45,16 @@ export default async function DeveloperInfakPage() {
             <Button asChild variant="outline">
               <Link href="/developer/infak/pelunasan">
                 <HandCoins className="size-4" /> Pelunasan
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/developer/infak/pengajuan">
+                <HeartHandshake className="size-4" /> Pengajuan Tidak Mampu
+                {waiverPending.length > 0 && (
+                  <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-[0.65rem] font-semibold text-white">
+                    {waiverPending.length}
+                  </span>
+                )}
               </Link>
             </Button>
             <Button asChild variant="outline">
@@ -138,6 +155,34 @@ export default async function DeveloperInfakPage() {
           Pilih santri yang menunggak (diurutkan dari tunggakan paling lama), tuliskan{" "}
           <span className="font-medium text-foreground">dibayarkan oleh siapa</span>, lalu lunasi. Nama pembayar
           dan tanggal pelunasan langsung tampil pada riwayat infak santri yang bersangkutan.
+        </p>
+      </CardBox>
+
+      {/* Pengajuan tidak mampu (keringanan infak) */}
+      <CardBox className="mt-6">
+        <SectionTitle
+          tone="amber"
+          icon={<HeartHandshake />}
+          title="Pengajuan Tidak Mampu"
+          description="keringanan infak dari wali santri, disertai Surat Keterangan Tidak Mampu"
+          action={
+            <Link href="/developer/infak/pengajuan" className="text-role-strong inline-flex items-center gap-1 text-sm font-semibold hover:underline">
+              Buka <ArrowRight className="size-3.5" />
+            </Link>
+          }
+        />
+        <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+          {waiverPending.length > 0 ? (
+            <>
+              <span className="font-semibold text-amber-700 dark:text-amber-300">
+                {waiverPending.length} pengajuan menunggu keputusan.{" "}
+              </span>
+            </>
+          ) : (
+            "Tidak ada pengajuan yang menunggu keputusan. "
+          )}
+          Setujui pengajuan untuk <span className="font-medium text-foreground">menggratiskan infak</span> santri
+          tersebut dalam kurun waktu tertentu (dalam bulan).
         </p>
       </CardBox>
 

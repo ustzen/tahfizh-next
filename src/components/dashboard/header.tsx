@@ -10,7 +10,7 @@ import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { GlobalSearch } from "@/components/search/global-search";
 import { ThemeToggle } from "@/components/theme-toggle";
-import type { AppRole } from "@/lib/roles";
+import { ROLE_HOME, type AppRole } from "@/lib/roles";
 import type { NavGroup } from "@/lib/terminology";
 import type { NotificationRow } from "@/lib/v10";
 
@@ -91,7 +91,7 @@ export function DashboardHeader({
 
         <div className="flex shrink-0 items-center gap-0.5">
           <Link
-            href={`/${role.toLowerCase()}/pengaturan/profil`}
+            href={`${ROLE_HOME[role]}/pengaturan/profil`}
             aria-label="Profil saya"
             className="flex size-11 items-center justify-center rounded-xl transition-colors hover:bg-muted dark:hover:bg-slate-500/10"
           >
@@ -125,7 +125,7 @@ export function DashboardHeader({
           ) : (
             <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Platform TAHFIZH</p>
           )}
-          <Link href={`/${role.toLowerCase()}/pengaturan/profil`} aria-label="Pengaturan profil">
+          <Link href={`${ROLE_HOME[role]}/pengaturan/profil`} aria-label="Pengaturan profil">
             {avatar}
           </Link>
         </div>
