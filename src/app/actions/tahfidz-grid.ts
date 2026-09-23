@@ -115,6 +115,8 @@ export async function saveTahfidzGridAction(items: GridCellInput[]): Promise<Gri
     if (msg.includes("NILAI_ANGKA_TIDAK_VALID")) return { error: "Nilai angka harus 1-100." };
     if (msg.includes("GRADE_TIDAK_VALID")) return { error: "Grade huruf tidak valid untuk lembaga ini." };
     if (msg.includes("STATUS_TIDAK_VALID")) return { error: "Status penilaian tidak valid." };
+    if (msg.includes("GURU_TIDAK_DITEMUKAN")) return { error: "Profil guru Anda belum tertaut ke akun ini. Hubungi admin lembaga untuk menautkan akun." };
+    if (msg.includes("AKSES_DITOLAK")) return { error: "Session Anda telah berakhir. Silakan login kembali." };
     return { error: "Penilaian belum berhasil disimpan. Silakan coba lagi." };
   }
 
