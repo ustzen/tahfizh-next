@@ -117,7 +117,8 @@ export async function saveTahfidzGridAction(items: GridCellInput[]): Promise<Gri
     if (msg.includes("STATUS_TIDAK_VALID")) return { error: "Status penilaian tidak valid." };
     if (msg.includes("GURU_TIDAK_DITEMUKAN")) return { error: "Profil guru Anda belum tertaut ke akun ini. Hubungi admin lembaga untuk menautkan akun." };
     if (msg.includes("AKSES_DITOLAK")) return { error: "Session Anda telah berakhir. Silakan login kembali." };
-    return { error: "Penilaian belum berhasil disimpan. Silakan coba lagi." };
+    // TEMPORARY DIAGNOSTIC (remove after root cause confirmed): expose raw DB error.
+    return { error: `Penilaian belum berhasil disimpan. [DEBUG: ${msg}]` };
   }
 
   const studentIds = [...new Set(items.map((i) => i.studentId))];
