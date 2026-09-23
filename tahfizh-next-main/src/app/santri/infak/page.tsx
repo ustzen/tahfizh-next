@@ -1,0 +1,136 @@
+import { HandCoins, Info, Lock } from "lucide-react";
+
+import { PageHeader, CardBox } from "@/components/dashboard/section";
+import { requireRole } from "@/lib/auth";
+import {
+  getPaymentGate,
+  getWaliHistory,
+  getWaliInvoices,
+  getWaliTransactions,
+  getWaliWaiverRequests,
+} from "@/lib/v10";
+import { WaliPaymentPanel } from "@/components/infak/wali-payment-panel";
+import { InfakHistoryCard } from "@/components/infak/infak-history-card";
+import { isIpaymuConfigured } from "@/lib/ipaymu";
+import { rupiah } from "@/lib/v10-shared";
+
+export const metadata = { title: "Infak Pengembangan" };
+
+/**
+ * Halaman Infak Santri (rule #8/#9). When the gate is locked (day ≥ 16 & unpaid)
+ * only this page is shown with payment instructions; all other menus are
+ * blocked at the layout level.
+ */
+export default async function SantriInfakPage() {
+  const profile = await requireRole(["WALI_SANTRI"], "/santri/infak");
+
+  const [gate, invoices, transactions, history, waiverRequests] = await Promise.all([
+    getPaymentGate(),
+    getWaliInvoices(),
+    getWaliTransactions(),
+    getWaliHistory(12),
+    getWaliWaiverRequests(),
+  ]);
+
+  const locked = gate?.locked === true;
+  const bank = invoices?.bank ?? null;
+  const waiverKids = (invoices?.children ?? []).map((c) => ({
+    studentId: c.studentId,
+    name: c.name,
+    code: c.code,
+  }));
+
+  if (locked) {
+    return (
+      <div>
+        <PageHeader
+          title="Infak Pengembangan"
+          description="Akses Anda dibatasi hingga pembayaran bulan ini terkonfirmasi."
+          icon={<HandCoins className="size-6" />}
+        />
+
+        <CardBox className="border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+              <Lock className="size-5" />
+            </span>
+            <div className="text-sm">
+              <h3 className="font-semibold text-foreground">
+                Infak Pengembangan bulan {gate?.monthLabel ?? ""} belum terkonfirmasi.
+              </h3>
+              <ul className="text-muted-foreground mt-2 space-y-1">
+                <li>Bulan: <span className="font-semibold text-foreground/85">{gate?.monthLabel}</span></li>
+                <li>Nominal minimum: <span className="font-semibold text-foreground/85">{rupiah(gate?.minAmount ?? 1000)} / santri</span></li>
+                <li>Tagihan belum lunas: <span className="font-semibold text-foreground/85">{gate?.unpaidCount ?? 0} santri</span></li>
+                <li>Batas pembayaran: maksimal tanggal 15 — pembatasan akses mulai tanggal 16</li>
+              </ul>
+            </div>
+          </div>
+        </CardBox>
+
+        <div className="mt-6">
+          <WaliPaymentPanel
+            kids={invoices?.children ?? []}
+            others={invoices?.others ?? []}
+            defaultAmount={invoices?.defaultAmount ?? 1000}
+            academicYear={invoices?.academicYear ?? "-"}
+            bank={bank}
+            transactions={transactions}
+            autoEnabled={isIpaymuConfigured()}
+            currentY={gate?.year ?? new Date().getFullYear()}
+            currentM={gate?.month ?? new Date().getMonth() + 1}
+            waiverKids={waiverKids}
+            waiverRequests={waiverRequests}
+          />
+        </div>
+
+        <InfakHistoryCard className="mt-6" history={history} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Infak Pengembangan"
+        description="Dukung pengembangan TAHFIZH — mulai Rp1.000 per bulan per santri. Bisa untuk beberapa bulan sekaligus dan untuk santri lain di lembaga Anda."
+        icon={<HandCoins className="size-6" />}
+      />
+
+      {/* V18 — panel infak SELALU tampil. Bila RPC tagihan sedang tidak dapat
+          dibaca, panel tetap dirender dengan nilai dasar agar santri tetap bisa
+          melihat nominal, rekening, dan riwayatnya. */}
+      {!invoices && (
+        <CardBox className="mb-6 border-sky-200 bg-sky-50 dark:border-sky-500/25 dark:bg-sky-500/10">
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+              <Info className="size-4.5" />
+            </span>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Rincian tagihan bulan ini belum termuat. Anda tetap dapat melihat nominal infak,
+              informasi rekening, dan riwayat pembayaran di bawah. Muat ulang halaman bila
+              tagihan belum muncul.
+            </p>
+          </div>
+        </CardBox>
+      )}
+
+      <div className="space-y-6">
+        <WaliPaymentPanel
+          kids={invoices?.children ?? []}
+          others={invoices?.others ?? []}
+          defaultAmount={invoices?.defaultAmount ?? 1000}
+          academicYear={invoices?.academicYear ?? "-"}
+          bank={bank}
+          transactions={transactions}
+          autoEnabled={isIpaymuConfigured()}
+          currentY={invoices?.y ?? new Date().getFullYear()}
+          currentM={invoices?.m ?? new Date().getMonth() + 1}
+          waiverKids={waiverKids}
+          waiverRequests={waiverRequests}
+        />
+        <InfakHistoryCard history={history} />
+      </div>
+    </div>
+  );
+}
