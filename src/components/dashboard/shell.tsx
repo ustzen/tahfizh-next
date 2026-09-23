@@ -6,9 +6,16 @@ import { ForceChangePasswordCard } from "@/components/akun/force-change-password
 import { Logo } from "@/components/logo";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { DashboardHeader } from "@/components/dashboard/header";
+import { BottomNav } from "@/components/dashboard/bottom-nav";
 import type { AppRole } from "@/lib/roles";
 import { ROLE_LABELS } from "@/lib/roles";
-import { getTerminology, resolveNavGroups, type TerminologyMap } from "@/lib/terminology";
+import {
+  getTerminology,
+  resolveNavGroups,
+  resolveBottomNav,
+  BOTTOM_NAV_DEFAULT_KEYS,
+  type TerminologyMap,
+} from "@/lib/terminology";
 import { createClient } from "@/lib/supabase/server";
 import { getNotificationList, getUnreadNotificationCount } from "@/lib/v10";
 
@@ -37,13 +44,15 @@ export async function DashboardShell({
   avatarUrl?: string | null;
   children: React.ReactNode;
 }) {
-  const [terms, menuOrder, notifications, unreadCount, mustChangePassword] = await Promise.all([
-    getTerminology(tenantId),
-    getMenuOrder(),
-    getNotificationList(),
-    getUnreadNotificationCount(),
-    getMustChangePassword(),
-  ]);
+  const [terms, menuOrder, bottomNavOrder, notifications, unreadCount, mustChangePassword] =
+    await Promise.all([
+      getTerminology(tenantId),
+      getMenuOrder(),
+      getBottomNavOrder(),
+      getNotificationList(),
+      getUnreadNotificationCount(),
+      getMustChangePassword(),
+    ]);
 
   // Gender-aware role naming (rule #17): USTADZ + P shows Ustadzah label.
   const gender = await getOwnGender();
@@ -53,6 +62,8 @@ export async function DashboardShell({
       : ROLE_LABELS[role];
 
   const navGroups = resolveNavGroups(role, terms, gender, menuOrder);
+  const allNavItems = navGroups.flatMap((g) => g.items);
+  const bottomNavItems = resolveBottomNav(role, allNavItems, bottomNavOrder);
 
   // Nama role untuk atribut CSS — WALI_SANTRI tampil sebagai "santri" (V12).
   const roleKey = role === "WALI_SANTRI" ? "santri" : role.toLowerCase();
@@ -104,8 +115,11 @@ export async function DashboardShell({
           navGroups={navGroups}
           notifications={notifications}
           unreadCount={unreadCount}
+          bottomNavAllItems={allNavItems}
+          bottomNavSelected={bottomNavItems}
+          bottomNavDefaultKeys={BOTTOM_NAV_DEFAULT_KEYS[role]}
         />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 pb-24 sm:px-6 sm:py-6 lg:px-8 lg:pb-6">
           {/* V12.11 — wajib ganti password untuk SEMUA role (password sementara
               dari admin: guru/koordinator/santri yang di-reset lewat fitur
               V12.4/V12.5). Kartu juga tampil di dasbor santri (duplikat aman). */}
@@ -113,6 +127,9 @@ export async function DashboardShell({
           {children}
         </main>
       </div>
+
+      {/* V32 — Menu Bawah: bar navigasi 4 menu, khusus mobile, bisa diatur per akun. */}
+      <BottomNav items={bottomNavItems} />
     </div>
   );
 }
@@ -130,6 +147,18 @@ const getMenuOrder = cache(async (): Promise<string[] | null> => {
     .eq("id", data.user.id)
     .single();
   return (profile?.menu_order as string[] | null) ?? null;
+});
+
+const getBottomNavOrder = cache(async (): Promise<string[] | null> => {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return null;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("bottom_nav_menu")
+    .eq("id", data.user.id)
+    .single();
+  return (profile?.bottom_nav_menu as string[] | null) ?? null;
 });
 
 const getMustChangePassword = cache(async (): Promise<boolean> => {

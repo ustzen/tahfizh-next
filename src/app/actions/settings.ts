@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
 import { invalidateTenantConfig, CACHE_KEYS, invalidateTags } from "@/lib/cache";
 import { slugifyIdentity, parseIdentityTypes } from "@/lib/identity";
-import { TERMINOLOGY_KEYS, type TerminologyKey } from "@/lib/terminology";
+import { TERMINOLOGY_KEYS, BOTTOM_NAV_MAX_ITEMS, type TerminologyKey } from "@/lib/terminology";
 import { ROLE_HOME, type AppRole } from "@/lib/roles";
 
 export type SettingsResult = { error?: string; success?: string };
@@ -265,6 +265,50 @@ export async function resetMenuOrderAction(): Promise<SettingsResult> {
   revalidatePath(sectionPath(session.role));
   revalidatePath(ROLE_HOME[session.role]);
   return { success: "Urutan menu kembali ke default." };
+}
+
+/* ------------------------------------------------------------------------ */
+/* MENU BAWAH (mobile bottom nav) — per user, maks 4 item (V32)             */
+/* ------------------------------------------------------------------------ */
+export async function saveBottomNavMenuAction(keys: string[]): Promise<SettingsResult> {
+  const session = await getSessionProfile();
+  if (!session) return { error: "Sesi berakhir." };
+
+  if (
+    !Array.isArray(keys) ||
+    keys.length === 0 ||
+    keys.length > BOTTOM_NAV_MAX_ITEMS ||
+    keys.some((k) => typeof k !== "string" || k.length > 60)
+  ) {
+    return { error: `Pilih 1–${BOTTOM_NAV_MAX_ITEMS} menu untuk Menu Bawah.` };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ bottom_nav_menu: keys })
+    .eq("id", session.id);
+
+  if (error) return { error: "Gagal menyimpan Menu Bawah." };
+
+  revalidatePath(ROLE_HOME[session.role]);
+  return { success: "Menu Bawah tersimpan." };
+}
+
+export async function resetBottomNavMenuAction(): Promise<SettingsResult> {
+  const session = await getSessionProfile();
+  if (!session) return { error: "Sesi berakhir." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ bottom_nav_menu: null })
+    .eq("id", session.id);
+
+  if (error) return { error: "Gagal mengembalikan Menu Bawah ke default." };
+
+  revalidatePath(ROLE_HOME[session.role]);
+  return { success: "Menu Bawah kembali ke default." };
 }
 
 /* ------------------------------------------------------------------------ */

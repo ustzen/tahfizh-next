@@ -36,7 +36,7 @@ import {
 import type { NavEntry, NavGroup } from "@/lib/terminology";
 import { cn } from "@/lib/utils";
 
-const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+export const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   dashboard: LayoutDashboard,
   lembaga: Building2,
   pengguna: Users,

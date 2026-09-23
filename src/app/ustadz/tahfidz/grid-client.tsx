@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { BookOpenCheck, Save } from "lucide-react";
+import { BookOpenCheck, Save, CheckCheck } from "lucide-react";
 
 import { saveTahfidzGridAction, type GridCellInput } from "@/app/actions/tahfidz-grid";
 import { Card, CardContent } from "@/components/ui/card";
@@ -165,6 +165,35 @@ export function TahfidzGridClient({
     });
   }
 
+  /**
+   * V33 — Centang/nilai sekaligus SATU KOLOM (satu surat) untuk semua
+   * santri binaan. Toggle: jika semua santri sudah DINILAI di surat ini,
+   * klik lagi akan membatalkan semua (BELUM). Selain itu tetap bisa
+   * centang manual per sel seperti biasa.
+   */
+  function bulkSetColumn(surahId: string) {
+    const allDinilai = students.every((st) => cells[key(surahId, st.id)]?.status === "DINILAI");
+    setCells((prev) => {
+      const next = { ...prev };
+      for (const st of students) {
+        const k = key(surahId, st.id);
+        next[k] = allDinilai
+          ? { status: "BELUM", scoreLabel: null, scoreValue: null }
+          : mode === "HURUF"
+            ? { status: "DINILAI", scoreLabel: gradeOptions[0], scoreValue: null }
+            : mode === "ANGKA"
+              ? { status: "DINILAI", scoreLabel: null, scoreValue: 80 }
+              : { status: "DINILAI", scoreLabel: "✓", scoreValue: null };
+      }
+      return next;
+    });
+    toast.success(
+      allDinilai
+        ? `Semua santri dibatalkan untuk surat ini.`
+        : `Semua santri (${students.length}) ditandai untuk surat ini — klik Simpan untuk menyimpan.`
+    );
+  }
+
   function onSave() {
     const items: GridCellInput[] = [];
     for (const k of changedKeys) {
@@ -273,15 +302,31 @@ export function TahfidzGridClient({
                 <TableHead className="w-8 bg-violet-600 px-1 text-center text-xs font-bold text-white">No</TableHead>
                 <TableHead className="sticky left-0 z-30 w-14 bg-violet-600 px-1 text-center text-xs font-bold text-white">NIS</TableHead>
                 <TableHead className="sticky left-14 z-30 min-w-32 bg-violet-600 px-2 text-xs font-bold text-white">Nama</TableHead>
-                {surahs.map((s) => (
-                  <TableHead
-                    key={s.surahId}
-                    className="w-6 min-w-6 max-w-6 border-l border-violet-400/50 px-0 pb-1.5 pt-1.5 text-center"
-                    title={s.name}
-                  >
-                    <VerticalSurahName name={s.name} />
-                  </TableHead>
-                ))}
+                {surahs.map((s) => {
+                  const allDinilai = students.every((st) => cells[key(s.surahId, st.id)]?.status === "DINILAI");
+                  return (
+                    <TableHead
+                      key={s.surahId}
+                      className="w-6 min-w-6 max-w-6 border-l border-violet-400/50 px-0 pb-1.5 pt-1 text-center"
+                      title={s.name}
+                    >
+                      <div className="flex flex-col items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => bulkSetColumn(s.surahId)}
+                          title={`Centang semua santri untuk ${s.name}`}
+                          aria-label={`Centang semua santri untuk ${s.name}`}
+                          className={`flex size-4 items-center justify-center rounded ${
+                            allDinilai ? "bg-emerald-400 text-emerald-950" : "bg-violet-500/40 text-white hover:bg-violet-400/60"
+                          }`}
+                        >
+                          <CheckCheck className="size-2.5" />
+                        </button>
+                        <VerticalSurahName name={s.name} />
+                      </div>
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -363,7 +408,7 @@ export function TahfidzGridClient({
             <span className="inline-block size-3 rounded border border-border bg-muted/50" />
             {mode === "CENTANG" ? "Belum Menguasai" : "Belum"}
           </span>
-          <span>Klik sel: ganti status. Mode Angka/Huruf: isi nilai di sel. Simpan sekali untuk semua perubahan.</span>
+          <span>Klik sel: ganti status. Mode Angka/Huruf: isi nilai di sel. Tombol kecil <CheckCheck className="inline size-3 align-text-bottom" /> di atas kolom surat = centang/batalkan semua santri sekaligus untuk surat itu. Simpan sekali untuk semua perubahan.</span>
         </div>
       </CardContent>
     </Card>

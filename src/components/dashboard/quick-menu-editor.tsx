@@ -4,25 +4,36 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
+  Activity,
   AudioLines,
+  Award,
+  BookOpenCheck,
   BookOpenText,
+  CalendarCheck,
+  CalendarRange,
   Check,
   ClipboardList,
   Eye,
   EyeOff,
+  FileText,
   GraduationCap,
   GripVertical,
+  HandCoins,
   HandHeart,
+  History,
   ListChecks,
   MessageCircleHeart,
+  MessageSquareText,
   MessagesSquare,
   NotebookPen,
   RotateCcw,
+  Rocket,
   Settings,
   Settings2,
   SpellCheck,
   Target,
   Users,
+  Users2,
 } from "lucide-react";
 
 import {
@@ -58,6 +69,17 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   MessagesSquare,
   MessageCircleHeart,
   Settings,
+  BookOpenCheck,
+  Users2,
+  CalendarRange,
+  FileText,
+  Rocket,
+  MessageSquareText,
+  History,
+  Activity,
+  Award,
+  HandCoins,
+  CalendarCheck,
 };
 
 function iconFor(name: string) {
@@ -72,11 +94,14 @@ function iconFor(name: string) {
 export function QuickMenuEditorButton({
   defaults,
   visible,
+  defaultVisible,
 }: {
-  /** Semua item yang tersedia, urutan default. */
+  /** Semua item yang tersedia (pool lengkap), untuk ditambahkan guru. */
   defaults: QuickMenuItem[];
   /** Item yang sedang tampil, urutan sesuai preferensi tersimpan saat ini. */
   visible: QuickMenuItem[];
+  /** 8 item bawaan sebelum guru mengatur apa pun (dipakai saat "Kembalikan Default"). */
+  defaultVisible: QuickMenuItem[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -173,8 +198,10 @@ export function QuickMenuEditorButton({
       const result: SettingsResult = await resetDashboardQuickMenuAction();
       if (result.success) {
         toast.success(result.success);
-        setItems(defaults);
-        setHiddenKeys(new Set());
+        const defaultVisibleKeys = new Set(defaultVisible.map((i) => i.key));
+        const restHidden = defaults.filter((i) => !defaultVisibleKeys.has(i.key));
+        setItems([...defaultVisible, ...restHidden]);
+        setHiddenKeys(new Set(restHidden.map((i) => i.key)));
         setDirty(false);
         setOpen(false);
       } else if (result.error) {
@@ -279,7 +306,7 @@ export function QuickMenuGrid({ items }: { items: QuickMenuItem[] }) {
     );
   }
   return (
-    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    <div className="mt-4 grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
       {items.map((item) => {
         const Icon = iconFor(item.icon);
         return (
@@ -287,12 +314,19 @@ export function QuickMenuGrid({ items }: { items: QuickMenuItem[] }) {
             key={item.key}
             href={item.href}
             prefetch
-            className="flex items-center gap-3 rounded-xl border border-slate-200/80 bg-card p-3.5 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-lg"
+            className="group flex flex-col items-center gap-1.5 rounded-2xl p-1.5 text-center transition-transform active:scale-95"
           >
-            <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${item.chip}`}>
-              <Icon className="size-5" />
+            <span
+              className={cn(
+                "flex size-14 shrink-0 items-center justify-center rounded-2xl shadow-card transition-shadow group-hover:shadow-card-lg group-active:shadow-none sm:size-16",
+                item.chip
+              )}
+            >
+              <Icon className="size-7 sm:size-8" />
             </span>
-            <span className="min-w-0 truncate text-sm font-semibold text-foreground">{item.label}</span>
+            <span className="line-clamp-2 w-full text-[11px] font-medium leading-tight text-foreground sm:text-xs">
+              {item.label}
+            </span>
           </Link>
         );
       })}

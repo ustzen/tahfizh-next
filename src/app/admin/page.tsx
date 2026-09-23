@@ -1,90 +1,36 @@
 import {
   ArrowRight,
-  BookOpenCheck,
   CalendarRange,
   CheckCircle2,
   Circle,
-  FileText,
-  GraduationCap,
   LayoutDashboard,
-  MessageSquareText,
-  Settings,
   Sparkles,
-  Users2,
 } from "lucide-react";
 import Link from "next/link";
 
 import { StatCard } from "@/components/stat-card";
 import { PageHeader, CardBox, SectionTitle } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
+import { QuickMenuEditorButton, QuickMenuGrid } from "@/components/dashboard/quick-menu-editor";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { computeOnboardingSteps, getActiveSemester, getActiveYear, getOnboarding } from "@/lib/akademik";
 import { getAdminHalaqahList } from "@/lib/halaqah";
 import { getTerminology } from "@/lib/terminology";
+import { ADMIN_QUICK_MENU, ADMIN_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 import { cn, formatDate } from "@/lib/utils";
 
 export const metadata = { title: "Ringkasan" };
 
-/** Menu cepat dengan warna aksen unik per kartu (V12 — full color). */
-const QUICK_LINKS = [
-  {
-    href: "/admin/guru",
-    label: "Guru",
-    hint: "Kelola data guru",
-    icon: BookOpenCheck,
-    chip: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-    strip: "bg-amber-400",
-  },
-  {
-    href: "/admin/santri",
-    label: "Santri",
-    hint: "Kelola data santri",
-    icon: GraduationCap,
-    chip: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-    strip: "bg-emerald-500",
-  },
-  {
-    href: "/admin/halaqah",
-    label: "Halaqah",
-    hint: "Pengampu & anggota",
-    icon: Users2,
-    chip: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
-    strip: "bg-indigo-500",
-  },
-  {
-    href: "/admin/akademik",
-    label: "Akademik",
-    hint: "Tahun ajaran & jadwal",
-    icon: CalendarRange,
-    chip: "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300",
-    strip: "bg-cyan-500",
-  },
-  {
-    href: "/admin/raport",
-    label: "Raport",
-    hint: "Template & cetak",
-    icon: FileText,
-    chip: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
-    strip: "bg-violet-500",
-  },
-  {
-    href: "/admin/saran",
-    label: "Kritik & Saran",
-    hint: "Masukan dari pengguna",
-    icon: MessageSquareText,
-    chip: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
-    strip: "bg-rose-500",
-  },
-  {
-    href: "/admin/pengaturan",
-    label: "Pengaturan",
-    hint: "Profil & konfigurasi",
-    icon: Settings,
-    chip: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-    strip: "bg-blue-500",
-  },
-] as const;
+async function getDashboardQuickMenuOrder(userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("dashboard_quick_menu")
+    .eq("id", userId)
+    .single();
+  return (data?.dashboard_quick_menu as string[] | null) ?? null;
+}
 
 export default async function AdminDashboardPage() {
   const profile = await requireRole(["ADMIN"], "/admin");
@@ -101,6 +47,7 @@ export default async function AdminDashboardPage() {
     semester,
     steps,
     halaqahList,
+    savedQuickMenu,
   ] = await Promise.all([
     supabase.from("teachers").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
     supabase.from("students").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
@@ -111,7 +58,13 @@ export default async function AdminDashboardPage() {
     getActiveSemester(),
     computeOnboardingSteps(),
     getAdminHalaqahList(),
+    // V31: preferensi Menu Cepat (urutan + tampil/sembunyi) per akun.
+    getDashboardQuickMenuOrder(profile.id),
   ]);
+
+  const visibleQuickMenu = resolveQuickMenu(ADMIN_QUICK_MENU, savedQuickMenu, ADMIN_QUICK_MENU_DEFAULT_KEYS);
+  // Set 8 item bawaan (sebelum admin mengatur), dipakai editor untuk "Kembalikan Default".
+  const defaultQuickMenu = resolveQuickMenu(ADMIN_QUICK_MENU, null, ADMIN_QUICK_MENU_DEFAULT_KEYS);
 
   // V11 (#28): onboarding reminder until completed/dismissed.
   const onboarding = await getOnboarding();
@@ -241,28 +194,23 @@ export default async function AdminDashboardPage() {
         </CardBox>
       </div>
 
-      {/* Menu cepat */}
-      <h3 className="text-muted-foreground mt-8 mb-3 text-sm font-bold">Menu cepat</h3>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {QUICK_LINKS.map(({ href, label, hint, icon: Icon, chip, strip }) => (
-          <Link
-            key={href}
-            href={href}
-            className="shadow-card hover:shadow-card-lg group relative overflow-hidden rounded-2xl border bg-card transition-all duration-200 hover:-translate-y-0.5"
-          >
-            <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", strip)} />
-            <span className="flex flex-col items-start gap-3 px-5 py-5 pl-6">
-              <span className={cn("flex size-11 items-center justify-center rounded-xl transition-transform group-hover:scale-105", chip)}>
-                <Icon className="size-5" />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold">{label}</span>
-                <span className="text-muted-foreground block text-xs">{hint}</span>
-              </span>
-            </span>
-          </Link>
-        ))}
-      </div>
+      {/* Menu Cepat (V31 — dapat diatur ulang & disembunyikan per akun) */}
+      <CardBox className="mt-8">
+        <SectionTitle
+          tone="blue"
+          icon={<LayoutDashboard />}
+          title="Menu Cepat"
+          description="Akses langsung ke semua modul yang Anda gunakan sehari-hari."
+          action={
+            <QuickMenuEditorButton
+              defaults={ADMIN_QUICK_MENU}
+              visible={visibleQuickMenu}
+              defaultVisible={defaultQuickMenu}
+            />
+          }
+        />
+        <QuickMenuGrid items={visibleQuickMenu} />
+      </CardBox>
     </div>
   );
 }

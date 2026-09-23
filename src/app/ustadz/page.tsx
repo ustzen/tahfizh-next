@@ -10,7 +10,7 @@ import { getTeacherV8Dashboard } from "@/lib/halaqah";
 import { getScheduleReminders } from "@/lib/schedule-reminder";
 import { getTerminology } from "@/lib/terminology";
 import { createClient } from "@/lib/supabase/server";
-import { USTADZ_QUICK_MENU, resolveQuickMenu } from "@/lib/quick-menu";
+import { USTADZ_QUICK_MENU, USTADZ_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 import { ScheduleReminderBanner } from "@/components/dashboard/schedule-reminder-banner";
 
 export const metadata = { title: "Dashboard Ustadz" };
@@ -44,7 +44,9 @@ export default async function UstadzDashboardPage() {
     getDashboardQuickMenuOrder(profile.id),
   ]);
 
-  const visibleQuickMenu = resolveQuickMenu(USTADZ_QUICK_MENU, savedQuickMenu);
+  const visibleQuickMenu = resolveQuickMenu(USTADZ_QUICK_MENU, savedQuickMenu, USTADZ_QUICK_MENU_DEFAULT_KEYS);
+  // Set 8 item bawaan (sebelum guru mengatur), dipakai editor untuk "Kembalikan Default".
+  const defaultQuickMenu = resolveQuickMenu(USTADZ_QUICK_MENU, null, USTADZ_QUICK_MENU_DEFAULT_KEYS);
 
   return (
     <div>
@@ -85,7 +87,13 @@ export default async function UstadzDashboardPage() {
           icon={<LayoutDashboard />}
           title="Menu Cepat"
           description="Akses langsung ke semua modul yang Anda gunakan sehari-hari."
-          action={<QuickMenuEditorButton defaults={USTADZ_QUICK_MENU} visible={visibleQuickMenu} />}
+          action={
+            <QuickMenuEditorButton
+              defaults={USTADZ_QUICK_MENU}
+              visible={visibleQuickMenu}
+              defaultVisible={defaultQuickMenu}
+            />
+          }
         />
         <QuickMenuGrid items={visibleQuickMenu} />
       </CardBox>

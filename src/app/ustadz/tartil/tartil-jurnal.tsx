@@ -60,12 +60,18 @@ type TemplateOption = { id: string; slot: NoteSlot; content: string };
 
 const LABEL_CLS = "flex items-center gap-1.5 text-[0.82rem] font-bold";
 
+const MODE_TABS: { value: TahfidzMode; label: string }[] = [
+  { value: "CENTANG", label: "Centang" },
+  { value: "HURUF", label: "Huruf" },
+  { value: "ANGKA", label: "Angka" },
+];
+
 export function TartilJurnalForm({
   students,
   materials,
   methods,
   grades,
-  mode,
+  mode: initialMode,
   templates,
 }: {
   students: StudentOption[];
@@ -73,6 +79,7 @@ export function TartilJurnalForm({
   /** Metode baca lembaga: { name: "Ummi", jilidCount: 8 } — dipakai dropdown Jilid & Ganti Metode. */
   methods: { id: string; name: string; jilidCount: number }[];
   grades: GradeOption[];
+  /** Mode bawaan dari Pengaturan → Tartil (admin); guru tetap bisa ganti sendiri di form ini. */
   mode: TahfidzMode;
   templates: TemplateOption[];
 }) {
@@ -82,6 +89,9 @@ export function TartilJurnalForm({
   const [fromPage, setFromPage] = useState("1");
   const [toPage, setToPage] = useState("1");
   const [showMethodPicker, setShowMethodPicker] = useState(false);
+  // V33 — mode nilai TIDAK terkunci ke pengaturan admin: guru dapat memilih
+  // Centang/Huruf/Angka langsung di form ini (default = pengaturan admin).
+  const [mode, setMode] = useState<TahfidzMode>(initialMode);
   const [scoreLabel, setScoreLabel] = useState(grades[0]?.label ?? "");
   const [scoreValue, setScoreValue] = useState("");
   // Mode Centang: guru mencentang sendiri (bukan teks mati).
@@ -309,13 +319,27 @@ export function TartilJurnalForm({
 
       {/* 4. NILAI */}
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Label htmlFor="tj-score" className="text-emerald-700 dark:text-emerald-400">
             <span className={LABEL_CLS}><Star className="size-4" /> Nilai</span>
           </Label>
-          <span className="text-muted-foreground text-xs">
-            Mode Nilai: <strong>{mode === "HURUF" ? "Huruf" : mode === "ANGKA" ? "Angka (1–100)" : "Centang"}</strong>
-          </span>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-muted-foreground mr-0.5 text-[0.7rem] font-semibold">Mode:</span>
+            {MODE_TABS.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => setMode(m.value)}
+                className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  mode === m.value
+                    ? "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
         {mode === "CENTANG" ? (
           <label

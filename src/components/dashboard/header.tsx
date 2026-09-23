@@ -7,11 +7,12 @@ import { Menu, X } from "lucide-react";
 
 import { Logo } from "@/components/logo";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
+import { BottomNavEditorButton } from "@/components/dashboard/bottom-nav";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { GlobalSearch } from "@/components/search/global-search";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ROLE_HOME, type AppRole } from "@/lib/roles";
-import type { NavGroup } from "@/lib/terminology";
+import type { NavGroup, NavEntry } from "@/lib/terminology";
 import type { NotificationRow } from "@/lib/v10";
 
 type HeaderProps = {
@@ -25,6 +26,9 @@ type HeaderProps = {
   navGroups: NavGroup[];
   notifications?: NotificationRow[];
   unreadCount?: number;
+  bottomNavAllItems: NavEntry[];
+  bottomNavSelected: NavEntry[];
+  bottomNavDefaultKeys: string[];
 };
 
 export function DashboardHeader({
@@ -37,6 +41,9 @@ export function DashboardHeader({
   navGroups,
   notifications = [],
   unreadCount = 0,
+  bottomNavAllItems,
+  bottomNavSelected,
+  bottomNavDefaultKeys,
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -168,6 +175,14 @@ export function DashboardHeader({
 
             <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-8">
               <SidebarNav groups={navGroups} onNavigate={() => setOpen(false)} prefetch={false} />
+            </div>
+
+            <div className="border-t px-4 py-3">
+              <BottomNavEditorButton
+                allItems={bottomNavAllItems}
+                selected={bottomNavSelected}
+                defaultKeys={bottomNavDefaultKeys}
+              />
             </div>
 
             <div className="border-t px-4 py-3">

@@ -8,12 +8,24 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
+import { QuickMenuEditorButton, QuickMenuGrid } from "@/components/dashboard/quick-menu-editor";
 import { genderLabel } from "@/lib/roles";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getTerminology } from "@/lib/terminology";
+import { KOORDINATOR_QUICK_MENU, KOORDINATOR_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 
 export const metadata = { title: "Koordinator Dashboard" };
+
+async function getDashboardQuickMenuOrder(userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("dashboard_quick_menu")
+    .eq("id", userId)
+    .single();
+  return (data?.dashboard_quick_menu as string[] | null) ?? null;
+}
 
 type StudentRow = {
   id: string;
@@ -34,7 +46,7 @@ export default async function KoordinatorDashboardPage() {
   const tid = profile.tenantId!;
   const terms = await getTerminology(tid);
 
-  const [{ count: teacherCount }, { count: studentCount }, { count: activeTeacherCount }, { count: activeStudentCount }, { count: halaqahCount }, { count: presentToday }, rpc] =
+  const [{ count: teacherCount }, { count: studentCount }, { count: activeTeacherCount }, { count: activeStudentCount }, { count: halaqahCount }, { count: presentToday }, rpc, savedQuickMenu] =
     await Promise.all([
       supabase.from("teachers").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
       supabase.from("students").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
@@ -50,7 +62,13 @@ export default async function KoordinatorDashboardPage() {
         .gte("created_at", new Date().toISOString().slice(0, 10)),
       // V12.1: data santri lengkap untuk tabel dasbor (RPC security definer).
       supabase.rpc("students_manager_list"),
+      // V31: preferensi Menu Cepat (urutan + tampil/sembunyi) per akun.
+      getDashboardQuickMenuOrder(profile.id),
     ]);
+
+  const visibleQuickMenu = resolveQuickMenu(KOORDINATOR_QUICK_MENU, savedQuickMenu, KOORDINATOR_QUICK_MENU_DEFAULT_KEYS);
+  // Set 8 item bawaan (sebelum koordinator mengatur), dipakai editor untuk "Kembalikan Default".
+  const defaultQuickMenu = resolveQuickMenu(KOORDINATOR_QUICK_MENU, null, KOORDINATOR_QUICK_MENU_DEFAULT_KEYS);
 
   const students: StudentRow[] = rpc.error
     ? []
@@ -80,6 +98,24 @@ export default async function KoordinatorDashboardPage() {
           </Button>
         }
       />
+
+      {/* Menu Cepat (V31 — dapat diatur ulang & disembunyikan per akun) */}
+      <CardBox className="mb-6">
+        <SectionTitle
+          tone="emerald"
+          icon={<LayoutDashboard />}
+          title="Menu Cepat"
+          description="Akses langsung ke semua modul yang Anda gunakan sehari-hari."
+          action={
+            <QuickMenuEditorButton
+              defaults={KOORDINATOR_QUICK_MENU}
+              visible={visibleQuickMenu}
+              defaultVisible={defaultQuickMenu}
+            />
+          }
+        />
+        <QuickMenuGrid items={visibleQuickMenu} />
+      </CardBox>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon="teacher" label="Total Guru" value={teacherCount ?? 0} hint={`${activeTeacherCount ?? 0} aktif`} />

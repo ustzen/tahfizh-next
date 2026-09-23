@@ -217,6 +217,45 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
 };
 
 /**
+ * V32 — Menu Bawah (mobile bottom nav): 4 item bawaan per role, dari pool
+ * menu penuh (`BASE_NAV`). Guru/pengguna dapat mengganti isinya (maks 4)
+ * lewat dialog "Atur Menu Bawah" — tersimpan di profiles.bottom_nav_menu.
+ */
+export const BOTTOM_NAV_DEFAULT_KEYS: Record<AppRole, NavKey[]> = {
+  DEVELOPER: ["dashboard", "lembaga", "infak", "pengaturan"],
+  ADMIN: ["dashboard", "santri", "halaqah", "pengaturan"],
+  KOORDINATOR: ["dashboard", "santri", "halaqah", "raport"],
+  USTADZ: ["dashboard", "presensi", "setoran", "tahfidz"],
+  WALI_SANTRI: ["dashboard", "pantauan", "presensi", "infak"],
+};
+
+/** Maksimum item Menu Bawah yang boleh tampil sekaligus (ruang layar mobile). */
+export const BOTTOM_NAV_MAX_ITEMS = 4;
+
+/**
+ * Resolusi Menu Bawah: pilih (maks 4) dari seluruh item nav yang tersedia
+ * untuk role ini (`allItems`, sudah terminology + menu_order aware), sesuai
+ * `savedKeys` (urutan pilihan pengguna) atau default per role bila kosong.
+ */
+export function resolveBottomNav(
+  role: AppRole,
+  allItems: NavEntry[],
+  savedKeys: string[] | null
+): NavEntry[] {
+  const byKey = new Map(allItems.map((i) => [i.key as string, i]));
+  const keys =
+    savedKeys && savedKeys.length > 0 ? savedKeys : BOTTOM_NAV_DEFAULT_KEYS[role];
+  const resolved: NavEntry[] = [];
+  for (const k of keys) {
+    const item = byKey.get(k);
+    if (item && !resolved.some((r) => r.key === item.key)) resolved.push(item);
+    if (resolved.length >= BOTTOM_NAV_MAX_ITEMS) break;
+  }
+  if (resolved.length === 0 && allItems.length > 0) resolved.push(allItems[0]);
+  return resolved;
+}
+
+/**
  * Resolve final nav for a role: terminology-aware labels + the user's own
  * menu ordering + kategori berlabel (V12 #21/#48).
  */

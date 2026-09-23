@@ -1,14 +1,9 @@
-import Link from "next/link";
 import {
-  Activity,
   AudioLines,
-  Award,
-  CalendarCheck,
   HandCoins,
   LayoutDashboard,
   Lock,
   Receipt,
-  Target as TargetIcon,
 } from "lucide-react";
 
 import { StatCard } from "@/components/stat-card";
@@ -18,21 +13,33 @@ import { Button } from "@/components/ui/button";
 import { ForceChangePasswordCard } from "@/components/akun/force-change-password-card";
 import { SantriTahfidzGrid, type SantriGridCell } from "@/components/santri/tahfidz-grid";
 import { SetoranTerakhirCard, type SetoranTerakhirRow } from "@/components/santri/setoran-terakhir";
+import { QuickMenuEditorButton, QuickMenuGrid } from "@/components/dashboard/quick-menu-editor";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getPaymentGate, getWaliMonthlyStatus, getWaliInvoices, getWaliHistory } from "@/lib/v10";
 import { InfakHistoryCard } from "@/components/infak/infak-history-card";
+import { SANTRI_QUICK_MENU, SANTRI_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 
 import { formatDateId, rupiah } from "@/lib/v10-shared";
 
 export const metadata = { title: "Dashboard Santri" };
+
+async function getDashboardQuickMenuOrder(userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("dashboard_quick_menu")
+    .eq("id", userId)
+    .single();
+  return (data?.dashboard_quick_menu as string[] | null) ?? null;
+}
 
 export default async function SantriDashboardPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri");
   const supabase = await createClient();
 
   // Semua kueri mandiri dijalankan paralel — memangkas latensi render dasbor.
-  const [gate, monthly, invoices, history, guardianRes, ownProfileRes, tahfidzRpc, tartilRpc, setoranRpc] = await Promise.all([
+  const [gate, monthly, invoices, history, guardianRes, ownProfileRes, tahfidzRpc, tartilRpc, setoranRpc, savedQuickMenu] = await Promise.all([
     // V10: gate + status tagihan (rule #61/#62)
     getPaymentGate(),
     getWaliMonthlyStatus(),
@@ -52,9 +59,15 @@ export default async function SantriDashboardPage() {
     // V12.11 — blok Setoran Terakhir (3 modul) per anak, sinkron dengan menu
     // Setoran guru (tahfidz_submissions + learning_assessments).
     supabase.rpc("setoran_wali_summary"),
+    // V31: preferensi Menu Cepat (urutan + tampil/sembunyi) per akun.
+    getDashboardQuickMenuOrder(profile.id),
   ]);
   const guardian = guardianRes.data;
   const mustChangePassword = ownProfileRes.data?.must_change_password === true;
+
+  const visibleQuickMenu = resolveQuickMenu(SANTRI_QUICK_MENU, savedQuickMenu, SANTRI_QUICK_MENU_DEFAULT_KEYS);
+  // Set 8 item bawaan (sebelum wali mengatur), dipakai editor untuk "Kembalikan Default".
+  const defaultQuickMenu = resolveQuickMenu(SANTRI_QUICK_MENU, null, SANTRI_QUICK_MENU_DEFAULT_KEYS);
 
   const unpaid = (monthly ?? []).filter((c) => c.status && c.status !== "PAID").length;
   const paid = (monthly ?? []).filter((c) => c.status === "PAID").length;
@@ -115,29 +128,23 @@ export default async function SantriDashboardPage() {
 
       {mustChangePassword && <ForceChangePasswordCard />}
 
-      {/* V18 — pintasan menu pantauan (sinkron dengan penilaian guru) */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { href: "/santri/prestasi", label: "Kartu Prestasi", desc: "Rangkuman capaian", Icon: Award, tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
-          { href: "/santri/pantauan", label: "Pantauan", desc: "Semua penilaian guru", Icon: Activity, tone: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
-          { href: "/santri/target", label: "Target", desc: "Progres target halaqah", Icon: TargetIcon, tone: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
-          { href: "/santri/presensi", label: "Presensi", desc: "Rekap kehadiran", Icon: CalendarCheck, tone: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" },
-        ].map(({ href, label, desc, Icon, tone }) => (
-          <Link
-            key={href}
-            href={href}
-            className="shadow-card flex items-center gap-3 rounded-2xl border bg-card px-4 py-3.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-500/10"
-          >
-            <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${tone}`}>
-              <Icon className="size-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-foreground">{label}</span>
-              <span className="text-muted-foreground block truncate text-xs">{desc}</span>
-            </span>
-          </Link>
-        ))}
-      </div>
+      {/* Menu Cepat (V31 — dapat diatur ulang & disembunyikan per akun) */}
+      <CardBox className="mb-6">
+        <SectionTitle
+          tone="emerald"
+          icon={<LayoutDashboard />}
+          title="Menu Cepat"
+          description="Akses langsung ke semua modul yang Anda gunakan sehari-hari."
+          action={
+            <QuickMenuEditorButton
+              defaults={SANTRI_QUICK_MENU}
+              visible={visibleQuickMenu}
+              defaultVisible={defaultQuickMenu}
+            />
+          }
+        />
+        <QuickMenuGrid items={visibleQuickMenu} />
+      </CardBox>
 
       {gate?.locked && (
         <CardBox className="mb-6 border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10">
