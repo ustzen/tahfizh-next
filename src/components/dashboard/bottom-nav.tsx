@@ -23,8 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { ICONS } from "@/components/dashboard/sidebar-nav";
 import { cn } from "@/lib/utils";
-import { BOTTOM_NAV_MAX_ITEMS } from "@/lib/terminology";
-import type { NavEntry } from "@/lib/terminology";
+import { BOTTOM_NAV_MAX_ITEMS, type NavEntry } from "@/lib/terminology-shared";
 
 function iconFor(key: string) {
   return ICONS[key] ?? Settings;
