@@ -1,6 +1,7 @@
 import { ClipboardList } from "lucide-react";
 
 import { CardBox } from "@/components/dashboard/section";
+import { fmtDMY } from "@/lib/date-format";
 
 /**
  * TAHFIZH V12.11 — Blok "Setoran Terakhir" di dasbor santri.
@@ -109,9 +110,7 @@ export function SetoranTerakhirCard({ rows }: { rows: SetoranTerakhirRow[] }) {
                     </div>
                     <div className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
                       <span>
-                        {new Date(`${r.assessedDate}T00:00:00`).toLocaleDateString("id-ID", {
-                          day: "numeric", month: "short", year: "numeric",
-                        })}
+                        {fmtDMY(r.assessedDate)}
                       </span>
                       {r.teacherName ? <span>· {r.teacherName}</span> : null}
                     </div>

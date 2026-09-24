@@ -14,10 +14,10 @@ import type { SubmissionStudentSummary } from "@/lib/setoran";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/status-badge";
+import { fmtDMY } from "@/lib/date-format";
 
 function formatDate(iso: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+  return fmtDMY(iso, "—");
 }
 
 function scoreText(s: SubmissionStudentSummary) {

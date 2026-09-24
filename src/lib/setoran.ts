@@ -149,9 +149,28 @@ export async function getSubmissionStudentSummaries(
     console.error("tahfidz_teacher_submission_summaries failed:", error.message);
     return [];
   }
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+  const rows = (data ?? []) as Record<string, unknown>[];
+
+  // NIS = NIS lembaga (students.nis), bukan business_code (S-21, dst).
+  // Ditimpa di sini agar benar walau versi RPC di database masih lama.
+  const nisById = new Map<string, string | null>();
+  if (rows.length > 0) {
+    const nisRes = await supabase
+      .from("students")
+      .select("id, nis")
+      .in("id", rows.map((r) => r.student_id as string));
+    if (!nisRes.error) {
+      for (const n of nisRes.data ?? []) {
+        nisById.set(n.id as string, (n.nis as string | null)?.trim() || null);
+      }
+    }
+  }
+
+  return rows.map((r) => ({
     studentId: r.student_id as string,
-    nis: (r.business_code as string | null) ?? null,
+    nis: nisById.has(r.student_id as string)
+      ? (nisById.get(r.student_id as string) ?? null)
+      : null,
     fullName: r.full_name as string,
     gender: r.gender as "L" | "P",
     studentStatus: r.student_status as string,

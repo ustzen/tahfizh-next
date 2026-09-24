@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import type { ReportComponent, ReportData, ReportStyle } from "@/lib/report-shared";
 import { DEFAULT_GRADE_LEGEND, MODULE_LABELS } from "@/lib/report-shared";
+import { fmtDMY } from "@/lib/date-format";
 
 /**
  * TAHFIZH V9 — renders the CONTENT of a single report component.
@@ -19,16 +20,8 @@ export type CanvasContext = {
   periodEnd: string;
 };
 
-const MONTHS_ID = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
-
 export function formatDateID(iso: string | null | undefined): string {
-  if (!iso) return "-";
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return `${d.getDate()} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
+  return fmtDMY(iso);
 }
 
 function periodText(ctx: CanvasContext): string {

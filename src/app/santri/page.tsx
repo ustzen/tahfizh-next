@@ -21,6 +21,7 @@ import { InfakHistoryCard } from "@/components/infak/infak-history-card";
 import { SANTRI_QUICK_MENU, SANTRI_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 
 import { formatDateId, rupiah } from "@/lib/v10-shared";
+import { fmtDMY } from "@/lib/date-format";
 
 export const metadata = { title: "Dashboard Santri" };
 
@@ -239,9 +240,7 @@ export default async function SantriDashboardPage() {
                   <p className="text-sm font-semibold text-foreground">{r.student_name}</p>
                   {r.last_assessed_at ? (
                     <span className="text-muted-foreground text-xs">
-                      {new Date(r.last_assessed_at).toLocaleDateString("id-ID", {
-                        day: "numeric", month: "short", year: "numeric",
-                      })}
+                      {fmtDMY(r.last_assessed_at)}
                     </span>
                   ) : null}
                 </div>

@@ -1,4 +1,6 @@
+import { fmtDMY } from "@/lib/date-format";
 /**
+import { fmtDMY } from "@/lib/date-format";
  * TAHFIZH V18 — Pantauan Santri (SHARED / client-safe).
  *
  * Tipe + label untuk menu pantauan di dasbor santri. Semua data berasal dari
@@ -185,10 +187,7 @@ export function persen(part: number, total: number) {
 }
 
 export function tanggalId(iso: string | null | undefined) {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return fmtDMY(iso);
 }
 
 export function bulanId(ym: string) {

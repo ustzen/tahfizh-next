@@ -16,6 +16,7 @@ import {
 } from "@/lib/v7-shared";
 import type { TaskRow } from "@/lib/v7";
 import { cn } from "@/lib/utils";
+import { fmtDMY } from "@/lib/date-format";
 
 const FILTERS = ["SEMUA", ...TASK_STATUSES] as const;
 type Filter = (typeof FILTERS)[number];
@@ -50,7 +51,7 @@ export function TaskListClient({
   function dueLabel(task: TaskRow) {
     const d = new Date(task.dueDate);
     const days = Math.ceil((d.getTime() - Date.now()) / 86_400_000);
-    const label = d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+    const label = fmtDMY(task.dueDate);
     if (days < 0 && t_active(task.status)) return `${label} · lewat ${Math.abs(days)} hari`;
     if (days === 0 && t_active(task.status)) return `${label} · hari ini`;
     return label;

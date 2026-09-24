@@ -7,6 +7,7 @@ import type { AchievementEntry } from "@/lib/tartil";
 import { SUBMISSION_RESULT_LABELS } from "@/lib/setoran-shared";
 import { learningStatusLabel } from "@/lib/learning-shared";
 import { cn } from "@/lib/utils";
+import { fmtDMY } from "@/lib/date-format";
 
 type Props = {
   entries: AchievementEntry[];
@@ -65,7 +66,7 @@ const MODULE_STYLE: Record<string, { label: string; icon: typeof Trophy; chip: s
 };
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  return fmtDMY(iso);
 }
 
 function scoreText(e: AchievementEntry) {

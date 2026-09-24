@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { JournalEntryRow } from "@/lib/v7";
 import { cn } from "@/lib/utils";
+import { fmtDMY } from "@/lib/date-format";
 
 export function JournalListClient({
   entries,
@@ -98,7 +99,7 @@ export function JournalListClient({
                       {e.templateName}
                     </span>
                     <span className="text-muted-foreground text-[11px]">
-                      {new Date(e.entryDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                      {fmtDMY(e.entryDate)}
                     </span>
                   </div>
                   <p className="truncate text-sm font-bold text-foreground">{e.studentName}</p>

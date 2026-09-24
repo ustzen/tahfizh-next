@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { fmtDMY } from "@/lib/date-format";
 
 /**
  * Riwayat Perkembangan timeline (#43-#47): modern vertical timeline with
@@ -43,11 +44,7 @@ function kindMeta(kind: string) {
 }
 
 function formatTanggal(iso: string) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return fmtDMY(iso);
 }
 
 export type TimelineYear = {

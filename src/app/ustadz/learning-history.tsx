@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { fmtDMY } from "@/lib/date-format";
 
 type HistoryItem = {
   id: string;
@@ -36,7 +37,7 @@ type HistoryItem = {
 };
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return fmtDMY(iso);
 }
 
 function scoreText(item: HistoryItem) {

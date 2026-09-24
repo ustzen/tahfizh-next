@@ -1,36 +1,17 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { fmtDMY, fmtDMYHM } from "@/lib/date-format";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export function formatDate(value?: string | null) {
-  if (!value) return "-";
-  try {
-    return new Intl.DateTimeFormat("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }).format(new Date(value));
-    } catch {
-    return "-";
-  }
+  return fmtDMY(value);
 }
 
 export function formatDateTime(value?: string | null) {
-  if (!value) return "-";
-  try {
-    return new Intl.DateTimeFormat("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(value));
-  } catch {
-    return "-";
-  }
+  return fmtDMYHM(value);
 }
 
 export function initialOf(name: string) {

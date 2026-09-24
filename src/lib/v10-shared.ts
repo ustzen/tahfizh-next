@@ -1,4 +1,6 @@
+import { fmtDMY } from "@/lib/date-format";
 /**
+import { fmtDMY } from "@/lib/date-format";
  * TAHFIZH V10 — shared constants & formatters (CLIENT SAFE).
  *
  * Pure helpers needed by both server components and client components.
@@ -163,16 +165,8 @@ export function monthIndex(y: number, m: number): number {
  * Tanggal Indonesia tetap zona Asia/Jakarta, mis. "20 September 2026".
  * timeZone eksplisit agar server & browser menampilkan hari yang sama.
  */
-export function formatDateId(iso: string | null | undefined, opts?: { short?: boolean }): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: opts?.short ? "short" : "long",
-    year: "numeric",
-    timeZone: "Asia/Jakarta",
-  });
+export function formatDateId(iso: string | null | undefined, _opts?: { short?: boolean }): string {
+  return fmtDMY(iso, "");
 }
 
 /**

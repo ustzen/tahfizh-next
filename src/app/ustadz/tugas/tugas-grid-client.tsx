@@ -42,6 +42,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { fmtDMY } from "@/lib/date-format";
 
 /**
  * TAHFIZH V12.8 — Grid Tugas (client).
@@ -74,9 +75,7 @@ function percentToGrade(pct: number): string {
 }
 
 function formatDateId(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" });
+  return fmtDMY(iso);
 }
 
 export function TugasGridClient({

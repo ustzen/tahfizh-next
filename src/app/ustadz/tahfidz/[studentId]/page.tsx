@@ -17,12 +17,13 @@ import { StatCard } from "@/components/stat-card";
 import { AssessmentForm } from "@/app/ustadz/tahfidz/[studentId]/assessment-form";
 import { HistoryList } from "@/app/ustadz/tahfidz/[studentId]/history-list";
 import { scoreDisplay } from "@/lib/tahfidz";
+import { fmtDMY } from "@/lib/date-format";
 
 export const metadata = { title: "Detail Tahfidz" };
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return fmtDMY(iso);
 }
 
 export default async function StudentTahfidzPage({

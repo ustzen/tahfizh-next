@@ -3,6 +3,7 @@ import { ShieldCheck } from "lucide-react";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { roleLabel } from "@/lib/roles";
 import type { AuditRow } from "@/app/actions/audit-log";
+import { fmtDMYHM } from "@/lib/date-format";
 
 /** Judul ramah untuk kode aksi audit (mis. terminology.update → "Terminologi diperbarui"). */
 const ACTION_LABELS: Record<string, string> = {
@@ -29,14 +30,6 @@ function formatDetail(detail: Record<string, unknown>): string {
     })
     .join(" · ");
 }
-
-const dateFormatter = new Intl.DateTimeFormat("id-ID", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 export function AuditLogList({ rows }: { rows: AuditRow[] }) {
   if (rows.length === 0) {
@@ -75,7 +68,7 @@ export function AuditLogList({ rows }: { rows: AuditRow[] }) {
               {r.actor_name ?? "Sistem"}
               {r.actor_role ? ` · ${roleLabel(r.actor_role)}` : ""}
             </p>
-            <p className="text-muted-foreground text-xs">{dateFormatter.format(new Date(r.created_at))}</p>
+            <p className="text-muted-foreground text-xs">{fmtDMYHM(r.created_at)}</p>
           </div>
           <span className="sr-only">{r.action}</span>
         </li>

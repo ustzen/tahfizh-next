@@ -11,6 +11,7 @@ import {
 import { Spinner } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { roleLabel } from "@/lib/roles";
+import { fmtDMYHM } from "@/lib/date-format";
 
 /**
  * V12.12 — Kartu permintaan reset password (Admin lembaga).
@@ -98,7 +99,7 @@ export function AdminResetRequestsCard({ requests }: { requests: AdminResetReque
                   {r.username && <span className="text-muted-foreground"> ({r.username})</span>}
                 </p>
                 <p className="text-muted-foreground mt-0.5 text-xs">
-                  Diminta {new Date(r.requested_at).toLocaleString("id-ID")}
+                  Diminta {fmtDMYHM(r.requested_at)}
                   {r.whatsapp ? ` · WA ${r.whatsapp}` : " · nomor WhatsApp belum tercatat"}
                 </p>
               </div>
@@ -145,7 +146,7 @@ export function AdminResetRequestsCard({ requests }: { requests: AdminResetReque
                     {r.full_name}
                     {r.username ? ` (${r.username})` : ""}{" "}
                     <span className="text-muted-foreground text-xs">
-                      · {new Date(r.requested_at).toLocaleString("id-ID")}
+                      · {fmtDMYHM(r.requested_at)}
                     </span>
                   </span>
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${s.cls}`}>

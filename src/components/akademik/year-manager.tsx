@@ -43,6 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { fmtDMY } from "@/lib/date-format";
 
 export type YearItem = {
   id: string;
@@ -307,10 +308,5 @@ function ArchiveForm({ yearId, yearName }: { yearId: string; yearName: string })
 }
 
 export function formatTanggal(iso: string) {
-  if (!iso) return "-";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return fmtDMY(iso);
 }

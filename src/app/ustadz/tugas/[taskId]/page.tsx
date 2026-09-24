@@ -12,11 +12,12 @@ import { Button } from "@/components/ui/button";
 import { TaskStatusControls } from "./status-controls";
 import { TASK_MODULE_OPTIONS, taskStatusLabel, taskStatusStyle } from "@/lib/v7-shared";
 import { cn } from "@/lib/utils";
+import { fmtDMY } from "@/lib/date-format";
 
 export const metadata = { title: "Detail Tugas" };
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return fmtDMY(iso);
 }
 
 export default async function TaskDetailPage({

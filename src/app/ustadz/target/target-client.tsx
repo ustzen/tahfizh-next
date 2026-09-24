@@ -51,6 +51,7 @@ import {
   type TargetCategory,
   type TargetHalaqah,
 } from "@/lib/target-shared";
+import { fmtDMY } from "@/lib/date-format";
 
 /**
  * TAHFIZH V17 — Target per halaqah (client).
@@ -94,9 +95,7 @@ function defaultPeriod(): { start: string; end: string } {
 }
 
 function formatDateId(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return fmtDMY(iso);
 }
 
 type EditState = {

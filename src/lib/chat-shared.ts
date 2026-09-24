@@ -2,6 +2,7 @@
  * TAHFIZH V20 — Obrolan (chat 1 lembaga, client-safe).
  */
 import type { AppRole } from "@/lib/roles";
+import { fmtDMY } from "@/lib/date-format";
 
 export type ChatMessage = {
   id: string;
@@ -61,5 +62,5 @@ export function chatDayLabel(iso: string) {
   const diffDays = Math.round((startOf(now) - startOf(d)) / 86400000);
   if (diffDays === 0) return "Hari ini";
   if (diffDays === 1) return "Kemarin";
-  return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  return fmtDMY(d);
 }

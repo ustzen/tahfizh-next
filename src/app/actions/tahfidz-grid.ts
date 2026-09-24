@@ -54,6 +54,21 @@ export async function fetchTahfidzGridAction(): Promise<{
   const grades: string[] = (gradesRes.data ?? []).map((g) => g.label);
   const data = gridRes.data as { students: { id: string; name: string; nickname: string | null; code?: string | null }[]; rows: { surahId: string; name: string; sortOrder: number }[] };
 
+  // Kolom NIS harus NIS lembaga (students.nis), bukan business_code (S-21, dst).
+  // Ditimpa di sini agar benar walau versi RPC di database masih lama.
+  if (data.students.length > 0) {
+    const nisRes = await supabase
+      .from("students")
+      .select("id, nis")
+      .in("id", data.students.map((st) => st.id));
+    if (!nisRes.error) {
+      const nisById = new Map<string, string | null>(
+        (nisRes.data ?? []).map((r) => [r.id as string, (r.nis as string | null)?.trim() || null])
+      );
+      data.students = data.students.map((st) => ({ ...st, code: nisById.get(st.id) ?? null }));
+    }
+  }
+
   // Nilai tersimpan per (surat, santri) — hanya binaan guru (SECURITY DEFINER
   // memverifikasi relasi halaqah di dalam RPC).
   const cellsRes = await supabase.rpc("tahfidz_grid_cells");
