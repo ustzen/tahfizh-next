@@ -357,7 +357,7 @@ export function SetoranDirectForm({
             <SelectContent>
               {students.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.name} ({cleanNis(s.code) ?? "—"})
+                  NIS {cleanNis(s.code) ?? "—"} · {s.name}
                 </SelectItem>
               ))}
             </SelectContent>
