@@ -53,7 +53,7 @@ import {
  *      isi catatan, ikon pensil = edit, ikon ✕ = hapus. {nama} diganti otomatis.
  */
 
-type StudentOption = { studentId: string; fullName: string; businessCode: string };
+type StudentOption = { studentId: string; fullName: string; nis: string | null };
 type MaterialOption = { id: string; name: string };
 type GradeOption = { label: string; minValue: number; maxValue: number };
 type TemplateOption = { id: string; slot: NoteSlot; content: string };
@@ -223,7 +223,7 @@ export function TartilJurnalForm({
           <SelectContent className="max-h-72">
             {students.map((s) => (
               <SelectItem key={s.studentId} value={s.studentId}>
-                {s.fullName} ({s.businessCode})
+                {s.fullName} ({s.nis ?? "—"})
               </SelectItem>
             ))}
           </SelectContent>

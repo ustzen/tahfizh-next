@@ -122,7 +122,7 @@ export const getSetoranTeacherForSession = cache(async () => {
 
 export type SubmissionStudentSummary = {
   studentId: string;
-  businessCode: string;
+  nis: string | null;
   fullName: string;
   gender: "L" | "P";
   studentStatus: string;
@@ -151,7 +151,7 @@ export async function getSubmissionStudentSummaries(
   }
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     studentId: r.student_id as string,
-    businessCode: r.business_code as string,
+    nis: (r.business_code as string | null) ?? null,
     fullName: r.full_name as string,
     gender: r.gender as "L" | "P",
     studentStatus: r.student_status as string,

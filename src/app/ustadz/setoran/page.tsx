@@ -74,24 +74,24 @@ export default async function UstadzSetoranPage() {
 }
 
 /** Santri binaan guru (binaan via halaqah) — untuk dropdown "Pilih Santri". */
-async function getBinaanStudents(teacherId: string): Promise<{ id: string; name: string; code: string }[]> {
+async function getBinaanStudents(teacherId: string): Promise<{ id: string; name: string; code: string | null }[]> {
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("teacher_students")
-    .select("student_id, students(business_code, full_name)")
+    .select("student_id, students(nis, full_name)")
     .eq("teacher_id", teacherId);
   if (error) {
     console.error("setoran binaan list failed:", error.message);
     return [];
   }
   const seen = new Set<string>();
-  const out: { id: string; name: string; code: string }[] = [];
+  const out: { id: string; name: string; code: string | null }[] = [];
   for (const r of data ?? []) {
-    const s = r.students as unknown as { business_code: string; full_name: string } | null;
+    const s = r.students as unknown as { nis: string | null; full_name: string } | null;
     if (!s || seen.has(r.student_id)) continue;
     seen.add(r.student_id);
-    out.push({ id: r.student_id, name: s.full_name, code: s.business_code });
+    out.push({ id: r.student_id, name: s.full_name, code: s.nis });
   }
   out.sort((a, b) => a.name.localeCompare(b.name));
   return out;

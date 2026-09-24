@@ -258,6 +258,58 @@ export function WaliPaymentPanel({
             </p>
           )}
 
+          {/* ---------------- Nominal infak (selalu tampil, tinggal klik) ---------------- */}
+          <section className="rounded-2xl border-2 border-blue-200 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-500/5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  Nominal infak: <span className="text-role-strong">{rupiah(customAmount ?? defaultAmount)}/bulan</span>
+                </p>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Minimal {rupiah(defaultAmount)} per santri per bulan — pilih di bawah untuk mengubah, atau ketik nominal sendiri.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={customAmount === null ? "default" : "outline"}
+                  className="h-8"
+                  onClick={() => {
+                    setCustomAmount(null);
+                    setCustomText("");
+                  }}
+                >
+                  Sesuai tagihan
+                </Button>
+                {QUICK_AMOUNTS.filter((a) => a > defaultAmount).map((a) => (
+                  <Button
+                    key={a}
+                    type="button"
+                    size="sm"
+                    variant={customAmount === a ? "default" : "outline"}
+                    className="h-8"
+                    onClick={() => {
+                      setCustomAmount(a);
+                      setCustomText(a.toLocaleString("id-ID"));
+                    }}
+                  >
+                    {rupiah(a)}
+                  </Button>
+                ))}
+                <Input
+                  id="infak-per-month"
+                  inputMode="numeric"
+                  value={customText}
+                  onChange={(e) => setCustom(e.target.value)}
+                  placeholder="Nominal lain"
+                  className="h-8 w-32 bg-white dark:bg-transparent"
+                  aria-label="Nominal infak per bulan lainnya"
+                />
+              </div>
+            </div>
+          </section>
+
           {/* ---------------- Anak sendiri ---------------- */}
           <section className="space-y-3.5">
             <h4 className="text-base font-semibold text-foreground">Tagihan Saya</h4>
@@ -336,67 +388,87 @@ export function WaliPaymentPanel({
                       </button>
                       {isAheadOpen && (
                         <div className="mt-3 space-y-2.5">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-muted-foreground text-xs">Cepat:</span>
-                            {[1, 3, 6].map((n) => (
-                              <Button
-                                key={n}
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2.5 text-xs"
-                                disabled={locked || aheadSelectable.length < n}
-                                onClick={() => pickAhead(child, n)}
-                              >
-                                {n} bulan
-                              </Button>
-                            ))}
-                            {aheadSelected > 0 && (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-xs text-red-600 dark:text-red-300"
-                                onClick={() => setMany(child.studentId, [], false, child.ahead)}
-                              >
-                                Batal
-                              </Button>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
-                            {child.ahead.map((inv) => {
-                              const on = keyOf(child.studentId, inv.y, inv.m) in selected;
-                              const ok = isSelectable(inv);
-                              return (
-                                <button
-                                  key={`${inv.y}-${inv.m}`}
+                          {child.ahead.length === 0 ? (
+                            <p className="text-muted-foreground text-[0.7rem] leading-relaxed">
+                              Tidak ada bulan tersisa untuk dibayar di muka tahun ini — sudah sampai Desember.
+                              Bulan Januari tahun depan akan muncul di sini setelah tagihannya diterbitkan.
+                            </p>
+                          ) : (
+                            <>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-muted-foreground text-xs">Cepat:</span>
+                                {[1, 3, 6].map((n) => (
+                                  <Button
+                                    key={n}
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2.5 text-xs"
+                                    disabled={locked || aheadSelectable.length < n}
+                                    onClick={() => pickAhead(child, n)}
+                                  >
+                                    {n} bulan
+                                  </Button>
+                                ))}
+                                <Button
                                   type="button"
-                                  disabled={locked || !ok}
-                                  onClick={() => toggleOne(child.studentId, inv)}
-                                  title={ok ? rupiah(inv.amount) : (INVOICE_STATUS_LABEL[inv.status] ?? inv.status)}
-                                  className={cn(
-                                    "rounded-lg border px-2 py-1.5 text-center text-xs transition-colors",
-                                    on
-                                      ? "border-blue-500 bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
-                                      : ok
-                                        ? "border-slate-200 bg-white text-slate-700 hover:border-blue-300 dark:border-slate-500/20 dark:bg-transparent"
-                                        : "border-slate-100 bg-slate-50 text-slate-400 dark:border-slate-500/10 dark:bg-transparent",
-                                    !ok && "cursor-not-allowed"
-                                  )}
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2.5 text-xs"
+                                  disabled={locked || aheadSelectable.length === 0}
+                                  onClick={() => pickAhead(child, aheadSelectable.length)}
                                 >
-                                  <span className="block">{monthYearShort(inv.y, inv.m)}</span>
-                                  {!ok && (
-                                    <span className="block text-[0.6rem]">
-                                      {inv.status === "PAID" ? "Lunas" : "Diproses"}
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <p className="text-muted-foreground text-[0.7rem] leading-relaxed">
-                            Tagihan bulan depan dibuat otomatis saat dibayar. Bisa sampai 11 bulan ke depan.
-                          </p>
+                                  Sampai Desember
+                                </Button>
+                                {aheadSelected > 0 && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs text-red-600 dark:text-red-300"
+                                    onClick={() => setMany(child.studentId, [], false, child.ahead)}
+                                  >
+                                    Batal
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                                {child.ahead.map((inv) => {
+                                  const on = keyOf(child.studentId, inv.y, inv.m) in selected;
+                                  const ok = isSelectable(inv);
+                                  return (
+                                    <button
+                                      key={`${inv.y}-${inv.m}`}
+                                      type="button"
+                                      disabled={locked || !ok}
+                                      onClick={() => toggleOne(child.studentId, inv)}
+                                      title={ok ? rupiah(inv.amount) : (INVOICE_STATUS_LABEL[inv.status] ?? inv.status)}
+                                      className={cn(
+                                        "rounded-lg border px-2 py-1.5 text-center text-xs transition-colors",
+                                        on
+                                          ? "border-blue-500 bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                                          : ok
+                                            ? "border-slate-200 bg-white text-slate-700 hover:border-blue-300 dark:border-slate-500/20 dark:bg-transparent"
+                                            : "border-slate-100 bg-slate-50 text-slate-400 dark:border-slate-500/10 dark:bg-transparent",
+                                        !ok && "cursor-not-allowed"
+                                      )}
+                                    >
+                                      <span className="block">{monthYearShort(inv.y, inv.m)}</span>
+                                      {!ok && (
+                                        <span className="block text-[0.6rem]">
+                                          {inv.status === "PAID" ? "Lunas" : "Diproses"}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <p className="text-muted-foreground text-[0.7rem] leading-relaxed">
+                                Tagihan bulan depan dibuat otomatis saat dibayar. Ditampilkan sampai Desember{" "}
+                                {child.ahead[child.ahead.length - 1]?.y ?? ""} — mulai lagi otomatis saat memasuki Januari.
+                              </p>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -549,48 +621,12 @@ export function WaliPaymentPanel({
                   Kosongkan pilihan
                 </Button>
               </div>
-              <div className="mt-3 space-y-1.5">
-                <Label htmlFor="infak-per-month" className="text-xs">
-                  Nominal per bulan (opsional — boleh lebih dari tagihan, min {rupiah(defaultAmount)})
-                </Label>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={customAmount === null ? "default" : "outline"}
-                    className="h-8"
-                    onClick={() => {
-                      setCustomAmount(null);
-                      setCustomText("");
-                    }}
-                  >
-                    Sesuai tagihan
-                  </Button>
-                  {QUICK_AMOUNTS.filter((a) => a > defaultAmount).map((a) => (
-                    <Button
-                      key={a}
-                      type="button"
-                      size="sm"
-                      variant={customAmount === a ? "default" : "outline"}
-                      className="h-8"
-                      onClick={() => {
-                        setCustomAmount(a);
-                        setCustomText(a.toLocaleString("id-ID"));
-                      }}
-                    >
-                      {rupiah(a)}
-                    </Button>
-                  ))}
-                  <Input
-                    id="infak-per-month"
-                    inputMode="numeric"
-                    value={customText}
-                    onChange={(e) => setCustom(e.target.value)}
-                    placeholder="Nominal lain"
-                    className="h-8 w-32 bg-white dark:bg-transparent"
-                  />
-                </div>
-              </div>
+              {customAmount !== null && (
+                <p className="text-muted-foreground mt-2 text-xs">
+                  Nominal {rupiah(customAmount)}/bulan diterapkan ke semua tagihan terpilih. Ubah di bagian
+                  "Nominal infak" di atas bila perlu.
+                </p>
+              )}
 
               {studentCount > 0 && (
                 <div className="mt-3 space-y-1.5">

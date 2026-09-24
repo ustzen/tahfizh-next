@@ -46,7 +46,7 @@ export default async function UstadzTartilPage() {
               students={summaries.map((s) => ({
                 studentId: s.studentId,
                 fullName: s.fullName,
-                businessCode: s.businessCode,
+                nis: s.nis,
               }))}
               materials={config.materials.map((m) => ({ id: m.id, name: m.name }))}
               methods={methods.map((m) => ({ id: m.id, name: m.name, jilidCount: m.jilidCount }))}

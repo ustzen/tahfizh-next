@@ -41,7 +41,7 @@ import { Spinner } from "@/components/loading";
 type Tab = "TAHFIDZ" | "HADITS" | "DOA";
 type Mode = "CENTANG" | "HURUF" | "ANGKA";
 
-type StudentOption = { id: string; name: string; code: string };
+type StudentOption = { id: string; name: string; code: string | null };
 type SurahOption = { id: string; name: string };
 type MaterialOption = { id: string; title: string; subtitle: string | null };
 type GradeOption = { label: string; minValue: number; maxValue: number };
@@ -356,7 +356,7 @@ export function SetoranDirectForm({
             <SelectContent>
               {students.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.name} ({s.code})
+                  {s.name} ({s.code ?? "—"})
                 </SelectItem>
               ))}
             </SelectContent>

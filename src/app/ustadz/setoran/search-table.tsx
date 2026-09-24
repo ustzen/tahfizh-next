@@ -54,7 +54,7 @@ export function SetoranSearchTable({
     const q = query.trim().toLowerCase();
     if (!q) return summaries;
     return summaries.filter(
-      (s) => s.fullName.toLowerCase().includes(q) || s.businessCode.toLowerCase().includes(q)
+      (s) => s.fullName.toLowerCase().includes(q) || (s.nis ?? "").toLowerCase().includes(q)
     );
   }, [summaries, query]);
 
