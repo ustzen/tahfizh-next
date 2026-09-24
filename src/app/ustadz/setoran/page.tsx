@@ -1,3 +1,4 @@
+import { cleanNis } from "@/lib/nis";
 import { Mic } from "lucide-react";
 
 import { requireRole } from "@/lib/auth";
@@ -79,7 +80,7 @@ async function getBinaanStudents(teacherId: string): Promise<{ id: string; name:
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("teacher_students")
-    .select("student_id, students(nis, full_name)")
+    .select("student_id, students(nis, business_code, full_name)")
     .eq("teacher_id", teacherId);
   if (error) {
     console.error("setoran binaan list failed:", error.message);
@@ -88,10 +89,10 @@ async function getBinaanStudents(teacherId: string): Promise<{ id: string; name:
   const seen = new Set<string>();
   const out: { id: string; name: string; code: string | null }[] = [];
   for (const r of data ?? []) {
-    const s = r.students as unknown as { nis: string | null; full_name: string } | null;
+    const s = r.students as unknown as { nis: string | null; business_code: string | null; full_name: string } | null;
     if (!s || seen.has(r.student_id)) continue;
     seen.add(r.student_id);
-    out.push({ id: r.student_id, name: s.full_name, code: s.nis });
+    out.push({ id: r.student_id, name: s.full_name, code: cleanNis(s.nis, s.business_code) });
   }
   out.sort((a, b) => a.name.localeCompare(b.name));
   return out;

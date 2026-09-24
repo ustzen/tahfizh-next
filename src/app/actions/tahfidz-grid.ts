@@ -1,5 +1,6 @@
 "use server";
 
+import { cleanNis } from "@/lib/nis";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
 import { invalidateTahfidzAssessments } from "@/lib/cache";
@@ -59,11 +60,14 @@ export async function fetchTahfidzGridAction(): Promise<{
   if (data.students.length > 0) {
     const nisRes = await supabase
       .from("students")
-      .select("id, nis")
+      .select("id, nis, business_code")
       .in("id", data.students.map((st) => st.id));
     if (!nisRes.error) {
       const nisById = new Map<string, string | null>(
-        (nisRes.data ?? []).map((r) => [r.id as string, (r.nis as string | null)?.trim() || null])
+        (nisRes.data ?? []).map((r) => [
+          r.id as string,
+          cleanNis(r.nis as string | null, r.business_code as string | null),
+        ])
       );
       data.students = data.students.map((st) => ({ ...st, code: nisById.get(st.id) ?? null }));
     }

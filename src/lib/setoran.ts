@@ -1,3 +1,4 @@
+import { cleanNis } from "@/lib/nis";
 import "server-only";
 
 import { cache } from "react";
@@ -157,11 +158,11 @@ export async function getSubmissionStudentSummaries(
   if (rows.length > 0) {
     const nisRes = await supabase
       .from("students")
-      .select("id, nis")
+      .select("id, nis, business_code")
       .in("id", rows.map((r) => r.student_id as string));
     if (!nisRes.error) {
       for (const n of nisRes.data ?? []) {
-        nisById.set(n.id as string, (n.nis as string | null)?.trim() || null);
+        nisById.set(n.id as string, cleanNis(n.nis as string | null, n.business_code as string | null));
       }
     }
   }
