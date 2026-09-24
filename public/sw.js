@@ -4,7 +4,7 @@
 // Sengaja TIDAK melakukan caching agresif dulu supaya data dashboard
 // (yang selalu server-rendered & tenant-spesifik) tidak pernah basi.
 
-const CACHE_NAME = "tahfizh-shell-v1";
+const CACHE_NAME = "tahfizh-shell-v2";
 const APP_SHELL = ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
