@@ -1,4 +1,4 @@
-import { cleanNis } from "@/lib/nis";
+import { cleanNis, compareByNis } from "@/lib/nis";
 import { Mic } from "lucide-react";
 
 import { requireRole } from "@/lib/auth";
@@ -78,22 +78,32 @@ export default async function UstadzSetoranPage() {
 async function getBinaanStudents(teacherId: string): Promise<{ id: string; name: string; code: string | null }[]> {
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
-  const { data, error } = await supabase
+
+  const { data: links, error } = await supabase
     .from("teacher_students")
-    .select("student_id, students(nis, business_code, full_name)")
+    .select("student_id")
     .eq("teacher_id", teacherId);
   if (error) {
     console.error("setoran binaan list failed:", error.message);
     return [];
   }
-  const seen = new Set<string>();
-  const out: { id: string; name: string; code: string | null }[] = [];
-  for (const r of data ?? []) {
-    const s = r.students as unknown as { nis: string | null; business_code: string | null; full_name: string } | null;
-    if (!s || seen.has(r.student_id)) continue;
-    seen.add(r.student_id);
-    out.push({ id: r.student_id, name: s.full_name, code: cleanNis(s.nis, s.business_code) });
+  const ids = Array.from(new Set((links ?? []).map((r) => r.student_id as string)));
+  if (ids.length === 0) return [];
+
+  // NIS diambil langsung dari tabel students (NIS lembaga), bukan business_code.
+  const { data: studs, error: studErr } = await supabase
+    .from("students")
+    .select("id, nis, business_code, full_name")
+    .in("id", ids);
+  if (studErr) {
+    console.error("setoran binaan students failed:", studErr.message);
+    return [];
   }
-  out.sort((a, b) => a.name.localeCompare(b.name));
+  const out = (studs ?? []).map((s) => ({
+    id: s.id as string,
+    name: s.full_name as string,
+    code: cleanNis(s.nis as string | null, s.business_code as string | null),
+  }));
+  out.sort((a, b) => compareByNis({ nis: a.code, name: a.name }, { nis: b.code, name: b.name }));
   return out;
 }

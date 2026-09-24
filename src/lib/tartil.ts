@@ -1,3 +1,4 @@
+import { cleanNis, compareByNis } from "@/lib/nis";
 import "server-only";
 
 import { cache } from "react";
@@ -199,9 +200,25 @@ export async function getTartilStudentSummaries(teacherId: string): Promise<Tart
     console.error("tartil_teacher_summaries failed:", error.message);
     return [];
   }
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+  const rows = (data ?? []) as Record<string, unknown>[];
+
+  // NIS = NIS lembaga (students.nis), bukan business_code (S-21, dst).
+  const nisById = new Map<string, string | null>();
+  if (rows.length > 0) {
+    const nisRes = await supabase
+      .from("students")
+      .select("id, nis, business_code")
+      .in("id", rows.map((r) => r.student_id as string));
+    if (!nisRes.error) {
+      for (const n of nisRes.data ?? []) {
+        nisById.set(n.id as string, cleanNis(n.nis as string | null, n.business_code as string | null));
+      }
+    }
+  }
+
+  const mapped = rows.map((r) => ({
     studentId: r.student_id as string,
-    nis: (r.business_code as string | null) ?? null,
+    nis: nisById.get(r.student_id as string) ?? null,
     fullName: r.full_name as string,
     gender: r.gender as "L" | "P",
     studentStatus: r.student_status as string,
@@ -213,6 +230,9 @@ export async function getTartilStudentSummaries(teacherId: string): Promise<Tart
     lastMode: (r.last_mode as TahfidzMode | null) ?? null,
     lastAssessedAt: (r.last_assessed_at as string | null) ?? null,
   }));
+  return mapped.sort((a, b) =>
+    compareByNis({ nis: a.nis, name: a.fullName }, { nis: b.nis, name: b.fullName })
+  );
 }
 
 export type TartilEntry = {

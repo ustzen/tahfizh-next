@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { compareByNis } from "@/lib/nis";
 
 /**
  * TAHFIZH V12.6 — Grid penilaian tahfidz (client).
@@ -97,29 +98,12 @@ export function TahfidzGridClient({
 
   const key = (surahId: string, studentId: string) => `${surahId}:${studentId}`;
 
-  /** Jumlah surat yang sudah DINILAI untuk satu santri (dihitung dari state sel saat ini). */
-  function countDinilai(studentId: string): number {
-    return surahs.reduce((acc, s) => {
-      const c = cells[key(s.surahId, studentId)];
-      return acc + (c?.status === "DINILAI" ? 1 : 0);
-    }, 0);
-  }
-
-  /**
-   * Urutan baris: jumlah hafalan (DINILAI) TERBANYAK dulu; bila sama, NIS
-   * LEBIH BESAR tampil lebih atas (mis. NIS 025 di atas NIS 012).
-   */
+  /** Urutan baris: berdasarkan NIS (naik, numerik-natural); NIS kosong di akhir. */
   const sortedStudents = useMemo(() => {
-    return [...students].sort((a, b) => {
-      const diff = countDinilai(b.id) - countDinilai(a.id);
-      if (diff !== 0) return diff;
-      const an = Number(a.code ?? "");
-      const bn = Number(b.code ?? "");
-      if (Number.isFinite(an) && Number.isFinite(bn) && an !== bn) return bn - an;
-      return (b.code ?? "").localeCompare(a.code ?? "");
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [students, cells, surahs]);
+    return [...students].sort((a, b) =>
+      compareByNis({ nis: a.code, name: a.name }, { nis: b.code, name: b.name })
+    );
+  }, [students]);
 
   const changedKeys = useMemo(() => {
     const dirty = new Set<string>();

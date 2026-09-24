@@ -10,3 +10,19 @@ export function cleanNis(nis: string | null | undefined, businessCode?: string |
   if (/^[A-Za-z]-\d+$/.test(v)) return null;
   return v;
 }
+
+/** Urut berdasarkan NIS (numerik-natural, naik); NIS kosong di akhir, lalu nama. */
+export function compareByNis(
+  a: { nis: string | null | undefined; name: string },
+  b: { nis: string | null | undefined; name: string }
+): number {
+  const an = (a.nis ?? "").trim();
+  const bn = (b.nis ?? "").trim();
+  if (!an && bn) return 1;
+  if (an && !bn) return -1;
+  if (an && bn) {
+    const c = an.localeCompare(bn, "id", { numeric: true, sensitivity: "base" });
+    if (c !== 0) return c;
+  }
+  return a.name.localeCompare(b.name, "id");
+}

@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { BookOpenText, HandHeart, Loader2, Pencil, Plus, Save, ScrollText, X } from "lucide-react";
 
+import { cleanNis } from "@/lib/nis";
 import { saveSetoranAction } from "@/app/actions/setoran";
 import { saveSetoranLearningAction } from "@/app/actions/setoran-learning";
 import {
@@ -356,7 +357,7 @@ export function SetoranDirectForm({
             <SelectContent>
               {students.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.name} ({s.code ?? "—"})
+                  {s.name} ({cleanNis(s.code) ?? "—"})
                 </SelectItem>
               ))}
             </SelectContent>

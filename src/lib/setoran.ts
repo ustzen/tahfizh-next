@@ -1,4 +1,4 @@
-import { cleanNis } from "@/lib/nis";
+import { cleanNis, compareByNis } from "@/lib/nis";
 import "server-only";
 
 import { cache } from "react";
@@ -167,7 +167,7 @@ export async function getSubmissionStudentSummaries(
     }
   }
 
-  return rows.map((r) => ({
+  const mapped = rows.map((r) => ({
     studentId: r.student_id as string,
     nis: nisById.has(r.student_id as string)
       ? (nisById.get(r.student_id as string) ?? null)
@@ -185,6 +185,9 @@ export async function getSubmissionStudentSummaries(
     lastScoreValue: (r.last_score_value as number | null) ?? null,
     lastDate: (r.last_date as string | null) ?? null,
   }));
+  return mapped.sort((a, b) =>
+    compareByNis({ nis: a.nis, name: a.fullName }, { nis: b.nis, name: b.fullName })
+  );
 }
 
 export type SubmissionEntry = {
