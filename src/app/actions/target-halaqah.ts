@@ -4,27 +4,30 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
-import { isTargetCategory } from "@/lib/target-shared";
+import { isTargetCategory, isTargetScope, targetItemsTooLong } from "@/lib/target-shared";
 import type { ActionResult } from "@/app/actions/crud";
 
 /**
- * TAHFIZH V17 — Aksi Target per halaqah.
+ * TAHFIZH V17 (diperbarui V38) — Aksi Target per halaqah.
  *
  * Target diatur untuk satu halaqah (bukan per santri) dengan 3 jenis:
- * TAHFIDZ, HADITS, DOA. Semua penulisan lewat RPC SECURITY DEFINER yang
- * memverifikasi ulang session → role USTADZ → tenant → halaqah yang diampu.
- * Validasi di sini hanya untuk umpan balik cepat.
+ * TAHFIDZ, HADITS, DOA. Isi target DIKETIK guru (daftar nama — surat/hadits/
+ * doa) dan cakupannya TAHUN / GANJIL / GENAP; tidak ada tanggal mulai/selesai.
+ * Semua penulisan lewat RPC SECURITY DEFINER yang memverifikasi ulang
+ * session → role USTADZ → tenant → halaqah yang diampu. Validasi di sini hanya
+ * untuk umpan balik cepat.
  */
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const ERROR_MAP: { match: RegExp; message: string }[] = [
   { match: /AKSES_DITOLAK|GURU_TIDAK_DITEMUKAN/, message: "Session Anda telah berakhir atau profil guru tidak ditemukan. Silakan login kembali." },
   { match: /HALAQAH_TIDAK_VALID/, message: "Halaqah tidak valid atau bukan halaqah yang Anda ampu." },
   { match: /KATEGORI_TIDAK_VALID/, message: "Jenis target tidak valid." },
-  { match: /TARGET_TIDAK_VALID/, message: "Jumlah target harus bilangan bulat 1–10000." },
-  { match: /PERIODE_TIDAK_VALID/, message: "Periode tidak valid — tanggal selesai tidak boleh sebelum tanggal mulai (maksimal 3 tahun)." },
+  { match: /CAKUPAN_TIDAK_VALID/, message: "Cakupan target tidak valid — pilih 1 tahun ajaran, semester ganjil, atau semester genap." },
+  { match: /ISI_TARGET_KOSONG/, message: "Isi target belum diisi — ketik minimal satu nama." },
+  { match: /ISI_TARGET_TERLALU_BANYAK/, message: "Isi target terlalu banyak — maksimal 500 nama." },
+  { match: /ISI_TARGET_TERLALU_PANJANG/, message: "Isi target terlalu panjang — total maksimal 5000 karakter." },
   { match: /DESKRIPSI_TERLALU_PANJANG/, message: "Keterangan maksimal 300 karakter." },
   { match: /TARGET_TIDAK_DITEMUKAN/, message: "Target tidak ditemukan — mungkin sudah dikosongkan. Muat ulang halaman." },
 ];
@@ -50,9 +53,8 @@ function revalidateTarget() {
 export async function saveHalaqahTargetAction(input: {
   halaqahId: string;
   category: string;
-  targetValue: number;
-  startDate: string;
-  endDate: string;
+  scope: string;
+  items: string;
   description?: string | null;
 }): Promise<ActionResult> {
   const profile = await requireUstadz();
@@ -60,15 +62,12 @@ export async function saveHalaqahTargetAction(input: {
 
   if (!UUID_RE.test(input.halaqahId)) return { error: "Halaqah tidak valid." };
   if (!isTargetCategory(input.category)) return { error: "Jenis target tidak valid." };
-  if (!Number.isInteger(input.targetValue) || input.targetValue < 1 || input.targetValue > 10000) {
-    return { error: "Jumlah target harus bilangan bulat 1–10000." };
+  if (!isTargetScope(input.scope)) {
+    return { error: "Cakupan target tidak valid — pilih 1 tahun ajaran, semester ganjil, atau semester genap." };
   }
-  if (!DATE_RE.test(input.startDate) || !DATE_RE.test(input.endDate)) {
-    return { error: "Tanggal mulai dan selesai wajib diisi." };
-  }
-  if (input.endDate < input.startDate) {
-    return { error: "Tanggal selesai tidak boleh sebelum tanggal mulai." };
-  }
+  const items = (input.items ?? "").trim();
+  if (!items) return { error: "Isi target belum diisi — ketik minimal satu nama." };
+  if (targetItemsTooLong(items)) return { error: "Isi target terlalu panjang — total maksimal 5000 karakter." };
   const description = (input.description ?? "").trim();
   if (description.length > 300) return { error: "Keterangan maksimal 300 karakter." };
 
@@ -76,9 +75,8 @@ export async function saveHalaqahTargetAction(input: {
   const { error } = await supabase.rpc("target_halaqah_save", {
     p_halaqah_id: input.halaqahId,
     p_category: input.category,
-    p_target_value: input.targetValue,
-    p_start_date: input.startDate,
-    p_end_date: input.endDate,
+    p_scope: input.scope,
+    p_items: items,
     p_description: description || null,
   });
   if (error) return { error: friendlyError(error.message) };

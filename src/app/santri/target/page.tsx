@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
 import { getTargetProgress } from "@/lib/santri-pantauan";
 import { cn } from "@/lib/utils";
-import { moduleLabel, persen, tanggalId } from "@/lib/santri-pantauan-shared";
+import { moduleLabel, persen, targetScopeLabel } from "@/lib/santri-pantauan-shared";
 
 export const metadata: Metadata = { title: "Target" };
 
@@ -51,14 +51,15 @@ export default async function SantriTargetPage() {
                 {list.map((t) => {
                   const pct = Math.min(persen(t.capaian, t.targetValue), 100);
                   const tercapai = t.capaian >= t.targetValue;
-                  const lewatTempo = new Date(t.endDate) < new Date() && !tercapai;
+                  const items = (t.items ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
                   return (
                     <li key={t.targetId}>
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <p className="text-sm font-semibold text-foreground">
                           {moduleLabel(t.category)}
+                          <span className="text-muted-foreground font-normal"> — {targetScopeLabel(t.scope)}</span>
                           {t.description ? (
-                            <span className="text-muted-foreground font-normal"> — {t.description}</span>
+                            <span className="text-muted-foreground font-normal"> · {t.description}</span>
                           ) : null}
                         </p>
                         <span className="tabular text-sm font-bold">
@@ -69,23 +70,32 @@ export default async function SantriTargetPage() {
 
                       <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-500/20">
                         <div
-                          className={cn(
-                            "h-full rounded-full",
-                            tercapai ? "bg-emerald-500" : lewatTempo ? "bg-rose-500" : "bg-sky-500"
-                          )}
+                          className={cn("h-full rounded-full", tercapai ? "bg-emerald-500" : "bg-sky-500")}
                           style={{ width: `${pct}%` }}
                         />
                       </div>
 
                       <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        <Badge variant={tercapai ? "success" : lewatTempo ? "danger" : "info"}>
-                          {tercapai ? "Tercapai" : lewatTempo ? "Lewat tempo" : `${pct}% berjalan`}
+                        <Badge variant={tercapai ? "success" : "info"}>
+                          {tercapai ? "Tercapai" : `${pct}% berjalan`}
                         </Badge>
                         <span className="text-muted-foreground text-xs">
-                          {tanggalId(t.startDate)} – {tanggalId(t.endDate)}
-                          {t.teacherName ? ` · ${t.teacherName}` : ""}
+                          {t.teacherName ? `${t.teacherName}` : ""}
                         </span>
                       </div>
+
+                      {items.length > 0 && (
+                        <ul className="mt-2 flex flex-wrap gap-1.5">
+                          {items.map((it, i) => (
+                            <li
+                              key={`${it}-${i}`}
+                              className="bg-slate-100 text-slate-600 dark:bg-slate-500/10 dark:text-slate-300 rounded-lg px-2 py-1 text-xs font-medium"
+                            >
+                              {it}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}

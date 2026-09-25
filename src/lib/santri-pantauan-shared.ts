@@ -125,11 +125,20 @@ export type TargetProgress = {
   category: string;
   targetValue: number;
   capaian: number;
-  startDate: string;
-  endDate: string;
+  /** V38 — cakupan target: TAHUN | GANJIL | GENAP (tanpa tanggal). */
+  scope: string;
+  /** Daftar nama yang diketik guru (satu per baris); null pada data lama. */
+  items: string | null;
   description: string | null;
   teacherName: string | null;
 };
+
+/** Label cakupan target di sisi santri/wali (client-safe, tanpa import lib target). */
+export function targetScopeLabel(scope: string | null | undefined): string {
+  if (scope === "GANJIL") return "Semester Ganjil";
+  if (scope === "GENAP") return "Semester Genap";
+  return "1 Tahun Ajaran";
+}
 
 export type RaportItem = {
   reportId: string;

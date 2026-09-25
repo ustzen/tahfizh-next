@@ -3,17 +3,20 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import {
   isTargetCategory,
+  isTargetScope,
+  parseTargetItems,
   type HalaqahTarget,
   type TargetHalaqah,
   type TargetOverview,
 } from "@/lib/target-shared";
 
 /**
- * TAHFIZH V17 — Target per halaqah (SERVER ONLY).
+ * TAHFIZH V17 (diperbarui V38) — Target per halaqah (SERVER ONLY).
  *
  * Identitas (tenant/guru) selalu dari session di dalam RPC SECURITY DEFINER
  * `target_halaqah_overview` — bukan dari client. Hasil: halaqah aktif yang
- * diampu guru + target (maks. 3 jenis per halaqah).
+ * diampu guru + target (maks. 3 jenis per halaqah) dengan cakupan
+ * TAHUN/GANJIL/GENAP dan isi yang diketik guru (tanpa tanggal).
  */
 
 type RawHalaqah = { id: string; name: string; studentCount?: number | string | null };
@@ -21,9 +24,9 @@ type RawTarget = {
   id: string;
   halaqahId: string;
   category: string;
+  scope: string;
+  items: string | null;
   targetValue: number | string;
-  startDate: string;
-  endDate: string;
   description: string | null;
   updatedAt: string;
 };
@@ -53,9 +56,10 @@ export async function getTargetOverview(): Promise<TargetOverview> {
       id: t.id,
       halaqahId: t.halaqahId,
       category: t.category,
+      // Data lama (sebelum V38) belum punya scope → default TAHUN.
+      scope: isTargetScope(t.scope) ? t.scope : "TAHUN",
+      items: t.items ? parseTargetItems(t.items) : [],
       targetValue: Number(t.targetValue ?? 0),
-      startDate: t.startDate,
-      endDate: t.endDate,
       description: t.description ?? null,
       updatedAt: t.updatedAt,
     });
