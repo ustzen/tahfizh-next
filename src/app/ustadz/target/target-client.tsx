@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import {
   BookOpen,
   BookOpenText,
-  CalendarDays,
   HandHeart,
   Pencil,
   Plus,
@@ -39,19 +38,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/loading";
 import {
   TARGET_CATEGORIES,
   TARGET_CATEGORY_META,
-  isTargetEnded,
+  TARGET_SCOPES,
+  TARGET_SCOPE_LABEL,
+  parseTargetItems,
   type HalaqahTarget,
   type TargetCategory,
   type TargetHalaqah,
+  type TargetScope,
 } from "@/lib/target-shared";
-import { fmtDMY } from "@/lib/date-format";
 
 /**
  * TAHFIZH V17 — Target per halaqah (client).
@@ -80,24 +80,6 @@ const CATEGORY_STYLE: Record<
   },
 };
 
-/** YYYY-MM-DD dari tanggal LOKAL (toISOString memakai UTC → bisa mundur sehari). */
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function defaultPeriod(): { start: string; end: string } {
-  const now = new Date();
-  const end = new Date(now.getFullYear(), now.getMonth() + 6, now.getDate());
-  return { start: toIsoDate(now), end: toIsoDate(end) };
-}
-
-function formatDateId(iso: string): string {
-  return fmtDMY(iso);
-}
-
 type EditState = {
   halaqah: TargetHalaqah;
   category: TargetCategory;
@@ -118,9 +100,8 @@ export function TargetClient({
   const [pending, startTransition] = useTransition();
 
   // Form dialog.
-  const [fValue, setFValue] = useState("");
-  const [fStart, setFStart] = useState("");
-  const [fEnd, setFEnd] = useState("");
+  const [fScope, setFScope] = useState<TargetScope>("TAHUN");
+  const [fItems, setFItems] = useState("");
   const [fDesc, setFDesc] = useState("");
 
   const findTarget = (halaqahId: string, category: TargetCategory) =>
@@ -129,24 +110,19 @@ export function TargetClient({
   function openEditor(h: TargetHalaqah, category: TargetCategory) {
     const existing = findTarget(h.id, category);
     if (existing) {
-      setFValue(String(existing.targetValue));
-      setFStart(existing.startDate);
-      setFEnd(existing.endDate);
+      setFScope(existing.scope);
+      setFItems(existing.items.join("\n"));
       setFDesc(existing.description ?? "");
     } else {
-      const p = defaultPeriod();
-      setFValue("");
-      setFStart(p.start);
-      setFEnd(p.end);
+      setFScope("TAHUN");
+      setFItems("");
       setFDesc("");
     }
     setEditing({ halaqah: h, category, existing });
   }
 
-  const valueNumber = Number(fValue);
-  const valueValid = fValue.trim() !== "" && Number.isInteger(valueNumber) && valueNumber >= 1 && valueNumber <= 10000;
-  const periodValid = !!fStart && !!fEnd && fEnd >= fStart;
-  const canSave = valueValid && periodValid && !pending;
+  const itemCount = parseTargetItems(fItems).length;
+  const canSave = itemCount >= 1 && itemCount <= 500 && !pending;
 
   function onSave() {
     if (!editing) return;
@@ -155,9 +131,8 @@ export function TargetClient({
       const res = await saveHalaqahTargetAction({
         halaqahId: h.id,
         category,
-        targetValue: valueNumber,
-        startDate: fStart,
-        endDate: fEnd,
+        scope: fScope,
+        items: fItems,
         description: fDesc || null,
       });
       if (res.error) {
@@ -224,7 +199,6 @@ export function TargetClient({
                 const style = CATEGORY_STYLE[category];
                 const Icon = style.icon;
                 const t = findTarget(h.id, category);
-                const ended = t ? isTargetEnded(t.endDate) : false;
 
                 return (
                   <div
@@ -243,18 +217,22 @@ export function TargetClient({
                         <div className="flex flex-wrap items-baseline gap-x-1.5">
                           <span className="text-role-strong text-3xl font-bold">{t.targetValue}</span>
                           <span className="text-muted-foreground text-sm">{meta.unit}</span>
-                          {ended && (
-                            <Badge variant="neutral" className="ml-auto">
-                              Periode selesai
-                            </Badge>
-                          )}
+                          <Badge variant="neutral" className="ml-auto">
+                            {TARGET_SCOPE_LABEL[t.scope]}
+                          </Badge>
                         </div>
-                        <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
-                          <CalendarDays className="mt-0.5 size-3.5 shrink-0" />
-                          <span>
-                            {formatDateId(t.startDate)} – {formatDateId(t.endDate)}
-                          </span>
-                        </p>
+                        {t.items.length > 0 && (
+                          <ul className="flex flex-wrap gap-1.5">
+                            {t.items.map((it, i) => (
+                              <li
+                                key={`${it}-${i}`}
+                                className={`rounded-lg px-2 py-1 text-xs font-medium ${style.chip}`}
+                              >
+                                {it}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         {t.description && (
                           <p className="text-foreground/80 text-sm leading-snug">{t.description}</p>
                         )}
@@ -296,7 +274,7 @@ export function TargetClient({
       <p className="text-muted-foreground flex items-center gap-2 px-1 text-xs">
         <TargetIcon className="size-3.5" />
         Target berlaku untuk seluruh {santriLabel.toLowerCase()} di halaqah — bukan per {santriLabel.toLowerCase()}.
-        Satu halaqah punya satu target untuk tiap jenis.
+        Satu halaqah punya satu target untuk tiap jenis, berlaku untuk 1 tahun ajaran, semester ganjil, atau semester genap.
       </p>
 
       {/* Dialog atur / ubah target */}
@@ -314,39 +292,41 @@ export function TargetClient({
 
           <div className="space-y-3.5">
             <div className="space-y-1.5">
-              <Label htmlFor="target-value">Jumlah target ({editingMeta?.unit})</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="target-value"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={10000}
-                  step={1}
-                  value={fValue}
-                  onChange={(e) => setFValue(e.target.value)}
-                  placeholder="Contoh: 10"
-                  className="max-w-40"
-                />
-                <span className="text-muted-foreground text-sm">{editingMeta?.unit}</span>
+              <Label>Berlaku untuk</Label>
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Cakupan target">
+                {TARGET_SCOPES.map((sc) => (
+                  <button
+                    key={sc}
+                    type="button"
+                    role="radio"
+                    aria-checked={fScope === sc}
+                    onClick={() => setFScope(sc)}
+                    disabled={pending}
+                    className={`rounded-xl border px-2 py-2 text-center text-xs font-semibold transition ${
+                      fScope === sc
+                        ? "border-transparent bg-role text-role-ink"
+                        : "border-slate-200 bg-card hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50"
+                    }`}
+                  >
+                    {TARGET_SCOPE_LABEL[sc]}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="target-start">Tanggal mulai</Label>
-                <Input id="target-start" type="date" value={fStart} onChange={(e) => setFStart(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="target-end">Tanggal selesai</Label>
-                <Input id="target-end" type="date" value={fEnd} onChange={(e) => setFEnd(e.target.value)} />
-              </div>
-            </div>
-            {fStart && fEnd && fEnd < fStart && (
-              <p className="text-xs text-red-600 dark:text-red-300">
-                Tanggal selesai tidak boleh sebelum tanggal mulai.
+            <div className="space-y-1.5">
+              <Label htmlFor="target-items">{editingMeta?.itemsLabel} yang ditargetkan</Label>
+              <Textarea
+                id="target-items"
+                value={fItems}
+                onChange={(e) => setFItems(e.target.value)}
+                placeholder={editingMeta?.itemsPlaceholder}
+                rows={6}
+              />
+              <p className="text-muted-foreground text-xs">
+                {itemCount} {editingMeta?.unit} — jumlah target dihitung otomatis dari yang Anda ketik.
               </p>
-            )}
+            </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="target-desc">Keterangan (opsional)</Label>
@@ -354,8 +334,7 @@ export function TargetClient({
                 id="target-desc"
                 value={fDesc}
                 onChange={(e) => setFDesc(e.target.value)}
-                placeholder={editingMeta?.placeholder}
-                rows={3}
+                rows={2}
                 maxLength={300}
               />
             </div>
