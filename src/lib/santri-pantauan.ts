@@ -14,6 +14,7 @@ import type {
   PantauanItem,
   PresensiRekap,
   PrestasiCard,
+  TugasTotal,
   TargetProgress,
 } from "@/lib/santri-pantauan-shared";
 
@@ -44,6 +45,15 @@ export function getPresensiRekap(months = 6) {
 
 export function getTargetProgress() {
   return rpc<TargetProgress>("santri_target_progress");
+}
+
+/** V40 — target per anak untuk meter persentase di Kartu Prestasi (capaian vs target guru). */
+export const getSantriTargetProgress = cache(getTargetProgress);
+
+/** V40 — total tugas halaqah yang diberikan per anak (penyebut % pengerjaan tugas). */
+export async function getTugasTotals(): Promise<Map<string, number>> {
+  const rows = await rpc<TugasTotal>("santri_tugas_totals");
+  return new Map(rows.map((r) => [r.studentId, Number(r.tugasTotal) || 0]));
 }
 
 /**

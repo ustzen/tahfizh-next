@@ -53,6 +53,8 @@ export type ModuleStat = {
   avgScore: number | null;
   lastDate: string | null;
   lastTitle: string | null;
+  /** V40 — hanya TUGAS: total tugas halaqah yang diberikan (penyebut persen). */
+  total?: number;
 };
 
 export const EMPTY_MODULE_STAT: ModuleStat = {
@@ -194,6 +196,35 @@ export function persen(part: number, total: number) {
   if (!total) return 0;
   return Math.round((part / total) * 100);
 }
+
+/**
+ * V40 — meter persentase di Kartu Prestasi.
+ *
+ * Pasangan capaian/target per metrik, mis. hafalan 9/10 surat → 90% atau
+ * tugas dikerjakan 5/10 → 50%. Dibangun di server component sebagai data
+ * biasa; persentase & bar dihitung saat render (pembulatan di `persen`).
+ */
+export type PersenMeter = {
+  /** Kunci modul terkait (ModuleKey) atau "" untuk metrik umum. */
+  key: string;
+  label: string;
+  /** Sudah dicapai (mis. 9 surat dikuasai / 5 tugas dikerjakan). */
+  done: number;
+  /** Total yang diharapkan (target guru / total tugas). */
+  total: number;
+  /** Keterangan sumber angka, mis. "Target ustadz · Semester Ganjil". */
+  hint: string;
+  /** Satuan untuk angka, mis. "surat" / "tugas". */
+  unit?: string;
+};
+
+/** Label singkat capaian: "9/10 surat" (tanpa satuan bila kosong). */
+export function meterDoneLabel(m: Pick<PersenMeter, "done" | "total" | "unit">) {
+  return m.unit ? `${m.done}/${m.total} ${m.unit}` : `${m.done}/${m.total}`;
+}
+
+/** V40 — hasil RPC santri_tugas_totals: total tugas diberikan per anak. */
+export type TugasTotal = { studentId: string; tugasTotal: number };
 
 export function tanggalId(iso: string | null | undefined) {
   return fmtDMY(iso);

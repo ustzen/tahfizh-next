@@ -14,19 +14,23 @@ import {
 
 import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
-import { getPrestasiCards } from "@/lib/santri-pantauan";
+import { getPrestasiCards, getSantriTargetProgress, getTugasTotals } from "@/lib/santri-pantauan";
 import { cn } from "@/lib/utils";
 import {
   EMPTY_MODULE_STAT,
   MODULE_ORDER,
   badgesFor,
+  meterDoneLabel,
   moduleLabel,
   persen,
   predikat,
+  targetScopeLabel,
   tanggalId,
   type ModuleKey,
   type ModuleStat,
+  type PersenMeter,
   type PrestasiCard,
+  type TargetProgress,
 } from "@/lib/santri-pantauan-shared";
 
 export const metadata: Metadata = { title: "Kartu Prestasi" };
@@ -51,6 +55,127 @@ const MODULE_ACCENT: Record<ModuleKey, string> = {
   TAJWID: "text-rose-600 dark:text-rose-400",
   TUGAS: "text-orange-600 dark:text-orange-400",
 };
+
+/** V40 — aksen warna meter persentase, konsisten dengan warna modulnya. */
+const TONE_METER: Record<string, { text: string; bar: string; track: string }> = {
+  TAHFIDZ: {
+    text: "text-emerald-700 dark:text-emerald-300",
+    bar: "bg-emerald-500",
+    track: "bg-emerald-200/70 dark:bg-emerald-500/20",
+  },
+  SETORAN: {
+    text: "text-blue-700 dark:text-blue-300",
+    bar: "bg-blue-500",
+    track: "bg-blue-200/70 dark:bg-blue-500/20",
+  },
+  TARTIL: {
+    text: "text-sky-700 dark:text-sky-300",
+    bar: "bg-sky-500",
+    track: "bg-sky-200/70 dark:bg-sky-500/20",
+  },
+  HADITS: {
+    text: "text-violet-700 dark:text-violet-300",
+    bar: "bg-violet-500",
+    track: "bg-violet-200/70 dark:bg-violet-500/20",
+  },
+  DOA: {
+    text: "text-amber-700 dark:text-amber-300",
+    bar: "bg-amber-500",
+    track: "bg-amber-200/70 dark:bg-amber-500/20",
+  },
+  TAJWID: {
+    text: "text-rose-700 dark:text-rose-300",
+    bar: "bg-rose-500",
+    track: "bg-rose-200/70 dark:bg-rose-500/20",
+  },
+  TUGAS: {
+    text: "text-orange-700 dark:text-orange-300",
+    bar: "bg-orange-500",
+    track: "bg-orange-200/70 dark:bg-orange-500/20",
+  },
+  UMUM: {
+    text: "text-foreground",
+    bar: "bg-foreground/70",
+    track: "bg-muted",
+  },
+};
+
+/** Satuan per modul untuk label "9/10 surat", "5/10 tugas", dst. */
+const METER_UNITS: Record<string, string> = {
+  TAHFIDZ: "surat",
+  SETORAN: "setoran",
+  TARTIL: "materi",
+  HADITS: "hadits",
+  DOA: "doa",
+  TAJWID: "materi",
+  TUGAS: "tugas",
+};
+
+/**
+ * V40 — bangun meter persentase untuk satu anak.
+ *
+ * Aturan: hafalan 9/10 surat → 90%; tugas dikerjakan 5/10 → 50%;
+ * modul lain → jumlah materi lulus dibagi target guru. Target diambil dari
+ * target halaqah per semester/tahun (V38); modul tanpa target tidak tampil.
+ */
+function buildMeters(
+  c: PrestasiCard,
+  targets: TargetProgress[],
+  tugasTotal: number,
+): PersenMeter[] {
+  const milik = targets.filter((t) => t.studentId === c.studentId && t.targetValue > 0);
+  const meters: PersenMeter[] = [];
+
+  // TAHFIDZ: surat dikuasai vs target hafalan guru.
+  // Contoh: target 10 surat, sudah 9 → 90%. Tanpa target → vs semua surat aktif.
+  const tTahfidz = milik.find((t) => t.category === "TAHFIDZ");
+  const targetTahfidz = tTahfidz ? tTahfidz.targetValue : c.surahTotal || 0;
+  if (targetTahfidz > 0) {
+    meters.push({
+      key: "TAHFIDZ",
+      label: "Target Hafalan",
+      done: Math.min(tTahfidz ? tTahfidz.capaian : c.surahSelesai, targetTahfidz),
+      total: targetTahfidz,
+      unit: METER_UNITS.TAHFIDZ,
+      hint: tTahfidz ? `Target ustadz · ${targetScopeLabel(tTahfidz.scope)}` : "Semua surat aktif di tenant",
+    });
+  }
+
+  // TUGAS: jumlah tugas yang sudah dikerjakan/dinilai vs total tugas diberikan.
+  // Contoh: 10 tugas diberikan, 5 dikerjakan → 50%.
+  const tugasStat = c.moduleStats?.TUGAS;
+  const tugasDiberikan = tugasTotal || tugasStat?.count || 0;
+  if (tugasDiberikan > 0) {
+    meters.push({
+      key: "TUGAS",
+      label: "Pengerjaan Tugas",
+      done: Math.min(tugasStat?.count ?? 0, tugasDiberikan),
+      total: tugasDiberikan,
+      unit: METER_UNITS.TUGAS,
+      hint: "Tugas halaqah yang sudah dikerjakan",
+    });
+  }
+
+  // Modul lain: materi lulus/dinilai vs target guru bila ada.
+  const lain = milik.filter(
+    (t) => t.category !== "TAHFIDZ" && t.category !== "TUGAS" && (t.category in METER_UNITS || t.category === "CUSTOM"),
+  );
+  for (const t of lain) {
+    const stat = c.moduleStats?.[t.category];
+    const done = Math.min(t.capaian, t.targetValue);
+    if (done <= 0 && !stat) continue;
+    meters.push({
+      key: t.category,
+      label: t.category === "CUSTOM" ? "Target Lain" : `Target ${moduleLabel(t.category).split(" ")[0]}`,
+      done,
+      total: t.targetValue,
+      unit: METER_UNITS[t.category] ?? "item",
+      hint: `Target ustadz · ${targetScopeLabel(t.scope)}`,
+    });
+  }
+
+  return meters;
+}
 
 /** Cincin skor kecil pakai conic-gradient — tanpa SVG/JS tambahan. */
 function ScoreRing({ score }: { score: number | null }) {
@@ -104,6 +229,31 @@ function ModuleTile({ moduleKey, stat }: { moduleKey: ModuleKey; stat: ModuleSta
 }
 
 /**
+ * V40 — bar persentase capaian: persen kanan, angka kiri (done/total + satuan),
+ * bar warna modul di bawahnya. Sembunyikan bila total target = 0.
+ */
+function MeterBar({ m }: { m: PersenMeter }) {
+  if (m.total <= 0) return null;
+  const pct = persen(m.done, m.total);
+  const tone = TONE_METER[m.key] ?? TONE_METER.UMUM;
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-500/10 lg:px-4 lg:py-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-muted-foreground truncate text-[0.68rem] font-medium lg:text-xs">{m.label}</p>
+        <p className={cn("tabular text-sm font-bold lg:text-base", tone.text)}>{pct}%</p>
+      </div>
+      <div className="mt-0.5 flex items-center justify-between gap-2">
+        <p className="tabular text-muted-foreground text-[0.62rem] lg:text-[0.7rem]">{meterDoneLabel(m)}</p>
+        <p className="text-muted-foreground/70 hidden truncate text-[0.62rem] sm:block lg:text-[0.7rem]">{m.hint}</p>
+      </div>
+      <div className={cn("mt-1 h-1.5 overflow-hidden rounded-full lg:mt-1.5 lg:h-2", tone.track)}>
+        <div className={cn("h-full rounded-full transition-all", tone.bar)} style={{ width: `${Math.min(pct, 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/**
  * Kartu Prestasi (versi baru) — seperti raport mini: identitas anak, cincin
  * rata-rata nilai, dua meter (surat dikuasai & kehadiran), 7 ubin modul,
  * lencana, dan catatan apresiasi guru. Kartu selalu dirender meski belum ada
@@ -111,7 +261,11 @@ function ModuleTile({ moduleKey, stat }: { moduleKey: ModuleKey; stat: ModuleSta
  */
 export default async function SantriPrestasiPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/prestasi");
-  const data = await getPrestasiCards();
+  const [data, targets, tugasTotals] = await Promise.all([
+    getPrestasiCards(),
+    getSantriTargetProgress(),
+    getTugasTotals(),
+  ]);
 
   const cards: PrestasiCard[] =
     data.length > 0
@@ -149,6 +303,7 @@ export default async function SantriPrestasiPage() {
           const lencana = badgesFor(c).slice(0, 3);
           const hadirPct = persen(c.presensi.hadir, c.presensi.total);
           const surahPct = persen(c.surahSelesai, c.surahTotal);
+          const meters = buildMeters(c, targets, tugasTotals.get(c.studentId) ?? 0);
           const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
 
           return (
@@ -207,6 +362,15 @@ export default async function SantriPrestasiPage() {
                   <ModuleTile key={key} moduleKey={key} stat={c.moduleStats?.[key] ?? EMPTY_MODULE_STAT} />
                 ))}
               </div>
+
+              {/* V40 — persentase capaian: hafalan & tugas (+ target modul lain) */}
+              {meters.length > 0 && (
+                <div className="mt-3 grid gap-1.5 px-4 lg:mt-4 lg:grid-cols-2 lg:gap-2 lg:px-6">
+                  {meters.map((m) => (
+                    <MeterBar key={`${m.key}-${m.label}`} m={m} />
+                  ))}
+                </div>
+              )}
 
               {/* Lencana pencapaian */}
               {lencana.length > 0 && (
