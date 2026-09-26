@@ -18,7 +18,6 @@ import { getPrestasiCards, getMeterTotals, getSantriTargetProgress } from "@/lib
 import { cn } from "@/lib/utils";
 import {
   EMPTY_MODULE_STAT,
-  MODULE_ORDER,
   badgesFor,
   meterDoneLabel,
   moduleLabel,
@@ -45,6 +44,12 @@ const MODULE_ICONS: Record<ModuleKey, React.ComponentType<{ className?: string }
   TAJWID: SpellCheck,
   TUGAS: ListChecks,
 };
+
+/**
+ * V40 — ubin modul Kartu Prestasi: SETORAN & TARTIL dihapus, sisanya
+ * diperbesar supaya lebih mudah dibaca anak.
+ */
+const TILE_ORDER: ModuleKey[] = ["TAHFIDZ", "HADITS", "DOA", "TAJWID", "TUGAS"];
 
 /** Warna ikon+angka per modul — dot kecil, bukan chip besar, biar ringkas. */
 const MODULE_ACCENT: Record<ModuleKey, string> = {
@@ -230,7 +235,7 @@ function ModuleTile({ moduleKey, stat }: { moduleKey: ModuleKey; stat: ModuleSta
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-1 rounded-xl px-1.5 py-2.5 text-center lg:gap-1.5 lg:px-2 lg:py-4",
+        "flex flex-col items-center gap-1.5 rounded-xl px-2 py-3.5 text-center lg:gap-2 lg:px-3 lg:py-5",
         kosong ? "bg-slate-50 dark:bg-slate-500/5" : "bg-slate-50 dark:bg-slate-500/10"
       )}
       title={
@@ -239,11 +244,11 @@ function ModuleTile({ moduleKey, stat }: { moduleKey: ModuleKey; stat: ModuleSta
           : `${moduleLabel(moduleKey)} · ${stat.lastTitle ?? ""} · ${tanggalId(stat.lastDate)}`
       }
     >
-      <Icon className={cn("size-4 lg:size-5", kosong ? "text-slate-400 dark:text-slate-500" : MODULE_ACCENT[moduleKey])} />
-      <span className={cn("tabular text-base leading-none font-bold lg:text-xl", kosong && "text-muted-foreground")}>
+      <Icon className={cn("size-6 lg:size-8", kosong ? "text-slate-400 dark:text-slate-500" : MODULE_ACCENT[moduleKey])} />
+      <span className={cn("tabular text-xl leading-none font-bold lg:text-3xl", kosong && "text-muted-foreground")}>
         {stat.count}
       </span>
-      <span className="text-muted-foreground truncate text-[0.6rem] leading-tight font-medium lg:text-[0.72rem]">
+      <span className="text-muted-foreground truncate text-[0.7rem] leading-tight font-medium lg:text-sm">
         {moduleLabel(moduleKey).split(" ")[0]}
       </span>
     </div>
@@ -378,9 +383,9 @@ export default async function SantriPrestasiPage() {
                 </div>
               </div>
 
-              {/* Ubin modul — selalu 7 tampil termasuk yang 0 */}
-              <div className="mt-3 grid grid-cols-4 gap-1 px-4 lg:mt-4 lg:grid-cols-7 lg:gap-2 lg:px-6">
-                {MODULE_ORDER.map((key) => (
+              {/* Ubin modul — 5 kartu (setoran & tartil dihapus), ukuran diperbesar */}
+              <div className="mt-3 grid grid-cols-3 gap-1.5 px-4 lg:mt-4 lg:grid-cols-5 lg:gap-2.5 lg:px-6">
+                {TILE_ORDER.map((key) => (
                   <ModuleTile key={key} moduleKey={key} stat={c.moduleStats?.[key] ?? EMPTY_MODULE_STAT} />
                 ))}
               </div>
