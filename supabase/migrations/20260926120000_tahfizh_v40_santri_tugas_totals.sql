@@ -5,6 +5,8 @@
 --   • Pengerjaan Tugas : tugas dikerjakan / tugas DIBERIKAN (5/10 → 50%).
 --   • Hadits/Doa/Tajwid: materi lulus / target guru, atau tanpa target guru →
 --     / jumlah materi AKTIF modul itu di lembaga (penyebut fallback).
+--     Tajwid memakai tabel tajwid_materi (V12, soft-delete) — tabel yang sama
+--     dengan tajwid_materi_scores yang dihitung di kartu prestasi.
 --
 -- Satu RPC SECURITY DEFINER mengembalikan keempat penyebut per anak milik
 -- akun wali ini. RPC santri_prestasi_card (V18) tidak diubah — penggabungan
@@ -53,8 +55,8 @@ begin
         where tenant_id = v_tenant and is_active)::int        as hadits_total,
       (select count(*) from public.daily_prayer_materials
         where tenant_id = v_tenant and is_active)::int        as doa_total,
-      (select count(*) from public.tajwid_materials
-        where tenant_id = v_tenant and is_active)::int        as tajwid_total
+      (select count(*) from public.tajwid_materi
+        where tenant_id = v_tenant and deleted_at is null)::int as tajwid_total
   )
   select coalesce(jsonb_agg(jsonb_build_object(
            'studentId',   st.student_id,

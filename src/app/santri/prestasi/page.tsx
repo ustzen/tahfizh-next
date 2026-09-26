@@ -96,6 +96,11 @@ const TONE_METER: Record<string, { text: string; bar: string; track: string }> =
     bar: "bg-orange-500",
     track: "bg-orange-200/70 dark:bg-orange-500/20",
   },
+  KEHADIRAN: {
+    text: "text-sky-700 dark:text-sky-300",
+    bar: "bg-sky-500",
+    track: "bg-sky-200/70 dark:bg-sky-500/20",
+  },
   UMUM: {
     text: "text-foreground",
     bar: "bg-foreground/70",
@@ -110,6 +115,7 @@ const METER_UNITS: Record<string, string> = {
   DOA: "doa",
   TAJWID: "materi",
   TUGAS: "tugas",
+  KEHADIRAN: "pertemuan",
   CUSTOM: "item",
 };
 
@@ -158,6 +164,19 @@ function buildMeters(
       total: tugasDiberikan,
       unit: METER_UNITS.TUGAS,
       hint: "Tugas halaqah yang sudah dikerjakan",
+    });
+  }
+
+  // KEHADIRAN: hadir / total pertemuan tercatat — selalu tampil bila ada
+  // data presensi (mis. 26 hadir dari 30 pertemuan → 87%).
+  if (c.presensi.total > 0) {
+    meters.push({
+      key: "KEHADIRAN",
+      label: "Kehadiran",
+      done: c.presensi.hadir,
+      total: c.presensi.total,
+      unit: METER_UNITS.KEHADIRAN,
+      hint: `${c.presensi.izin} izin · ${c.presensi.sakit} sakit · ${c.presensi.alpa} alpa`,
     });
   }
 
