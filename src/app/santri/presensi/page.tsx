@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarCheck, CalendarX2 } from "lucide-react";
+import { CalendarCheck, CalendarX2, TrendingUp } from "lucide-react";
 
 import { CardBox, PageHeader, SectionTitle } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
@@ -11,6 +11,18 @@ export const metadata: Metadata = { title: "Presensi" };
 
 const KOLOM = ["hadir", "izin", "sakit", "alpa"] as const;
 
+const KOLOM_ICON: Record<(typeof KOLOM)[number], string> = {
+  hadir: "✓",
+  izin: "✉",
+  sakit: "✚",
+  alpa: "✕",
+};
+
+/**
+ * Presensi (versi baru) — papan kehadiran ringkas per anak:
+ * 4 ubin besar (Hadir/Izin/Sakit/Alpa) + persentase kehadiran, tabel
+ * per-bulan 6 bulan terakhir, dan chip 10 pertemuan terakhir.
+ */
 export default async function SantriPresensiPage() {
   await requireRole(["WALI_SANTRI"], "/santri/presensi");
   const rekap = await getPresensiRekap(6);
@@ -19,7 +31,7 @@ export default async function SantriPresensiPage() {
     <div>
       <PageHeader
         title="Presensi"
-        description="Rekap kehadiran ananda 6 bulan terakhir — diisi guru saat halaqah berlangsung."
+        description="Kehadiran ananda di halaqah 6 bulan terakhir — diisi langsung oleh guru saat halaqah berlangsung."
         icon={<CalendarCheck className="size-6" />}
       />
 
@@ -36,10 +48,11 @@ export default async function SantriPresensiPage() {
         <div className="space-y-5">
           {rekap.map((r) => {
             const pct = persen(r.summary.hadir, r.summary.total);
+            const besteTahun = pct >= 90;
             return (
               <CardBox key={r.studentId}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-role-strong text-lg font-bold tracking-tight">{r.studentName}</p>
                     <p className="text-muted-foreground mt-0.5 text-xs">
                       {r.summary.total} pertemuan tercatat
@@ -47,20 +60,24 @@ export default async function SantriPresensiPage() {
                   </div>
                   <span
                     className={cn(
-                      "shadow-card inline-flex items-center rounded-xl px-3 py-1.5 text-sm font-bold text-white",
-                      pct >= 90 ? "bg-emerald-600" : pct >= 75 ? "bg-amber-500" : "bg-rose-600"
+                      "shadow-card inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-bold text-white",
+                      besteTahun ? "bg-emerald-600" : pct >= 75 ? "bg-amber-500" : "bg-rose-600"
                     )}
                   >
+                    <TrendingUp className="size-4" />
                     Kehadiran {pct}%
                   </span>
                 </div>
 
-                {/* Ringkasan total */}
+                {/* Ubin kehadiran besar */}
                 <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {KOLOM.map((k) => (
-                    <div key={k} className={cn("rounded-xl px-3 py-2.5", ATTENDANCE_TONES[k.toUpperCase()])}>
-                      <p className="text-[0.7rem] font-bold uppercase tracking-wider">{k}</p>
-                      <p className="tabular mt-0.5 text-xl font-bold">{r.summary[k]}</p>
+                    <div key={k} className={cn("rounded-2xl px-3 py-3", ATTENDANCE_TONES[k.toUpperCase()])}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[0.7rem] font-bold uppercase tracking-wider">{k}</p>
+                        <span aria-hidden className="text-sm opacity-70">{KOLOM_ICON[k]}</span>
+                      </div>
+                      <p className="tabular mt-0.5 text-2xl font-bold">{r.summary[k]}</p>
                     </div>
                   ))}
                 </div>
@@ -95,7 +112,7 @@ export default async function SantriPresensiPage() {
                   </div>
                 )}
 
-                {/* Catatan terakhir */}
+                {/* 10 pertemuan terakhir */}
                 {r.recent.length > 0 && (
                   <div className="mt-5">
                     <p className="text-muted-foreground mb-2 text-[0.7rem] font-bold uppercase tracking-widest">

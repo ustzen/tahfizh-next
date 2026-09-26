@@ -103,13 +103,16 @@ function ModuleTile({ moduleKey, stat }: { moduleKey: ModuleKey; stat: ModuleSta
   );
 }
 
+/**
+ * Kartu Prestasi (versi baru) — seperti raport mini: identitas anak, cincin
+ * rata-rata nilai, dua meter (surat dikuasai & kehadiran), 7 ubin modul,
+ * lencana, dan catatan apresiasi guru. Kartu selalu dirender meski belum ada
+ * penilaian (angka 0) supaya anak tahu apa yang akan terisi nanti.
+ */
 export default async function SantriPrestasiPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/prestasi");
   const data = await getPrestasiCards();
 
-  // Kartu prestasi SELALU tampil. Bila guru belum menilai sama sekali (atau
-  // biodata santri belum dilengkapi lembaga), bentuk kartunya tetap dirender
-  // dengan angka 0 supaya santri tahu apa saja yang akan terisi nanti.
   const cards: PrestasiCard[] =
     data.length > 0
       ? data
@@ -136,7 +139,7 @@ export default async function SantriPrestasiPage() {
     <div>
       <PageHeader
         title="Kartu Prestasi"
-        description="Rangkuman capaian ananda, langsung dari penilaian ustadz/ustadzah."
+        description="Raport mini ananda — rata-rata nilai, capaian hafalan, kehadiran, dan apresiasi dari ustadz/ustadzah."
         icon={<Award className="size-6" />}
       />
 
@@ -153,7 +156,6 @@ export default async function SantriPrestasiPage() {
               key={c.studentId}
               className="bg-card shadow-card relative flex flex-col overflow-hidden rounded-2xl border"
             >
-              {/* Strip identitas warna role */}
               <span aria-hidden className="bg-role absolute inset-x-0 top-0 h-1" />
 
               <div className="flex items-start gap-3 px-4 pt-4 lg:gap-4 lg:px-6 lg:pt-6">
@@ -166,6 +168,7 @@ export default async function SantriPrestasiPage() {
                   </p>
                   <p className="text-muted-foreground truncate text-xs lg:text-sm">
                     {c.halaqahName ?? "Belum tergabung halaqah"}
+                    {c.businessCode ? ` · ${c.businessCode}` : ""}
                   </p>
                 </div>
                 <ScoreRing score={c.avgScore} />
@@ -198,7 +201,7 @@ export default async function SantriPrestasiPage() {
                 </div>
               </div>
 
-              {/* Tile modul — ringkas, ikonik, selalu 7 tampil termasuk yang 0 */}
+              {/* Ubin modul — selalu 7 tampil termasuk yang 0 */}
               <div className="mt-3 grid grid-cols-4 gap-1 px-4 lg:mt-4 lg:grid-cols-7 lg:gap-2 lg:px-6">
                 {MODULE_ORDER.map((key) => (
                   <ModuleTile key={key} moduleKey={key} stat={c.moduleStats?.[key] ?? EMPTY_MODULE_STAT} />
@@ -220,14 +223,13 @@ export default async function SantriPrestasiPage() {
                 </div>
               )}
 
-              {/* Catatan apresiasi */}
+              {/* Catatan apresiasi guru */}
               {c.catatanApresiasi && (
                 <p className="mx-4 mt-3 line-clamp-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs leading-relaxed text-amber-900 dark:bg-yellow-500/10 dark:text-yellow-200 lg:mx-6 lg:mt-4 lg:px-4 lg:py-2.5 lg:text-sm">
                   “{c.catatanApresiasi}”
                 </p>
               )}
 
-              {/* Footer */}
               <div className="mt-3 flex items-center justify-between gap-2 border-t px-4 py-2.5 lg:mt-4 lg:px-6 lg:py-3.5">
                 <span className="text-muted-foreground text-[0.7rem] lg:text-sm">
                   {c.lastAssessedAt ? `Terakhir dinilai ${tanggalId(c.lastAssessedAt)}` : "Belum ada penilaian"}
@@ -237,7 +239,7 @@ export default async function SantriPrestasiPage() {
                     href={`/santri/pantauan?student=${c.studentId}`}
                     className="text-role-strong inline-flex items-center gap-0.5 text-xs font-semibold hover:underline lg:text-sm"
                   >
-                    Detail
+                    Pantauan lengkap
                     <ArrowUpRight className="size-3 lg:size-4" />
                   </Link>
                 )}
