@@ -14,7 +14,7 @@ import {
 
 import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
-import { getPrestasiCards, getSantriTargetProgress, getTugasTotals } from "@/lib/santri-pantauan";
+import { getPrestasiCards, getMeterTotals, getSantriTargetProgress } from "@/lib/santri-pantauan";
 import { cn } from "@/lib/utils";
 import {
   EMPTY_MODULE_STAT,
@@ -26,6 +26,7 @@ import {
   predikat,
   targetScopeLabel,
   tanggalId,
+  type MeterTotals,
   type ModuleKey,
   type ModuleStat,
   type PersenMeter,
@@ -100,28 +101,30 @@ const TONE_METER: Record<string, { text: string; bar: string; track: string }> =
   },
 };
 
-/** Satuan per modul untuk label "9/10 surat", "5/10 tugas", dst. */
+/** Satuan per tipe meter. */
 const METER_UNITS: Record<string, string> = {
   TAHFIDZ: "surat",
-  SETORAN: "setoran",
-  TARTIL: "materi",
   HADITS: "hadits",
   DOA: "doa",
   TAJWID: "materi",
   TUGAS: "tugas",
+  CUSTOM: "item",
 };
 
 /**
  * V40 — bangun meter persentase untuk satu anak.
  *
- * Aturan: hafalan 9/10 surat → 90%; tugas dikerjakan 5/10 → 50%;
- * modul lain → jumlah materi lulus dibagi target guru. Target diambil dari
- * target halaqah per semester/tahun (V38); modul tanpa target tidak tampil.
+ * Aturan per modul:
+ *   • TAHFIDZ : surat dikuasai / target guru (fallback: semua surat aktif).
+ *   • TUGAS   : tugas dikerjakan / tugas diberikan (5/10 → 50%).
+ *   • HADITS, DOA, TAJWID: materi lulus / target guru; tanpa target guru →
+ *     / jumlah materi aktif modul itu di lembaga (RPC santri_meter_totals).
+ * SETORAN & TARTIL sengaja tidak punya meter.
  */
 function buildMeters(
   c: PrestasiCard,
   targets: TargetProgress[],
-  tugasTotal: number,
+  totals: MeterTotals | undefined,
 ): PersenMeter[] {
   const milik = targets.filter((t) => t.studentId === c.studentId && t.targetValue > 0);
   const meters: PersenMeter[] = [];
@@ -144,7 +147,7 @@ function buildMeters(
   // TUGAS: jumlah tugas yang sudah dikerjakan/dinilai vs total tugas diberikan.
   // Contoh: 10 tugas diberikan, 5 dikerjakan → 50%.
   const tugasStat = c.moduleStats?.TUGAS;
-  const tugasDiberikan = tugasTotal || tugasStat?.count || 0;
+  const tugasDiberikan = (totals?.tugasTotal || 0) || tugasStat?.count || 0;
   if (tugasDiberikan > 0) {
     meters.push({
       key: "TUGAS",
@@ -156,21 +159,40 @@ function buildMeters(
     });
   }
 
-  // Modul lain: materi lulus/dinilai vs target guru bila ada.
-  const lain = milik.filter(
-    (t) => t.category !== "TAHFIDZ" && t.category !== "TUGAS" && (t.category in METER_UNITS || t.category === "CUSTOM"),
-  );
-  for (const t of lain) {
-    const stat = c.moduleStats?.[t.category];
-    const done = Math.min(t.capaian, t.targetValue);
-    if (done <= 0 && !stat) continue;
+  // HADITS / DOA / TAJWID: materi lulus / target guru; tanpa target guru →
+  // / jumlah materi aktif modul itu di lembaga. SELALU tampil.
+  const modulMateri: Array<{ key: string; label: string; total: number }> = [
+    { key: "HADITS", label: "Target Hadits", total: totals?.haditsTotal ?? 0 },
+    { key: "DOA", label: "Target Doa", total: totals?.doaTotal ?? 0 },
+    { key: "TAJWID", label: "Target Tajwid", total: totals?.tajwidTotal ?? 0 },
+  ];
+  for (const modul of modulMateri) {
+    const t = milik.find((x) => x.category === modul.key);
+    const targetGuru = t?.targetValue ?? 0;
+    const total = targetGuru > 0 ? targetGuru : modul.total;
+    if (total <= 0) continue;
+    const stat = c.moduleStats?.[modul.key];
+    const done = Math.min(t ? t.capaian : stat?.count ?? 0, total);
     meters.push({
-      key: t.category,
-      label: t.category === "CUSTOM" ? "Target Lain" : `Target ${moduleLabel(t.category).split(" ")[0]}`,
+      key: modul.key,
+      label: modul.label,
       done,
-      total: t.targetValue,
-      unit: METER_UNITS[t.category] ?? "item",
-      hint: `Target ustadz · ${targetScopeLabel(t.scope)}`,
+      total,
+      unit: METER_UNITS[modul.key],
+      hint: t ? `Target ustadz · ${targetScopeLabel(t.scope)}` : "Materi aktif di lembaga",
+    });
+  }
+
+  // Target bebas (CUSTOM) dari guru — tampil bila ada.
+  const tCustom = milik.find((x) => x.category === "CUSTOM");
+  if (tCustom && tCustom.targetValue > 0) {
+    meters.push({
+      key: "CUSTOM",
+      label: "Target Lain",
+      done: Math.min(tCustom.capaian, tCustom.targetValue),
+      total: tCustom.targetValue,
+      unit: METER_UNITS.CUSTOM,
+      hint: `Target ustadz · ${targetScopeLabel(tCustom.scope)}`,
     });
   }
 
@@ -261,10 +283,10 @@ function MeterBar({ m }: { m: PersenMeter }) {
  */
 export default async function SantriPrestasiPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/prestasi");
-  const [data, targets, tugasTotals] = await Promise.all([
+  const [data, targets, meterTotals] = await Promise.all([
     getPrestasiCards(),
     getSantriTargetProgress(),
-    getTugasTotals(),
+    getMeterTotals(),
   ]);
 
   const cards: PrestasiCard[] =
@@ -303,7 +325,7 @@ export default async function SantriPrestasiPage() {
           const lencana = badgesFor(c).slice(0, 3);
           const hadirPct = persen(c.presensi.hadir, c.presensi.total);
           const surahPct = persen(c.surahSelesai, c.surahTotal);
-          const meters = buildMeters(c, targets, tugasTotals.get(c.studentId) ?? 0);
+          const meters = buildMeters(c, targets, meterTotals.get(c.studentId));
           const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
 
           return (

@@ -223,8 +223,16 @@ export function meterDoneLabel(m: Pick<PersenMeter, "done" | "total" | "unit">) 
   return m.unit ? `${m.done}/${m.total} ${m.unit}` : `${m.done}/${m.total}`;
 }
 
-/** V40 — hasil RPC santri_tugas_totals: total tugas diberikan per anak. */
-export type TugasTotal = { studentId: string; tugasTotal: number };
+/** V40 — hasil RPC santri_meter_totals: penyebut persentase per anak. */
+export type MeterTotals = {
+  studentId: string;
+  /** Total tugas halaqah yang diberikan ke anak. */
+  tugasTotal: number;
+  /** Jumlah materi aktif di lembaga — penyebut bila guru tak pasang target. */
+  haditsTotal: number;
+  doaTotal: number;
+  tajwidTotal: number;
+};
 
 export function tanggalId(iso: string | null | undefined) {
   return fmtDMY(iso);

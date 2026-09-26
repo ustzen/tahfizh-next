@@ -11,10 +11,10 @@ import { cache } from "react";
 
 import { createClient } from "@/lib/supabase/server";
 import type {
+  MeterTotals,
   PantauanItem,
   PresensiRekap,
   PrestasiCard,
-  TugasTotal,
   TargetProgress,
 } from "@/lib/santri-pantauan-shared";
 
@@ -50,10 +50,13 @@ export function getTargetProgress() {
 /** V40 — target per anak untuk meter persentase di Kartu Prestasi (capaian vs target guru). */
 export const getSantriTargetProgress = cache(getTargetProgress);
 
-/** V40 — total tugas halaqah yang diberikan per anak (penyebut % pengerjaan tugas). */
-export async function getTugasTotals(): Promise<Map<string, number>> {
-  const rows = await rpc<TugasTotal>("santri_tugas_totals");
-  return new Map(rows.map((r) => [r.studentId, Number(r.tugasTotal) || 0]));
+/**
+ * V40 — penyebut persentase per anak dari RPC santri_meter_totals:
+ * total tugas diberikan + jumlah materi aktif hadits/doa/tajwid.
+ */
+export async function getMeterTotals(): Promise<Map<string, MeterTotals>> {
+  const rows = await rpc<MeterTotals>("santri_meter_totals");
+  return new Map(rows.map((r) => [r.studentId, r]));
 }
 
 /**

@@ -1,19 +1,18 @@
 -- ============================================================================
--- TAHFIZH V40 — Total tugas halaqah per anak (untuk persentase Kartu Prestasi)
+-- TAHFIZH V40 — Penyebut persentase Kartu Prestasi (tugas + materi modul)
 -- ============================================================================
--- Kebutuhan: di Kartu Prestasi, meter "Pengerjaan Tugas" butuh penyebut —
--- berapa tugas yang DIBERIKAN ke halaqah anak — bukan hanya berapa yang sudah
--- dinilai (tugas_halaqah_scores). Contoh: 10 tugas diberikan, santri
--- mengerjakan 5 → 50%.
+-- Kebutuhan meter persentase di Kartu Prestasi:
+--   • Pengerjaan Tugas : tugas dikerjakan / tugas DIBERIKAN (5/10 → 50%).
+--   • Hadits/Doa/Tajwid: materi lulus / target guru, atau tanpa target guru →
+--     / jumlah materi AKTIF modul itu di lembaga (penyebut fallback).
 --
--- Solusi: RPC kecil SECURITY DEFINER yang mengembalikan total tugas aktif
--- (deleted_at is null) di halaqah yang sedang ditempati tiap anak milik akun
--- wali ini. RPC santri_prestasi_card (V18) tidak diubah — jumlah digabung di
--- server component. Tidak ada tabel/policy yang disentuh.
+-- Satu RPC SECURITY DEFINER mengembalikan keempat penyebut per anak milik
+-- akun wali ini. RPC santri_prestasi_card (V18) tidak diubah — penggabungan
+-- terjadi di server component. Tidak ada tabel/policy yang disentuh.
 -- Idempotent: create or replace + grant, aman dijalankan ulang.
 -- ============================================================================
 
-create or replace function public.santri_tugas_totals()
+create or replace function public.santri_meter_totals()
 returns jsonb
 language plpgsql
 stable
@@ -38,24 +37,40 @@ begin
     join anak a on a.student_id = hs.student_id
     where hs.left_at is null
   ),
-  total as (
-    select ah.student_id, count(t.id)::int as tugas_total
-    from anak_halaqah ah
+  tugas_total as (
+    select a.student_id, count(t.id)::int as tugas_total
+    from anak a
+    left join anak_halaqah ah on ah.student_id = a.student_id
     left join public.tugas_halaqah t
       on t.halaqah_id = ah.halaqah_id
      and t.tenant_id = v_tenant
      and t.deleted_at is null
-    group by ah.student_id
+    group by a.student_id
+  ),
+  materi as (
+    select
+      (select count(*) from public.hadith_materials
+        where tenant_id = v_tenant and is_active)::int        as hadits_total,
+      (select count(*) from public.daily_prayer_materials
+        where tenant_id = v_tenant and is_active)::int        as doa_total,
+      (select count(*) from public.tajwid_materials
+        where tenant_id = v_tenant and is_active)::int        as tajwid_total
   )
   select coalesce(jsonb_agg(jsonb_build_object(
-           'studentId',  st.student_id,
-           'tugasTotal', st.tugas_total
+           'studentId',   st.student_id,
+           'tugasTotal',  st.tugas_total,
+           'haditsTotal', m.hadits_total,
+           'doaTotal',    m.doa_total,
+           'tajwidTotal', m.tajwid_total
          )), '[]'::jsonb)
   into v_out
-  from total st;
+  from tugas_total st cross join materi m;
 
   return v_out;
 end;
 $$;
 
-grant execute on function public.santri_tugas_totals() to authenticated;
+grant execute on function public.santri_meter_totals() to authenticated;
+
+-- Versi awal V40 (hanya tugas) — digantikan fungsi di atas.
+drop function if exists public.santri_tugas_totals();
