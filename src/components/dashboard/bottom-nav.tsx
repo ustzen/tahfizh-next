@@ -21,20 +21,26 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ICONS } from "@/components/dashboard/sidebar-nav";
+import { ICONS } from "@/components/dashboard/menu-icon-fallbacks";
+import { MenuIcon } from "@/components/icons/menu-icon";
+import type { MenuIconOverride } from "@/lib/menu-icons";
 import { cn } from "@/lib/utils";
 import { BOTTOM_NAV_MAX_ITEMS, type NavEntry } from "@/lib/terminology-shared";
-
-function iconFor(key: string) {
-  return ICONS[key] ?? Settings;
-}
 
 /**
  * V32 — Bar navigasi bawah, HANYA tampil di mobile (< lg). Menampilkan
  * maksimal 4 menu pilihan pengguna (lihat resolveBottomNav). Menu penuh
  * tetap dapat diakses lewat tombol hamburger di header (drawer sidebar).
+ * V39: ikon mengikuti override Pengaturan Developer (Phosphor/custom).
  */
-export function BottomNav({ items }: { items: NavEntry[] }) {
+export function BottomNav({
+  items,
+  iconOverrides = [],
+}: {
+  items: NavEntry[];
+  /** Override ikon menu platform (V39). */
+  iconOverrides?: MenuIconOverride[];
+}) {
   const pathname = usePathname();
   if (items.length === 0) return null;
 
@@ -49,7 +55,6 @@ export function BottomNav({ items }: { items: NavEntry[] }) {
         style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
       >
         {items.map((item) => {
-          const Icon = iconFor(item.key);
           const active =
             pathname === item.href ||
             (item.href !== "/" &&
@@ -67,7 +72,12 @@ export function BottomNav({ items }: { items: NavEntry[] }) {
                   : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
               )}
             >
-              <Icon className={cn("size-5.5", active && "text-primary")} />
+              <MenuIcon
+                menuKey={item.key}
+                overrides={iconOverrides}
+                fallback={ICONS[item.key] ?? Settings}
+                className={cn("size-5.5", active && "text-primary")}
+              />
               <span className="line-clamp-1 w-full text-center leading-tight">{item.label}</span>
             </Link>
           );
@@ -86,6 +96,7 @@ export function BottomNavEditorButton({
   allItems,
   selected,
   defaultKeys,
+  iconOverrides = [],
 }: {
   /** Seluruh menu yang tersedia untuk role ini (pool lengkap). */
   allItems: NavEntry[];
@@ -93,6 +104,8 @@ export function BottomNavEditorButton({
   selected: NavEntry[];
   /** Kunci default sebelum pengguna mengatur apa pun (untuk "Kembalikan Default"). */
   defaultKeys: string[];
+  /** Override ikon menu platform (V39). */
+  iconOverrides?: MenuIconOverride[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -189,14 +202,18 @@ export function BottomNavEditorButton({
             {chosen.map((key, index) => {
               const item = byKey.get(key);
               if (!item) return null;
-              const Icon = iconFor(item.key);
               return (
                 <li
                   key={key}
                   className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 shadow-sm dark:bg-slate-900"
                 >
                   <span className="bg-role-soft flex size-8 shrink-0 items-center justify-center rounded-lg">
-                    <Icon className="size-4" />
+                    <MenuIcon
+                      menuKey={item.key}
+                      overrides={iconOverrides}
+                      fallback={ICONS[item.key] ?? Settings}
+                      className="size-4"
+                    />
                   </span>
                   <span className="flex-1 truncate text-sm font-medium text-foreground">
                     {item.label}
@@ -243,7 +260,6 @@ export function BottomNavEditorButton({
           {allItems
             .filter((i) => !chosen.includes(i.key as string))
             .map((item) => {
-              const Icon = iconFor(item.key);
               return (
                 <button
                   key={item.key}
@@ -251,7 +267,13 @@ export function BottomNavEditorButton({
                   onClick={() => toggle(item.key as string)}
                   className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
                 >
-                  <Icon className="size-3.5" /> {item.label}
+                  <MenuIcon
+                    menuKey={item.key}
+                    overrides={iconOverrides}
+                    fallback={ICONS[item.key] ?? Settings}
+                    className="size-3.5"
+                  />{" "}
+                  {item.label}
                 </button>
               );
             })}

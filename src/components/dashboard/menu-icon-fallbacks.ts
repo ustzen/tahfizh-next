@@ -1,0 +1,67 @@
+/**
+ * V39 — Peta ikon lucide bawaan per kunci menu (NavKey).
+ *
+ * Dipindah dari sidebar-nav.tsx ke modul tanpa "use client" supaya bisa
+ * dipakai baik dari Server Component (mis. Pengaturan Ikon Menu) maupun
+ * Client Component (sidebar, menu bawah, dialog editor).
+ */
+import {
+  LayoutDashboard,
+  Building2,
+  Users,
+  BookMarked,
+  GraduationCap,
+  BookOpenCheck,
+  AudioLines,
+  ClipboardList,
+  BookOpenText,
+  HandHeart,
+  SpellCheck,
+  ListChecks,
+  NotebookPen,
+  Target as TargetIcon,
+  FileText,
+  Users2,
+  CalendarCheck,
+  CalendarRange,
+  Rocket,
+  History,
+  Award,
+  Activity,
+  HandCoins,
+  MessageSquareText,
+  MessageCircle,
+  MessagesSquare,
+  Settings,
+} from "lucide-react";
+
+export const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  dashboard: LayoutDashboard,
+  lembaga: Building2,
+  pengguna: Users,
+  guru: BookMarked,
+  santri: GraduationCap,
+  tahfidz: BookOpenCheck,
+  tartil: AudioLines,
+  setoran: ClipboardList,
+  hadits: BookOpenText,
+  doa: HandHeart,
+  tajwid: SpellCheck,
+  tugas: ListChecks,
+  jurnal: NotebookPen,
+  target: TargetIcon,
+  raport: FileText,
+  halaqah: Users2,
+  presensi: CalendarCheck,
+  anak: GraduationCap,
+  infak: HandCoins,
+  akademik: CalendarRange,
+  onboarding: Rocket,
+  perkembangan: History,
+  prestasi: Award,
+  pantauan: Activity,
+  saran: MessageSquareText,
+  obrolan: MessagesSquare,
+  whatsapp: MessageCircle,
+  pengaturan: Settings,
+};

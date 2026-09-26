@@ -13,6 +13,7 @@ import { genderLabel } from "@/lib/roles";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getTerminology } from "@/lib/terminology";
+import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
 import { KOORDINATOR_QUICK_MENU, KOORDINATOR_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 
 export const metadata = { title: "Koordinator Dashboard" };
@@ -46,7 +47,7 @@ export default async function KoordinatorDashboardPage() {
   const tid = profile.tenantId!;
   const terms = await getTerminology(tid);
 
-  const [{ count: teacherCount }, { count: studentCount }, { count: activeTeacherCount }, { count: activeStudentCount }, { count: halaqahCount }, { count: presentToday }, rpc, savedQuickMenu] =
+  const [{ count: teacherCount }, { count: studentCount }, { count: activeTeacherCount }, { count: activeStudentCount }, { count: halaqahCount }, { count: presentToday }, rpc, savedQuickMenu, iconOverrides] =
     await Promise.all([
       supabase.from("teachers").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
       supabase.from("students").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
@@ -64,6 +65,8 @@ export default async function KoordinatorDashboardPage() {
       supabase.rpc("students_manager_list"),
       // V31: preferensi Menu Cepat (urutan + tampil/sembunyi) per akun.
       getDashboardQuickMenuOrder(profile.id),
+      // V39: override ikon menu platform.
+      getMenuIconOverrides(),
     ]);
 
   const visibleQuickMenu = resolveQuickMenu(KOORDINATOR_QUICK_MENU, savedQuickMenu, KOORDINATOR_QUICK_MENU_DEFAULT_KEYS);
@@ -111,10 +114,11 @@ export default async function KoordinatorDashboardPage() {
               defaults={KOORDINATOR_QUICK_MENU}
               visible={visibleQuickMenu}
               defaultVisible={defaultQuickMenu}
+              iconOverrides={iconOverrides}
             />
           }
         />
-        <QuickMenuGrid items={visibleQuickMenu} />
+        <QuickMenuGrid items={visibleQuickMenu} iconOverrides={iconOverrides} />
       </CardBox>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

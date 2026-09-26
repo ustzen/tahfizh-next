@@ -9,6 +9,7 @@ import { requireRole } from "@/lib/auth";
 import { getTeacherV8Dashboard } from "@/lib/halaqah";
 import { getScheduleReminders } from "@/lib/schedule-reminder";
 import { getTerminology } from "@/lib/terminology";
+import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
 import { createClient } from "@/lib/supabase/server";
 import { USTADZ_QUICK_MENU, USTADZ_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 import { ScheduleReminderBanner } from "@/components/dashboard/schedule-reminder-banner";
@@ -36,12 +37,14 @@ export default async function UstadzDashboardPage() {
   const greetingName = `${honorific} ${profile.fullName.split(" ")[0]}`;
 
   // V8 (rule #39): halaqah saya + presensi hari ini + rata-rata capaian.
-  const [v8Stats, reminders, savedQuickMenu] = await Promise.all([
+  const [v8Stats, reminders, savedQuickMenu, iconOverrides] = await Promise.all([
     getTeacherV8Dashboard(),
     // V12.13: pengingat sesi halaqah hari ini & besok (H-1).
     getScheduleReminders(),
     // V31: preferensi Menu Cepat (urutan + tampil/sembunyi) per akun.
     getDashboardQuickMenuOrder(profile.id),
+    // V39: override ikon menu platform.
+    getMenuIconOverrides(),
   ]);
 
   const visibleQuickMenu = resolveQuickMenu(USTADZ_QUICK_MENU, savedQuickMenu, USTADZ_QUICK_MENU_DEFAULT_KEYS);
@@ -92,10 +95,11 @@ export default async function UstadzDashboardPage() {
               defaults={USTADZ_QUICK_MENU}
               visible={visibleQuickMenu}
               defaultVisible={defaultQuickMenu}
+              iconOverrides={iconOverrides}
             />
           }
         />
-        <QuickMenuGrid items={visibleQuickMenu} />
+        <QuickMenuGrid items={visibleQuickMenu} iconOverrides={iconOverrides} />
       </CardBox>
     </div>
   );

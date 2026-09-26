@@ -51,10 +51,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { MenuIcon } from "@/components/icons/menu-icon";
+import type { MenuIconOverride } from "@/lib/menu-icons";
 import { cn } from "@/lib/utils";
 import type { QuickMenuItem } from "@/lib/quick-menu";
 
-/** Peta nama ikon (string) -> komponen lucide-react, sisi client. */
+/** Peta nama ikon (string) -> komponen lucide-react, sisi client (fallback). */
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Users,
   ClipboardList,
@@ -90,11 +92,13 @@ function iconFor(name: string) {
  * V31 — Tombol kecil "Atur Menu" + dialog pengaturan Menu Cepat di dashboard.
  * Guru dapat mengubah urutan (naik/turun) dan menyembunyikan/menampilkan
  * item, tersimpan per akun (profiles.dashboard_quick_menu).
+ * V39: ikon mengikuti override Pengaturan Developer (Phosphor/custom).
  */
 export function QuickMenuEditorButton({
   defaults,
   visible,
   defaultVisible,
+  iconOverrides = [],
 }: {
   /** Semua item yang tersedia (pool lengkap), untuk ditambahkan guru. */
   defaults: QuickMenuItem[];
@@ -102,6 +106,8 @@ export function QuickMenuEditorButton({
   visible: QuickMenuItem[];
   /** 8 item bawaan sebelum guru mengatur apa pun (dipakai saat "Kembalikan Default"). */
   defaultVisible: QuickMenuItem[];
+  /** Override ikon menu platform (V39). */
+  iconOverrides?: MenuIconOverride[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -228,7 +234,6 @@ export function QuickMenuEditorButton({
 
         <ul className="space-y-1.5 py-2">
           {items.map((item, index) => {
-            const Icon = iconFor(item.icon);
             const hidden = hiddenKeys.has(item.key);
             return (
               <li
@@ -246,7 +251,12 @@ export function QuickMenuEditorButton({
               >
                 <GripVertical className="text-muted-foreground size-4 shrink-0" />
                 <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", item.chip)}>
-                  <Icon className="size-4" />
+                  <MenuIcon
+                    menuKey={item.key}
+                    overrides={iconOverrides}
+                    fallback={iconFor(item.icon)}
+                    className="size-4"
+                  />
                 </span>
                 <span className="flex-1 truncate text-sm font-medium text-foreground">{item.label}</span>
                 <span className="flex shrink-0 gap-0.5">
@@ -296,8 +306,15 @@ export function QuickMenuEditorButton({
   );
 }
 
-/** Grid Menu Cepat itu sendiri (link ke masing-masing modul). */
-export function QuickMenuGrid({ items }: { items: QuickMenuItem[] }) {
+/** Grid Menu Cepat itu sendiri (link ke masing-masing modul). V39: ikon override-aware. */
+export function QuickMenuGrid({
+  items,
+  iconOverrides = [],
+}: {
+  items: QuickMenuItem[];
+  /** Override ikon menu platform (V39). */
+  iconOverrides?: MenuIconOverride[];
+}) {
   if (items.length === 0) {
     return (
       <p className="text-muted-foreground mt-3 text-sm">
@@ -308,7 +325,6 @@ export function QuickMenuGrid({ items }: { items: QuickMenuItem[] }) {
   return (
     <div className="mt-4 grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
       {items.map((item) => {
-        const Icon = iconFor(item.icon);
         return (
           <Link
             key={item.key}
@@ -322,7 +338,12 @@ export function QuickMenuGrid({ items }: { items: QuickMenuItem[] }) {
                 item.chip
               )}
             >
-              <Icon className="size-7 sm:size-8" />
+              <MenuIcon
+                menuKey={item.key}
+                overrides={iconOverrides}
+                fallback={iconFor(item.icon)}
+                className="size-7 sm:size-8"
+              />
             </span>
             <span className="line-clamp-2 w-full text-[11px] font-medium leading-tight text-foreground sm:text-xs">
               {item.label}

@@ -16,6 +16,7 @@ import {
   BOTTOM_NAV_DEFAULT_KEYS,
   type TerminologyMap,
 } from "@/lib/terminology";
+import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
 import { createClient } from "@/lib/supabase/server";
 import { getNotificationList, getUnreadNotificationCount } from "@/lib/v10";
 
@@ -44,7 +45,7 @@ export async function DashboardShell({
   avatarUrl?: string | null;
   children: React.ReactNode;
 }) {
-  const [terms, menuOrder, bottomNavOrder, notifications, unreadCount, mustChangePassword] =
+  const [terms, menuOrder, bottomNavOrder, notifications, unreadCount, mustChangePassword, iconOverrides] =
     await Promise.all([
       getTerminology(tenantId),
       getMenuOrder(),
@@ -52,6 +53,7 @@ export async function DashboardShell({
       getNotificationList(),
       getUnreadNotificationCount(),
       getMustChangePassword(),
+      getMenuIconOverrides(),
     ]);
 
   // Gender-aware role naming (rule #17): USTADZ + P shows Ustadzah label.
@@ -79,7 +81,7 @@ export async function DashboardShell({
           {roleLabel}
         </p>
         <div className="flex-1 overflow-y-auto">
-          <SidebarNav groups={navGroups} />
+          <SidebarNav groups={navGroups} iconOverrides={iconOverrides} />
         </div>
         <div className="bg-role-soft mt-3 flex items-center gap-3 rounded-2xl p-3">
           <span className="bg-role text-role-ink flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold">
@@ -118,6 +120,7 @@ export async function DashboardShell({
           bottomNavAllItems={allNavItems}
           bottomNavSelected={bottomNavItems}
           bottomNavDefaultKeys={BOTTOM_NAV_DEFAULT_KEYS[role]}
+          iconOverrides={iconOverrides}
         />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 pb-24 sm:px-6 sm:py-6 lg:px-8 lg:pb-6">
           {/* V12.11 — wajib ganti password untuk SEMUA role (password sementara
@@ -129,7 +132,7 @@ export async function DashboardShell({
       </div>
 
       {/* V32 — Menu Bawah: bar navigasi 4 menu, khusus mobile, bisa diatur per akun. */}
-      <BottomNav items={bottomNavItems} />
+      <BottomNav items={bottomNavItems} iconOverrides={iconOverrides} />
     </div>
   );
 }

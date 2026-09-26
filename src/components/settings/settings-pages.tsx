@@ -3,6 +3,7 @@ import { AvatarSection } from "@/components/settings/avatar-section";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { EmailForm, PasswordForm } from "@/components/settings/security-forms";
 import { MenuOrderEditor } from "@/components/settings/menu-order";
+import { MenuIconManager, type IconMenuRow } from "@/components/settings/menu-icon-manager";
 import { AdminForceResetCard, type ResettableAccount } from "@/components/akun/admin-force-reset-card";
 import { AdminResetRequestsCard } from "@/components/akun/admin-reset-requests-card";
 import { TerminologyForm } from "@/components/settings/terminology-form";
@@ -11,6 +12,13 @@ import { LeaderForm } from "@/components/settings/leader-form";
 import { formatFullName, resolveNav, DEFAULT_TERMINOLOGY } from "@/lib/terminology";
 import { parseIdentityTypes } from "@/lib/identity";
 import { getTerminology, hasCustomTerminology } from "@/lib/terminology";
+import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
+import {
+  USTADZ_QUICK_MENU,
+  ADMIN_QUICK_MENU,
+  KOORDINATOR_QUICK_MENU,
+  SANTRI_QUICK_MENU,
+} from "@/lib/quick-menu";
 import { getDisplayProfile } from "@/lib/layout-data";
 import { createClient } from "@/lib/supabase/server";
 import { listPasswordResetRequests } from "@/app/actions/password";
@@ -224,6 +232,75 @@ export async function KeamananSection({ role }: { role: AppRole }) {
           </CardContent>
         </Card>
       )}
+    </SettingsLayout>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* IKON MENU (DEVELOPER — V39)                                         */
+/* ------------------------------------------------------------------ */
+export async function MenuIconSection({ role }: { role: AppRole }) {
+  const profile = await requireSession();
+  const terms = await getTerminology(profile.tenantId);
+  const overrides = await getMenuIconOverrides();
+  const sections = settingsSectionsFor(role);
+
+  // Pool menu: nav semua role + Menu Cepat semua role. Dedup per key —
+  // fallback ikon lucide di-resolve client-side dari peta terpusat.
+  const navRows: IconMenuRow[] = [
+    ...resolveNav("DEVELOPER", terms, profile.gender, null),
+    ...resolveNav("ADMIN", terms, profile.gender, null),
+    ...resolveNav("KOORDINATOR", terms, profile.gender, null),
+    ...resolveNav("USTADZ", terms, profile.gender, null),
+    ...resolveNav("WALI_SANTRI", terms, profile.gender, null),
+  ]
+    .map((item) => ({ key: item.key as string, label: item.label }))
+    .filter((row, i, arr) => arr.findIndex((r) => r.key === row.key) === i);
+
+  const quickRows: IconMenuRow[] = [
+    ...USTADZ_QUICK_MENU,
+    ...ADMIN_QUICK_MENU,
+    ...KOORDINATOR_QUICK_MENU,
+    ...SANTRI_QUICK_MENU,
+  ]
+    .map((item) => ({ key: item.key, label: item.label }))
+    .filter((row, i, arr) => arr.findIndex((r) => r.key === row.key) === i)
+    // Menu Cepat yang key-nya sudah ada di nav tidak perlu baris kedua.
+    .filter((row) => !navRows.some((n) => n.key === row.key));
+
+  return (
+    <SettingsLayout
+      role={role}
+      sections={sections}
+      active="ikon"
+      title="Pengaturan"
+      description="Ganti ikon tiap menu dari katalog Phosphor atau unggahan sendiri."
+    >
+      <Card className="shadow-card rounded-2xl">
+        <CardHeader>
+          <CardTitle>Ikon Menu</CardTitle>
+          <CardDescription>
+            Klik ikon atau tombol Ganti untuk memilih dari katalog Phosphor Icons, atau unggah
+            gambar sendiri. Perubahan berlaku untuk seluruh web (semua lembaga).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MenuIconManager menus={[...navRows, ...quickRows]} overrides={overrides} />
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-card rounded-2xl">
+        <CardHeader>
+          <CardTitle>Catatan</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Menu yang berbagi kunci yang sama (mis. menu di sidebar dan Menu Cepat) otomatis ikut
+            berubah. Ikon bawaan memakai Lucide; pilihan Phosphor dan unggahan disimpan di
+            database platform dan langsung tampil setelah halaman dimuat ulang.
+          </p>
+        </CardContent>
+      </Card>
     </SettingsLayout>
   );
 }

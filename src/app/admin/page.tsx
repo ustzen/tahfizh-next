@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { computeOnboardingSteps, getActiveSemester, getActiveYear, getOnboarding } from "@/lib/akademik";
 import { getAdminHalaqahList } from "@/lib/halaqah";
 import { getTerminology } from "@/lib/terminology";
+import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
 import { ADMIN_QUICK_MENU, ADMIN_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -48,6 +49,7 @@ export default async function AdminDashboardPage() {
     steps,
     halaqahList,
     savedQuickMenu,
+    iconOverrides,
   ] = await Promise.all([
     supabase.from("teachers").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
     supabase.from("students").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
@@ -60,6 +62,8 @@ export default async function AdminDashboardPage() {
     getAdminHalaqahList(),
     // V31: preferensi Menu Cepat (urutan + tampil/sembunyi) per akun.
     getDashboardQuickMenuOrder(profile.id),
+    // V39: override ikon menu platform.
+    getMenuIconOverrides(),
   ]);
 
   const visibleQuickMenu = resolveQuickMenu(ADMIN_QUICK_MENU, savedQuickMenu, ADMIN_QUICK_MENU_DEFAULT_KEYS);
@@ -206,10 +210,11 @@ export default async function AdminDashboardPage() {
               defaults={ADMIN_QUICK_MENU}
               visible={visibleQuickMenu}
               defaultVisible={defaultQuickMenu}
+              iconOverrides={iconOverrides}
             />
           }
         />
-        <QuickMenuGrid items={visibleQuickMenu} />
+        <QuickMenuGrid items={visibleQuickMenu} iconOverrides={iconOverrides} />
       </CardBox>
     </div>
   );

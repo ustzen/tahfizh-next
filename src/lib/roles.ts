@@ -139,6 +139,10 @@ export function settingsSectionsFor(role: AppRole) {
     { key: "keamanan", label: "Keamanan", href: `${base_path}/pengaturan/keamanan` },
     { key: "menu", label: "Tampilan & Menu", href: `${base_path}/pengaturan/menu` },
   ];
+  // V39 — khusus Developer: ganti ikon menu (Phosphor / unggahan) platform-wide.
+  if (role === "DEVELOPER") {
+    base.push({ key: "ikon", label: "Ikon Menu", href: "/developer/pengaturan/ikon" });
+  }
   if (role === "ADMIN") {
     base.push(
       { key: "tahfidz", label: "Tahfidz", href: "/admin/pengaturan/tahfidz" },

@@ -3,69 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  BookMarked,
-  GraduationCap,
-  BookOpenCheck,
-  AudioLines,
-  ClipboardList,
-  BookOpenText,
-  HandHeart,
-  SpellCheck,
-  ListChecks,
-  NotebookPen,
-  Target as TargetIcon,
-  FileText,
-  Users2,
-  CalendarCheck,
-  CalendarRange,
-  Rocket,
-  History,
-  Award,
-  Activity,
-  HandCoins,
-  MessageSquareText,
-  MessageCircle,
-  MessagesSquare,
-  Settings,
-} from "lucide-react";
+import { Settings, LayoutDashboard } from "lucide-react";
 
+import { MenuIcon } from "@/components/icons/menu-icon";
+import { ICONS } from "@/components/dashboard/menu-icon-fallbacks";
+import type { MenuIconOverride } from "@/lib/menu-icons";
 import type { NavEntry, NavGroup } from "@/lib/terminology";
 import { cn } from "@/lib/utils";
-
-export const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  dashboard: LayoutDashboard,
-  lembaga: Building2,
-  pengguna: Users,
-  guru: BookMarked,
-  santri: GraduationCap,
-  tahfidz: BookOpenCheck,
-  tartil: AudioLines,
-  setoran: ClipboardList,
-  hadits: BookOpenText,
-  doa: HandHeart,
-  tajwid: SpellCheck,
-  tugas: ListChecks,
-  jurnal: NotebookPen,
-  target: TargetIcon,
-  raport: FileText,
-  halaqah: Users2,
-  presensi: CalendarCheck,
-  anak: GraduationCap,
-  infak: HandCoins,
-  akademik: CalendarRange,
-  onboarding: Rocket,
-  perkembangan: History,
-  prestasi: Award,
-  pantauan: Activity,
-  saran: MessageSquareText,
-  obrolan: MessagesSquare,
-  whatsapp: MessageCircle,
-  pengaturan: Settings,
-};
 
 /**
  * Warna aksen per kategori menu (V12 #19/#48) — harmonis, biru tetap utama.
@@ -121,11 +65,13 @@ function NavLinks({
   pathname,
   onNavigate,
   prefetchEnabled,
+  iconOverrides,
 }: {
   groups: NavGroup[];
   pathname: string;
   onNavigate?: () => void;
   prefetchEnabled: boolean;
+  iconOverrides: MenuIconOverride[];
 }) {
   return (
     <>
@@ -140,7 +86,7 @@ function NavLinks({
             )}
             <nav className="space-y-0.5" aria-label={style.label || "Menu utama"}>
               {group.items.map((item) => {
-                const Icon =
+                const fallback =
                   ICONS[item.key] ?? (item.href.endsWith("/pengaturan") ? Settings : LayoutDashboard);
                 // V12: hanya menu yang persis dibuka yang dianggap aktif —
                 // "Ringkasan" (/admin) tidak ikut menyala saat membuka
@@ -164,7 +110,12 @@ function NavLinks({
                         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-500/10 dark:hover:text-white"
                     )}
                   >
-                    <Icon className="size-5 shrink-0" />
+                    <MenuIcon
+                      menuKey={item.key}
+                      overrides={iconOverrides}
+                      fallback={fallback}
+                      className="size-5 shrink-0"
+                    />
                     <span className="truncate">{item.label}</span>
                   </Link>
                 );
@@ -181,15 +132,19 @@ function NavLinks({
  * Role navigation — V12: menu dikelompokkan per kategori berlabel dengan
  * warna aksen berbeda; tetap terminology-aware + urutan menu per user (V2)
  * dan prefetch rute saudara (V1 rule #30).
+ * V39: ikon mengikuti override Pengaturan Developer (Phosphor/custom).
  */
 export function SidebarNav({
   groups,
   onNavigate,
   prefetch = true,
+  iconOverrides = [],
 }: {
   groups: NavGroup[];
   onNavigate?: () => void;
   prefetch?: boolean;
+  /** Override ikon menu platform (V39) — dikosongkan bila tidak disediakan. */
+  iconOverrides?: MenuIconOverride[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -211,6 +166,7 @@ export function SidebarNav({
         pathname={pathname}
         onNavigate={onNavigate}
         prefetchEnabled={prefetch}
+        iconOverrides={iconOverrides}
       />
     </div>
   );

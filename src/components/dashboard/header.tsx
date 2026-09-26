@@ -12,6 +12,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { GlobalSearch } from "@/components/search/global-search";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ROLE_HOME, type AppRole } from "@/lib/roles";
+import type { MenuIconOverride } from "@/lib/menu-icons";
 import type { NavGroup, NavEntry } from "@/lib/terminology";
 import type { NotificationRow } from "@/lib/v10";
 
@@ -29,6 +30,8 @@ type HeaderProps = {
   bottomNavAllItems: NavEntry[];
   bottomNavSelected: NavEntry[];
   bottomNavDefaultKeys: string[];
+  /** V39 — override ikon menu platform untuk sidebar drawer & editor Menu Bawah. */
+  iconOverrides?: MenuIconOverride[];
 };
 
 export function DashboardHeader({
@@ -44,6 +47,7 @@ export function DashboardHeader({
   bottomNavAllItems,
   bottomNavSelected,
   bottomNavDefaultKeys,
+  iconOverrides = [],
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -174,7 +178,12 @@ export function DashboardHeader({
             </div>
 
             <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-8">
-              <SidebarNav groups={navGroups} onNavigate={() => setOpen(false)} prefetch={false} />
+              <SidebarNav
+                groups={navGroups}
+                onNavigate={() => setOpen(false)}
+                prefetch={false}
+                iconOverrides={iconOverrides}
+              />
             </div>
 
             <div className="border-t px-4 py-3">
@@ -182,6 +191,7 @@ export function DashboardHeader({
                 allItems={bottomNavAllItems}
                 selected={bottomNavSelected}
                 defaultKeys={bottomNavDefaultKeys}
+                iconOverrides={iconOverrides}
               />
             </div>
 
