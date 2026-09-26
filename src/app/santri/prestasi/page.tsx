@@ -4,10 +4,9 @@ import {
   Award,
   BookOpenCheck,
   BookOpenText,
-  ClipboardCheck,
+  CalendarCheck,
   HandHeart,
   SpellCheck,
-  AudioLines,
   ListChecks,
   ArrowUpRight,
 } from "lucide-react";
@@ -27,7 +26,6 @@ import {
   tanggalId,
   type MeterTotals,
   type ModuleKey,
-  type ModuleStat,
   type PersenMeter,
   type PrestasiCard,
   type TargetProgress,
@@ -35,10 +33,8 @@ import {
 
 export const metadata: Metadata = { title: "Kartu Prestasi" };
 
-const MODULE_ICONS: Record<ModuleKey, React.ComponentType<{ className?: string }>> = {
+const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   TAHFIDZ: BookOpenCheck,
-  SETORAN: ClipboardCheck,
-  TARTIL: AudioLines,
   HADITS: BookOpenText,
   DOA: HandHeart,
   TAJWID: SpellCheck,
@@ -51,8 +47,8 @@ const MODULE_ICONS: Record<ModuleKey, React.ComponentType<{ className?: string }
  */
 const TILE_ORDER: ModuleKey[] = ["TAHFIDZ", "HADITS", "DOA", "TAJWID", "TUGAS"];
 
-/** Warna ikon+angka per modul — dot kecil, bukan chip besar, biar ringkas. */
-const MODULE_ACCENT: Record<ModuleKey, string> = {
+/** Warna ikon+angka per modul + kehadiran. */
+const MODULE_ACCENT: Record<string, string> = {
   TAHFIDZ: "text-emerald-600 dark:text-emerald-400",
   SETORAN: "text-blue-600 dark:text-blue-400",
   TARTIL: "text-sky-600 dark:text-sky-400",
@@ -60,6 +56,7 @@ const MODULE_ACCENT: Record<ModuleKey, string> = {
   DOA: "text-amber-600 dark:text-amber-400",
   TAJWID: "text-rose-600 dark:text-rose-400",
   TUGAS: "text-orange-600 dark:text-orange-400",
+  KEHADIRAN: "text-sky-600 dark:text-sky-400",
 };
 
 /** V40 — aksen warna meter persentase, konsisten dengan warna modulnya. */
@@ -229,27 +226,38 @@ function ScoreRing({ score }: { score: number | null }) {
   );
 }
 
-function ModuleTile({ moduleKey, stat }: { moduleKey: ModuleKey; stat: ModuleStat }) {
-  const Icon = MODULE_ICONS[moduleKey];
-  const kosong = stat.count === 0;
+/**
+ * Ubin ringkas: ikon + angka besar + label. Dipakai modul & kehadiran.
+ */
+function Tile({
+  icon: Icon,
+  label,
+  count,
+  accent,
+  title,
+  kosong,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  count: number;
+  accent: string;
+  title: string;
+  kosong: boolean;
+}) {
   return (
     <div
       className={cn(
         "flex flex-col items-center gap-1.5 rounded-xl px-2 py-3.5 text-center lg:gap-2 lg:px-3 lg:py-5",
         kosong ? "bg-slate-50 dark:bg-slate-500/5" : "bg-slate-50 dark:bg-slate-500/10"
       )}
-      title={
-        kosong
-          ? `${moduleLabel(moduleKey)} · belum ada penilaian`
-          : `${moduleLabel(moduleKey)} · ${stat.lastTitle ?? ""} · ${tanggalId(stat.lastDate)}`
-      }
+      title={title}
     >
-      <Icon className={cn("size-6 lg:size-8", kosong ? "text-slate-400 dark:text-slate-500" : MODULE_ACCENT[moduleKey])} />
+      <Icon className={cn("size-6 lg:size-8", kosong ? "text-slate-400 dark:text-slate-500" : accent)} />
       <span className={cn("tabular text-xl leading-none font-bold lg:text-3xl", kosong && "text-muted-foreground")}>
-        {stat.count}
+        {count}
       </span>
       <span className="text-muted-foreground truncate text-[0.7rem] leading-tight font-medium lg:text-sm">
-        {moduleLabel(moduleKey).split(" ")[0]}
+        {label}
       </span>
     </div>
   );
@@ -282,9 +290,9 @@ function MeterBar({ m }: { m: PersenMeter }) {
 
 /**
  * Kartu Prestasi (versi baru) — seperti raport mini: identitas anak, cincin
- * rata-rata nilai, dua meter (surat dikuasai & kehadiran), 7 ubin modul,
- * lencana, dan catatan apresiasi guru. Kartu selalu dirender meski belum ada
- * penilaian (angka 0) supaya anak tahu apa yang akan terisi nanti.
+ * rata-rata nilai, ubin modul + kehadiran, meter persentase, lencana, dan
+ * catatan apresiasi guru. Kartu selalu dirender meski belum ada penilaian
+ * (angka 0) supaya anak tahu apa yang akan terisi nanti.
  */
 export default async function SantriPrestasiPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/prestasi");
@@ -328,10 +336,9 @@ export default async function SantriPrestasiPage() {
         {cards.map((c) => {
           const p = predikat(c.avgScore);
           const lencana = badgesFor(c).slice(0, 3);
-          const hadirPct = persen(c.presensi.hadir, c.presensi.total);
-          const surahPct = persen(c.surahSelesai, c.surahTotal);
           const meters = buildMeters(c, targets, meterTotals.get(c.studentId));
           const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
+          const subtitle = `${(c.halaqahName ?? "Belum tergabung halaqah").toUpperCase()}${c.businessCode ? ` - ${c.businessCode}` : ""}`;
 
           return (
             <div
@@ -348,10 +355,7 @@ export default async function SantriPrestasiPage() {
                   <p className="truncate text-[0.95rem] font-bold tracking-tight text-foreground lg:text-xl">
                     {c.studentName}
                   </p>
-                  <p className="text-muted-foreground truncate text-xs lg:text-sm">
-                    {c.halaqahName ?? "Belum tergabung halaqah"}
-                    {c.businessCode ? ` · ${c.businessCode}` : ""}
-                  </p>
+                  <p className="text-muted-foreground truncate text-xs lg:text-sm">{subtitle}</p>
                 </div>
                 <ScoreRing score={c.avgScore} />
               </div>
@@ -362,32 +366,39 @@ export default async function SantriPrestasiPage() {
                 </span>
               </div>
 
-              {/* Dua meter ringkas berdampingan */}
-              <div className="mt-3 grid grid-cols-2 gap-2 px-4 lg:mt-4 lg:gap-3 lg:px-6">
-                <div className="rounded-xl bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10 lg:px-5 lg:py-4">
-                  <p className="tabular text-sm font-bold text-emerald-700 dark:text-emerald-300 lg:text-lg">
-                    {c.surahSelesai}
-                    <span className="text-muted-foreground font-normal">/{c.surahTotal || 0}</span>
-                  </p>
-                  <p className="text-muted-foreground text-[0.65rem] font-medium lg:text-xs">Surat dikuasai</p>
-                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-emerald-200/70 dark:bg-emerald-500/20 lg:mt-2 lg:h-1.5">
-                    <div className="h-full rounded-full bg-emerald-500" style={{ width: `${surahPct}%` }} />
-                  </div>
-                </div>
-                <div className="rounded-xl bg-sky-50 px-3 py-2 dark:bg-sky-500/10 lg:px-5 lg:py-4">
-                  <p className="tabular text-sm font-bold text-sky-700 dark:text-sky-300 lg:text-lg">{hadirPct}%</p>
-                  <p className="text-muted-foreground text-[0.65rem] font-medium lg:text-xs">Kehadiran</p>
-                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-sky-200/70 dark:bg-sky-500/20 lg:mt-2 lg:h-1.5">
-                    <div className="h-full rounded-full bg-sky-500" style={{ width: `${hadirPct}%` }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Ubin modul — 5 kartu (setoran & tartil dihapus), ukuran diperbesar */}
-              <div className="mt-3 grid grid-cols-3 gap-1.5 px-4 lg:mt-4 lg:grid-cols-5 lg:gap-2.5 lg:px-6">
-                {TILE_ORDER.map((key) => (
-                  <ModuleTile key={key} moduleKey={key} stat={c.moduleStats?.[key] ?? EMPTY_MODULE_STAT} />
-                ))}
+              {/* Ubin modul + kehadiran — 6 kartu (setoran & tartil dihapus) */}
+              <div className="mt-3 grid grid-cols-3 gap-1.5 px-4 lg:mt-4 lg:grid-cols-6 lg:gap-2.5 lg:px-6">
+                {TILE_ORDER.map((key) => {
+                  const stat = c.moduleStats?.[key] ?? EMPTY_MODULE_STAT;
+                  const kosong = stat.count === 0;
+                  return (
+                    <Tile
+                      key={key}
+                      icon={MODULE_ICONS[key]}
+                      label={moduleLabel(key).split(" ")[0]}
+                      count={stat.count}
+                      accent={MODULE_ACCENT[key]}
+                      kosong={kosong}
+                      title={
+                        kosong
+                          ? `${moduleLabel(key)} · belum ada penilaian`
+                          : `${moduleLabel(key)} · ${stat.lastTitle ?? ""} · ${tanggalId(stat.lastDate)}`
+                      }
+                    />
+                  );
+                })}
+                <Tile
+                  icon={CalendarCheck}
+                  label="Kehadiran"
+                  count={c.presensi.hadir}
+                  accent={MODULE_ACCENT.KEHADIRAN}
+                  kosong={c.presensi.total === 0}
+                  title={
+                    c.presensi.total === 0
+                      ? "Kehadiran · belum ada data presensi"
+                      : `Kehadiran · ${c.presensi.hadir} hadir, ${c.presensi.izin} izin, ${c.presensi.sakit} sakit, ${c.presensi.alpa} alpa`
+                  }
+                />
               </div>
 
               {/* V40 — persentase capaian: hafalan & tugas (+ target modul lain) */}
