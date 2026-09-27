@@ -1,15 +1,15 @@
 -- ============================================================================
--- TAHFIZH V42 — Peringkat sementara santri di halaqahnya
+-- TAHFIZH V43 — Peringkat halaqah: poin default untuk penilaian non-angka
 -- ============================================================================
--- Cincin di pojok kanan atas Kartu Prestasi diisi peringkat sementara:
--- rata-rata nilai penilaian berangka (tahfidz, tartil, hadits, doa, tajwid,
--- tugas, setoran) santri dibandingkan dengan seluruh santri aktif di
--- halaqah yang sama. Peringkat = dense_rank rata-rata tertinggi → terendah;
--- nilai sama mendapat peringkat sama. Santri belum bernilai tidak diperingkat.
---
--- SECURITY DEFINER karena perhitungan melibatkan nilai santri lain sekelas,
--- yang memang tidak bisa dibaca akun wali via RLS. Output dibatasi hanya
--- anak milik akun ini. Tidak ada tabel/policy yang diubah. Idempotent.
+-- Perbaikan V42: grid penilaian umumnya memakai mode CENTANG/HURUF sehingga
+-- score_value kosong — peringkat tidak pernah terhitung (cincin selalu "–").
+-- Sekarang SETIAP penilaian yang sudah dinilai dipetakan ke poin:
+--   • score_value terisi                    → pakai angka aslinya (1–100).
+--   • Dinilai / lulus / centang (tanpa angka) → 85.
+--   • Perlu mengulang / perlu latihan        → 65.
+--   • Belum selesai / belum menguasai / ditunda → 50.
+-- Pemetaan sama untuk semua santri, jadi perbandingan tetap adil.
+-- Idempotent: create or replace + grant; aman dijalankan setelah V42.
 -- ============================================================================
 
 create or replace function public.santri_halaqah_rank()
@@ -47,38 +47,50 @@ begin
       and hs.halaqah_id in (select halaqah_id from anak_halaqah)
   ),
   skor as (
-    select s.student_id, round(avg(x.score_value))::int as rata
+    select s.student_id, round(avg(x.poin))::int as rata
     from sekelas s
     join lateral (
-      select t.score_value
+      -- Hafalan (tahfidz): DINILAI tanpa angka = lulus setoran → 85
+      select coalesce(t.score_value, 85) as poin
         from public.tahfidz_assessments t
         where t.student_id = s.student_id and t.tenant_id = v_tenant
-          and t.status = 'DINILAI' and t.score_value is not null
+          and t.status = 'DINILAI'
       union all
-      select t.score_value
+      -- Tartil
+      select coalesce(t.score_value, 85)
         from public.tartil_assessments t
         where t.student_id = s.student_id and t.tenant_id = v_tenant
-          and t.deleted_at is null and t.score_value is not null
+          and t.deleted_at is null
       union all
-      select l.score_value
+      -- Hadits / Doa / Tajwid (learning): status menentukan poin default
+      select coalesce(l.score_value, case l.status::text
+               when 'PERLU_MENGULANG'  then 65
+               when 'PERLU_LATIHAN'    then 65
+               when 'BELUM_SELESAI'    then 50
+               when 'BELUM_MENGUASAI'  then 50
+               else 85 end)
         from public.learning_assessments l
         where l.student_id = s.student_id and l.tenant_id = v_tenant
-          and l.deleted_at is null and l.score_value is not null
+          and l.deleted_at is null
       union all
-      select sc.score_value
+      -- Tugas halaqah: centang/huruf tanpa angka → 85
+      select coalesce(sc.score_value, 85)
         from public.tugas_halaqah_scores sc
         where sc.student_id = s.student_id and sc.tenant_id = v_tenant
-          and sc.score_value is not null
       union all
-      select sc.score_value
+      -- Tajwid (materi grid)
+      select coalesce(sc.score_value, 85)
         from public.tajwid_materi_scores sc
         where sc.student_id = s.student_id and sc.tenant_id = v_tenant
-          and sc.score_value is not null
       union all
-      select sb.score_value
+      -- Setoran: hasil menentukan poin default
+      select coalesce(sb.score_value, case sb.result::text
+               when 'PERLU_MENGULANG' then 65
+               when 'DITUNDA'         then 50
+               else 85 end)
         from public.tahfidz_submissions sb
         where sb.student_id = s.student_id and sb.tenant_id = v_tenant
-          and sb.deleted_at is null and sb.score_value is not null
+          and sb.deleted_at is null
     ) x on true
     group by s.student_id
   ),
