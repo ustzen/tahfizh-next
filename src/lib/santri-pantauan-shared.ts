@@ -238,6 +238,15 @@ export type HalaqahRank = {
   avgScore: number | null;
 };
 
+/** V45 — hasil RPC teacher_students_rank: peringkat per santri untuk guru. */
+export type TeacherStudentRank = {
+  studentId: string;
+  halaqahId: string | null;
+  rank: number | null;
+  totalRanked: number;
+  avgScore: number | null;
+};
+
 /** V40 — hasil RPC santri_meter_totals: penyebut persentase per anak. */
 export type MeterTotals = {
   studentId: string;

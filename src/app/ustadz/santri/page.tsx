@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth";
 import { getTeacherStudentsDetailed } from "@/lib/teacher-students";
+import { getTeacherStudentRanks } from "@/lib/teacher-student-rank";
 import { PageHeader } from "@/components/dashboard/section";
 import { getTerminology } from "@/lib/terminology";
 import { SantriClient } from "./santri-client";
@@ -17,8 +18,11 @@ export default async function UstadzSantriPage() {
 
   // V12.10: data binaan lengkap via helper bersama — RPC SECURITY DEFINER
   // `teacher_students_list` + fallback baca langsung jalur halaqah (RLS
-  // tenant-scoped) bila RPC gagal/kosong.
-  const students = await getTeacherStudentsDetailed();
+  // tenant-scoped) bila RPC gagal/kosong. V45: + peringkat & skor per halaqah.
+  const [students, ranks] = await Promise.all([
+    getTeacherStudentsDetailed(),
+    getTeacherStudentRanks(),
+  ]);
 
   return (
     <div>
@@ -27,7 +31,12 @@ export default async function UstadzSantriPage() {
         description={`${terms.santri} di halaqah yang Anda ampu — 1 guru bisa mengampu lebih dari 1 halaqah.`}
       />
 
-      <SantriClient students={students} santriLabel={terms.santri} halaqahLabel={terms.halaqah} />
+      <SantriClient
+        students={students}
+        ranks={ranks}
+        santriLabel={terms.santri}
+        halaqahLabel={terms.halaqah}
+      />
     </div>
   );
 }

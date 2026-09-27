@@ -10,9 +10,35 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WaChatButton } from "@/components/santri/wa-chat-button";
 import { genderLabel } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 import type { TeacherStudentRow } from "@/lib/teacher-students";
+import type { TeacherStudentRank } from "@/lib/santri-pantauan-shared";
 
 const ALL_HALAQAH = "ALL";
+
+/** V45 — badge peringkat: warna medali untuk 3 besar, netral setelahnya. */
+function RankBadge({ rank, totalRanked, avgScore }: TeacherStudentRank) {
+  if (rank === null) {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
+  const tone =
+    rank === 1
+      ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"
+      : rank === 2
+        ? "bg-slate-200 text-slate-700 dark:bg-slate-500/20 dark:text-slate-200"
+        : rank === 3
+          ? "bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300"
+          : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300";
+  return (
+    <span
+      className={cn("tabular inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold", tone)}
+      title={`Rata-rata nilai ${avgScore ?? "–"} · dari ${totalRanked} santri bernilai`}
+    >
+      #{rank}
+      <span className="text-[0.65rem] font-medium opacity-70">/{totalRanked}</span>
+    </span>
+  );
+}
 
 /**
  * TAHFIZH V21.2 — Filter Halaqah pada Data Santri (guru).
@@ -24,10 +50,12 @@ const ALL_HALAQAH = "ALL";
  */
 export function SantriClient({
   students,
+  ranks,
   santriLabel,
   halaqahLabel,
 }: {
   students: TeacherStudentRow[];
+  ranks: Map<string, TeacherStudentRank>;
   santriLabel: string;
   halaqahLabel: string;
 }) {
@@ -88,6 +116,8 @@ export function SantriClient({
                     <TableHead className="px-5">NIS</TableHead>
                     <TableHead>NISN</TableHead>
                     <TableHead>Nama</TableHead>
+                    <TableHead className="text-center">Peringkat</TableHead>
+                    <TableHead className="text-center">Skor</TableHead>
                     <TableHead>Panggilan</TableHead>
                     <TableHead>Gender</TableHead>
                     <TableHead>{halaqahLabel}</TableHead>
@@ -102,6 +132,21 @@ export function SantriClient({
                       <TableCell className="px-5 font-mono text-xs text-muted-foreground">{s.nis ?? "—"}</TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{s.nisn ?? "—"}</TableCell>
                       <TableCell className="font-medium">{s.full_name}</TableCell>
+                      <TableCell className="text-center">
+                        {(() => {
+                          const r = ranks.get(s.id ?? "");
+                          return r ? (
+                            <RankBadge {...r} />
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="tabular text-center text-sm font-semibold">
+                        {ranks.get(s.id ?? "")?.avgScore ?? (
+                          <span className="text-muted-foreground font-normal">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{s.nickname ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{genderLabel(s.gender)}</TableCell>
                       <TableCell>
