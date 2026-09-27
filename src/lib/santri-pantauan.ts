@@ -11,6 +11,7 @@ import { cache } from "react";
 
 import { createClient } from "@/lib/supabase/server";
 import type {
+  HalaqahRank,
   MeterTotals,
   PantauanItem,
   PresensiRekap,
@@ -56,6 +57,12 @@ export const getSantriTargetProgress = cache(getTargetProgress);
  */
 export async function getMeterTotals(): Promise<Map<string, MeterTotals>> {
   const rows = await rpc<MeterTotals>("santri_meter_totals");
+  return new Map(rows.map((r) => [r.studentId, r]));
+}
+
+/** V42 — peringkat sementara per anak di halaqahnya (dari rata-rata nilai). */
+export async function getHalaqahRank(): Promise<Map<string, HalaqahRank>> {
+  const rows = await rpc<HalaqahRank>("santri_halaqah_rank");
   return new Map(rows.map((r) => [r.studentId, r]));
 }
 

@@ -226,6 +226,18 @@ export function meterDoneLabel(m: Pick<PersenMeter, "done" | "total" | "unit">) 
   return m.unit ? `${m.done}/${m.total} ${m.unit}` : `${m.done}/${m.total}`;
 }
 
+/** V42 — hasil RPC santri_halaqah_rank: peringkat sementara per anak. */
+export type HalaqahRank = {
+  studentId: string;
+  halaqahName: string | null;
+  /** Peringkat di halaqah (dense_rank rata-rata nilai tertinggi); null = belum dinilai. */
+  rank: number | null;
+  /** Jumlah santri yang sudah bernilai di halaqah itu. */
+  totalRanked: number;
+  /** Rata-rata nilai santri itu (untuk tooltip). */
+  avgScore: number | null;
+};
+
 /** V40 — hasil RPC santri_meter_totals: penyebut persentase per anak. */
 export type MeterTotals = {
   studentId: string;

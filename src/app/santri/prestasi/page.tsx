@@ -14,7 +14,7 @@ import {
 import { cleanNis } from "@/lib/nis";
 import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
-import { getPrestasiCards, getMeterTotals, getSantriTargetProgress } from "@/lib/santri-pantauan";
+import { getPrestasiCards, getHalaqahRank, getMeterTotals, getSantriTargetProgress } from "@/lib/santri-pantauan";
 import { cn } from "@/lib/utils";
 import {
   EMPTY_MODULE_STAT,
@@ -221,26 +221,54 @@ function buildMeters(
   return meters;
 }
 
-/** Cincin skor kecil pakai conic-gradient — tanpa SVG/JS tambahan. */
-function ScoreRing({ score }: { score: number | null }) {
-  const pct = score ?? 0;
+/**
+ * V42 — cincin peringkat sementara di halaqah (dari rata-rata nilai semua
+ * modul berangka). Emas/silver/perunggu untuk 3 besar, hijau setelahnya;
+ "–" bila santri belum memiliki nilai yang bisa diperingkat.
+ */
+function RankRing({
+  rank,
+  totalRanked,
+  avgScore,
+  halaqahName,
+}: {
+  rank: number | null;
+  totalRanked: number;
+  avgScore: number | null;
+  halaqahName: string | null;
+}) {
   const ringColor =
-    score === null
+    rank === null
       ? "#cbd5e1"
-      : score >= 90
-        ? "#059669"
-        : score >= 80
-          ? "#0284c7"
-          : score >= 70
-            ? "#d97706"
-            : "#e11d48";
+      : rank === 1
+        ? "#f59e0b"
+        : rank === 2
+          ? "#94a3b8"
+          : rank === 3
+            ? "#b45309"
+            : "#059669";
+  const pct = rank === null ? 0 : totalRanked > 1 ? Math.round(((totalRanked - rank) / (totalRanked - 1)) * 100) : 100;
+  const title =
+    rank === null
+      ? "Peringkat sementara · belum ada nilai"
+      : `Peringkat sementara di ${halaqahName ?? "halaqah"}: #${rank} dari ${totalRanked} santri · rata-rata nilai ${avgScore ?? "–"}`;
   return (
     <div
       className="relative flex size-14 shrink-0 items-center justify-center rounded-full lg:size-20"
       style={{ background: `conic-gradient(${ringColor} ${pct * 3.6}deg, #e2e8f0 0deg)` }}
+      title={title}
     >
-      <div className="bg-card flex size-11 items-center justify-center rounded-full lg:size-16">
-        <span className="tabular text-sm font-bold leading-none lg:text-xl">{score ?? "–"}</span>
+      <div className="bg-card flex size-11 flex-col items-center justify-center rounded-full leading-none lg:size-16">
+        {rank === null ? (
+          <span className="text-muted-foreground text-sm font-bold lg:text-xl">–</span>
+        ) : (
+          <>
+            <span className="tabular text-sm font-bold lg:text-xl">#{rank}</span>
+            <span className="text-muted-foreground mt-0.5 text-[0.55rem] font-medium lg:text-[0.65rem]">
+              / {totalRanked}
+            </span>
+          </>
+        )}
       </div>
     </div>
   );
@@ -316,10 +344,11 @@ function MeterBar({ m }: { m: PersenMeter }) {
  */
 export default async function SantriPrestasiPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/prestasi");
-  const [data, targets, meterTotals] = await Promise.all([
+  const [data, targets, meterTotals, ranks] = await Promise.all([
     getPrestasiCards(),
     getSantriTargetProgress(),
     getMeterTotals(),
+    getHalaqahRank(),
   ]);
 
   const cards: PrestasiCard[] =
@@ -357,6 +386,7 @@ export default async function SantriPrestasiPage() {
           const p = predikat(c.avgScore);
           const lencana = badgesFor(c).slice(0, 3);
           const meters = buildMeters(c, targets, meterTotals.get(c.studentId));
+          const rankInfo = ranks.get(c.studentId);
           const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
           // V41 — subtitle: HALAQAH - NIS/NISN lembaga (bukan nomor ID web).
           const nisTampil = cleanNis(c.nis, c.businessCode);
@@ -382,7 +412,12 @@ export default async function SantriPrestasiPage() {
                   </p>
                   <p className="text-muted-foreground truncate text-xs lg:text-sm">{subtitle}</p>
                 </div>
-                <ScoreRing score={c.avgScore} />
+                <RankRing
+                  rank={rankInfo?.rank ?? null}
+                  totalRanked={rankInfo?.totalRanked ?? 0}
+                  avgScore={rankInfo?.avgScore ?? null}
+                  halaqahName={rankInfo?.halaqahName ?? c.halaqahName}
+                />
               </div>
 
               <div className="px-4 pt-2 lg:px-6 lg:pt-3">
