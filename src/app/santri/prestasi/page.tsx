@@ -223,9 +223,42 @@ function buildMeters(
 
 /**
  * V42 — cincin peringkat sementara di halaqah (dari rata-rata nilai semua
- * modul berangka). Emas/silver/perunggu untuk 3 besar, hijau setelahnya;
- "–" bila santri belum memiliki nilai yang bisa diperingkat.
+ * modul). Tampilan V45: cincin lebih besar dengan gradasi warna medali,
+ * angka besar tebal berwarna, dan latar dalam berbinar lembut.
  */
+const RANK_STYLES = {
+  emas: {
+    ring: "#f59e0b",
+    text: "text-amber-500 dark:text-amber-400",
+    inner: "from-amber-50 to-white dark:from-amber-500/15 dark:to-slate-900",
+    glow: "0 0 0 3px rgba(245,158,11,0.18), 0 6px 18px rgba(245,158,11,0.28)",
+  },
+  perak: {
+    ring: "#94a3b8",
+    text: "text-slate-500 dark:text-slate-300",
+    inner: "from-slate-100 to-white dark:from-slate-500/15 dark:to-slate-900",
+    glow: "0 0 0 3px rgba(148,163,184,0.20), 0 6px 18px rgba(148,163,184,0.28)",
+  },
+  perunggu: {
+    ring: "#b45309",
+    text: "text-amber-700 dark:text-amber-500",
+    inner: "from-orange-100 to-white dark:from-orange-500/15 dark:to-slate-900",
+    glow: "0 0 0 3px rgba(180,83,9,0.16), 0 6px 18px rgba(180,83,9,0.26)",
+  },
+  hijau: {
+    ring: "#059669",
+    text: "text-emerald-600 dark:text-emerald-400",
+    inner: "from-emerald-50 to-white dark:from-emerald-500/15 dark:to-slate-900",
+    glow: "0 0 0 3px rgba(5,150,105,0.16), 0 6px 18px rgba(5,150,105,0.24)",
+  },
+  kosong: {
+    ring: "#cbd5e1",
+    text: "text-muted-foreground",
+    inner: "from-slate-50 to-white dark:from-slate-500/10 dark:to-slate-900",
+    glow: "none",
+  },
+} as const;
+
 function RankRing({
   rank,
   totalRanked,
@@ -237,35 +270,46 @@ function RankRing({
   avgScore: number | null;
   halaqahName: string | null;
 }) {
-  const ringColor =
+  const s =
     rank === null
-      ? "#cbd5e1"
+      ? RANK_STYLES.kosong
       : rank === 1
-        ? "#f59e0b"
+        ? RANK_STYLES.emas
         : rank === 2
-          ? "#94a3b8"
+          ? RANK_STYLES.perak
           : rank === 3
-            ? "#b45309"
-            : "#059669";
-  const pct = rank === null ? 0 : totalRanked > 1 ? Math.round(((totalRanked - rank) / (totalRanked - 1)) * 100) : 100;
+            ? RANK_STYLES.perunggu
+            : RANK_STYLES.hijau;
+  const pct =
+    rank === null ? 0 : totalRanked > 1 ? Math.round(((totalRanked - rank) / (totalRanked - 1)) * 100) : 100;
   const title =
     rank === null
       ? "Peringkat sementara · belum ada nilai"
       : `Peringkat sementara di ${halaqahName ?? "halaqah"}: #${rank} dari ${totalRanked} santri · rata-rata nilai ${avgScore ?? "–"}`;
   return (
     <div
-      className="relative flex size-14 shrink-0 items-center justify-center rounded-full lg:size-20"
-      style={{ background: `conic-gradient(${ringColor} ${pct * 3.6}deg, #e2e8f0 0deg)` }}
+      className="relative flex size-16 shrink-0 items-center justify-center rounded-full lg:size-24"
+      style={{
+        background: `conic-gradient(${s.ring} ${pct * 3.6}deg, ${s.ring}22 ${pct * 3.6}deg)`,
+        boxShadow: s.glow,
+      }}
       title={title}
     >
-      <div className="bg-card flex size-11 flex-col items-center justify-center rounded-full leading-none lg:size-16">
+      <div
+        className={cn(
+          "flex size-12 flex-col items-center justify-center rounded-full bg-gradient-to-br lg:size-20",
+          s.inner,
+        )}
+      >
         {rank === null ? (
-          <span className="text-muted-foreground text-sm font-bold lg:text-xl">–</span>
+          <span className={cn("text-lg font-black lg:text-2xl", s.text)}>–</span>
         ) : (
           <>
-            <span className="tabular text-sm font-bold lg:text-xl">#{rank}</span>
-            <span className="text-muted-foreground mt-0.5 text-[0.55rem] font-medium lg:text-[0.65rem]">
-              / {totalRanked}
+            <span className={cn("tabular text-[1.35rem] leading-none font-black tracking-tight lg:text-4xl", s.text)}>
+              #{rank}
+            </span>
+            <span className="text-muted-foreground mt-1 text-[0.55rem] font-semibold tracking-wide lg:text-[0.68rem]">
+              dari {totalRanked}
             </span>
           </>
         )}
