@@ -11,6 +11,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 
+import { cleanNis } from "@/lib/nis";
 import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getPrestasiCards, getMeterTotals, getSantriTargetProgress } from "@/lib/santri-pantauan";
@@ -357,7 +358,12 @@ export default async function SantriPrestasiPage() {
           const lencana = badgesFor(c).slice(0, 3);
           const meters = buildMeters(c, targets, meterTotals.get(c.studentId));
           const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
-          const subtitle = `${(c.halaqahName ?? "Belum tergabung halaqah").toUpperCase()}${c.businessCode ? ` - ${c.businessCode}` : ""}`;
+          // V41 — subtitle: HALAQAH - NIS/NISN lembaga (bukan nomor ID web).
+          const nisTampil = cleanNis(c.nis, c.businessCode);
+          const idLembaga = [nisTampil, (c.nisn ?? "").trim() || null]
+            .filter(Boolean)
+            .join("/");
+          const subtitle = `${(c.halaqahName ?? "Belum tergabung halaqah").toUpperCase()}${idLembaga ? ` - ${idLembaga}` : ""}`;
 
           return (
             <div

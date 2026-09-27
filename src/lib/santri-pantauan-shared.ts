@@ -76,6 +76,9 @@ export type PrestasiCard = {
   studentId: string;
   studentName: string;
   businessCode: string | null;
+  /** V41 — NIS & NISN lembaga (students.nis/nisn), bukan nomor ID web. */
+  nis?: string | null;
+  nisn?: string | null;
   halaqahName: string | null;
   surahSelesai: number;
   surahTotal: number;
