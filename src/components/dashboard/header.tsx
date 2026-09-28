@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 
 import { Logo } from "@/components/logo";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
@@ -11,6 +11,7 @@ import { BottomNavEditorButton } from "@/components/dashboard/bottom-nav";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { GlobalSearch } from "@/components/search/global-search";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { logoutAction } from "@/app/actions/auth";
 import { ROLE_HOME, type AppRole } from "@/lib/roles";
 import type { MenuIconOverride } from "@/lib/menu-icons";
 import type { NavGroup, NavEntry } from "@/lib/terminology";
@@ -204,6 +205,19 @@ export function DashboardHeader({
                 </span>
                 <ThemeToggle />
               </div>
+            </div>
+
+            {/* Tombol Keluar — mobile tidak punya sidebar desktop tempat tombol
+                ini berada, jadi ditampilkan di dasar drawer menu. */}
+            <div className="border-t px-4 py-3">
+              <form action={logoutAction} onSubmit={() => setOpen(false)}>
+                <button
+                  type="submit"
+                  className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                >
+                  <LogOut className="size-4" /> Keluar
+                </button>
+              </form>
             </div>
           </div>
         </div>
