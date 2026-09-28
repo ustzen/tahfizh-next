@@ -10,7 +10,6 @@ import {
   getWaliWaiverRequests,
 } from "@/lib/v10";
 import { WaliPaymentPanel } from "@/components/infak/wali-payment-panel";
-import { InfakHistoryCard } from "@/components/infak/infak-history-card";
 import { isIpaymuConfigured } from "@/lib/ipaymu";
 import { rupiah } from "@/lib/v10-shared";
 
@@ -74,9 +73,8 @@ export default async function SantriInfakPage() {
           currentM={gate?.month ?? new Date().getMonth() + 1}
           waiverKids={waiverKids}
           waiverRequests={waiverRequests}
+          history={history}
         />
-
-        <InfakHistoryCard history={history} />
       </div>
     );
   }
@@ -114,8 +112,8 @@ export default async function SantriInfakPage() {
         currentM={invoices?.m ?? new Date().getMonth() + 1}
         waiverKids={waiverKids}
         waiverRequests={waiverRequests}
+        history={history}
       />
-      <InfakHistoryCard history={history} />
     </div>
   );
 }

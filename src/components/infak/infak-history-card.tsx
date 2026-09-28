@@ -20,7 +20,62 @@ import {
  * di muka / sekaligus beberapa bulan.
  *
  * Server component murni — dipakai di dasbor santri dan halaman Infak.
+ * V48.3: `InfakHistoryInline` = isi tanpa header kartu (untuk tab Riwayat).
  */
+export function InfakHistoryInline({ history, limit }: { history: WaliHistoryChild[]; limit?: number }) {
+  const children = history.filter((c) => c.items.length > 0);
+
+  if (children.length === 0) {
+    return <p className="text-muted-foreground py-6 text-center text-sm">Belum ada riwayat infak.</p>;
+  }
+
+  return (
+    <div className="space-y-5">
+      {children.map((child) => {
+        const items = typeof limit === "number" ? child.items.slice(0, limit) : child.items;
+        return (
+          <div key={child.studentId}>
+            {children.length > 1 && (
+              <p className="mb-2 text-sm font-semibold text-foreground">
+                {child.name} <span className="text-muted-foreground font-mono text-xs">{child.code}</span>
+              </p>
+            )}
+            <ul className="divide-y overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-500/20">
+              {items.map((it) => {
+                const paid = it.status === "PAID";
+                return (
+                  <li
+                    key={it.id}
+                    className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-500/10"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">{monthYearLabel(it.y, it.m)}</p>
+                      <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                        {paid
+                          ? paidNote(it)
+                          : it.status === "WAITING_CONFIRM"
+                            ? "Bukti pembayaran terkirim — menunggu konfirmasi."
+                            : it.status === "PENDING"
+                              ? "Menunggu pembayaran diselesaikan."
+                              : "Belum dibayar."}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <span className="text-sm font-bold text-foreground">{rupiah(it.amount)}</span>
+                      <Badge variant="outline" className={cn("px-2.5 py-1", statusTone(it.status))}>
+                        {INVOICE_STATUS_LABEL[it.status] ?? it.status}
+                      </Badge>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 export function InfakHistoryCard({
   history,
   limit,

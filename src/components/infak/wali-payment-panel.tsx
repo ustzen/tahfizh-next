@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CalendarPlus, CheckCircle2, ChevronDown, FileUp, HandCoins, HandHeart, QrCode, Search, X } from "lucide-react";
+import { Banknote, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, FileUp, HandCoins, HandHeart, History, QrCode, ReceiptText, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,8 +35,18 @@ import {
   rupiah,
   statusTone,
 } from "@/lib/v10-shared";
-import type { WaiverRequestRow, WaliChild, WaliInvoiceItem, WaliOtherStudent, WaliTxRow, WaliBankInfo } from "@/lib/v10";
+import type {
+  WaiverRequestRow,
+  WaliBankInfo,
+  WaliChild,
+  WaliHistoryChild,
+  WaliInvoiceItem,
+  WaliOtherStudent,
+  WaliTxRow,
+} from "@/lib/v10";
+import { InfakHistoryInline } from "@/components/infak/infak-history-card";
 import { WaiverRequestLink } from "@/components/infak/waiver-request-link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 type DialogState =
@@ -67,6 +77,7 @@ export function WaliPaymentPanel({
   currentM,
   waiverKids,
   waiverRequests,
+  history,
 }: {
   kids: WaliChild[];
   others: WaliOtherStudent[];
@@ -79,6 +90,8 @@ export function WaliPaymentPanel({
   currentM: number;
   waiverKids: { studentId: string; name: string; code: string }[];
   waiverRequests: WaiverRequestRow[];
+  /** Riwayat per bulan (tab kedua kartu Riwayat gabungan). */
+  history: WaliHistoryChild[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -96,6 +109,10 @@ export function WaliPaymentPanel({
   // "Dibayarkan atas nama" — dipakai bila ingin infak untuk santri lain tanpa
   // menampilkan nama asli (mis. "Hamba Allah").
   const [payerAlias, setPayerAlias] = useState("");
+  // V48.3 — kartu metode bayar hanya muncul setelah pengguna klik lanjut.
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  // Tab kartu Riwayat gabungan.
+  const [histTab, setHistTab] = useState<"transaksi" | "bulanan">("transaksi");
 
   const pendingTx = transactions.find((t) => t.status === "PENDING");
   const locked = pending || pendingTx !== undefined;
@@ -148,6 +165,7 @@ export function WaliPaymentPanel({
     setCustomAmount(null);
     setCustomText("");
     setError(null);
+    setCheckoutOpen(false);
   }
 
   /** Pilih N santri lain dengan tunggakan paling lama (seluruh bulannya). */
@@ -216,23 +234,28 @@ export function WaliPaymentPanel({
   return (
     <div className="space-y-6">
       <Card className="shadow-card overflow-hidden rounded-2xl">
-        <div className="bg-gradient-brand relative overflow-hidden px-5 py-5 sm:px-7">
+        {/* Gaya PageHeader: strip warna role di pinggir kiri + chip ikon. */}
+        <div className="bg-role-soft border-role/15 relative overflow-hidden border-l-4 px-5 py-5 sm:px-7">
           <span
             aria-hidden
             className="bg-dots text-role/20 pointer-events-none absolute -top-4 -right-4 h-32 w-52 [mask-image:linear-gradient(to_left,black,transparent)]"
           />
-          <div className="relative flex flex-wrap items-center gap-3">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white backdrop-blur-sm">
+          <div className="relative flex flex-wrap items-center gap-3.5">
+            <span className="bg-role text-role-ink shadow-card flex size-11 shrink-0 items-center justify-center rounded-xl">
               <HandCoins className="size-6" />
             </span>
             <div className="min-w-0 flex-1">
-              <h3 className="text-base font-bold text-white sm:text-lg">Infak Pengembangan {academicYear}</h3>
-              <p className="text-xs text-white/85">Dana pengembangan platform · mulai {rupiah(defaultAmount)}/bulan/santri</p>
+              <h3 className="text-role-strong text-lg font-bold tracking-tight sm:text-xl">
+                Infak Pengembangan {academicYear}
+              </h3>
+              <p className="text-muted-foreground mt-0.5 text-sm">
+                Dana pengembangan platform · mulai {rupiah(defaultAmount)}/bulan/santri
+              </p>
             </div>
             {selectedCount > 0 && (
-              <div className="rounded-xl bg-white/15 px-3.5 py-1.5 text-right backdrop-blur-sm">
-                <p className="text-[0.65rem] font-medium text-white/80">{selectedCount} dipilih</p>
-                <p className="text-base font-extrabold tracking-tight text-white">{rupiah(total)}</p>
+              <div className="bg-role text-role-ink rounded-xl px-3.5 py-1.5 text-right">
+                <p className="text-[0.65rem] font-medium opacity-80">{selectedCount} dipilih</p>
+                <p className="text-base font-extrabold tracking-tight">{rupiah(total)}</p>
               </div>
             )}
           </div>
@@ -584,9 +607,9 @@ export function WaliPaymentPanel({
             </section>
           )}
 
-          {/* ---------------- Ringkasan pilihan + nominal ---------------- */}
+          {/* ---------------- Ringkasan pilihan + lanjut bayar ---------------- */}
           {selectedCount > 0 && (
-            <div className="bg-role-soft/50 space-y-3 rounded-2xl border p-4">
+            <div className="bg-role-soft/50 rounded-2xl border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-foreground">
                   {selectedCount} tagihan · {studentCount} santri · <span className="text-role-strong">{rupiah(total)}</span>
@@ -595,95 +618,137 @@ export function WaliPaymentPanel({
                   Kosongkan
                 </Button>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-muted-foreground text-xs">Atas nama:</span>
-                <Input
-                  value={payerAlias}
-                  onChange={(e) => setPayerAlias(e.target.value)}
-                  maxLength={60}
-                  placeholder="Nama Anda (opsional)"
-                  className="h-8 w-44 rounded-full bg-white text-xs dark:bg-transparent"
-                  aria-label="Dibayarkan atas nama"
-                />
+              {!checkoutOpen ? (
                 <Button
                   type="button"
-                  size="sm"
-                  variant={payerAlias === ANONYMOUS_PAYER_NAME ? "default" : "outline"}
-                  className="h-8 rounded-full px-3 text-xs"
-                  onClick={() =>
-                    setPayerAlias((v) => (v === ANONYMOUS_PAYER_NAME ? "" : ANONYMOUS_PAYER_NAME))
-                  }
+                  onClick={() => setCheckoutOpen(true)}
+                  disabled={pending || pendingTx !== undefined}
+                  className="bg-gradient-brand mt-3 w-full hover:opacity-90"
                 >
-                  {ANONYMOUS_PAYER_NAME}
+                  Lanjut ke Pembayaran ({rupiah(total)})
                 </Button>
-              </div>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-muted-foreground text-xs">Atas nama:</span>
+                    <Input
+                      value={payerAlias}
+                      onChange={(e) => setPayerAlias(e.target.value)}
+                      maxLength={60}
+                      placeholder="Nama Anda (opsional)"
+                      className="h-8 w-44 rounded-full bg-white text-xs dark:bg-transparent"
+                      aria-label="Dibayarkan atas nama"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={payerAlias === ANONYMOUS_PAYER_NAME ? "default" : "outline"}
+                      className="h-8 rounded-full px-3 text-xs"
+                      onClick={() =>
+                        setPayerAlias((v) => (v === ANONYMOUS_PAYER_NAME ? "" : ANONYMOUS_PAYER_NAME))
+                      }
+                    >
+                      {ANONYMOUS_PAYER_NAME}
+                    </Button>
+                  </div>
+
+                  {/* Metode pembayaran — muncul setelah lanjut */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border p-4">
+                      <div className="flex items-center gap-2.5">
+                        <span className="bg-role-soft text-role-strong flex size-9 shrink-0 items-center justify-center rounded-xl">
+                          <Banknote className="size-4.5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">Transfer Manual</p>
+                          {bank?.bankName && bank?.bankNo ? (
+                            <p className="text-muted-foreground truncate font-mono text-xs">
+                              {bank.bankName} · {bank.bankNo}
+                            </p>
+                          ) : (
+                            <p className="text-muted-foreground truncate text-xs">Rekening belum diatur</p>
+                          )}
+                        </div>
+                      </div>
+                      {bank?.bankAccount && <p className="text-muted-foreground mt-1.5 text-xs">a.n. {bank.bankAccount}</p>}
+                      <Button
+                        onClick={() => handlePay("MANUAL")}
+                        disabled={pending || pendingTx !== undefined}
+                        className="bg-gradient-brand mt-3 w-full hover:opacity-90"
+                      >
+                        {pending ? "Memproses…" : `Bayar ${rupiah(total)} via Transfer`}
+                      </Button>
+                    </div>
+
+                    <div className="rounded-2xl border p-4">
+                      <div className="flex items-center gap-2.5">
+                        <span className="bg-role-soft text-role-strong flex size-9 shrink-0 items-center justify-center rounded-xl">
+                          <QrCode className="size-4.5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">Otomatis (QRIS / e-wallet)</p>
+                          <p className="text-muted-foreground truncate text-xs">
+                            {autoEnabled ? `QRIS · VA · e-wallet · min ${rupiah(IPAYMU_MIN_TOTAL)}` : "Belum diaktifkan"}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handlePay("IPAYMU")}
+                        disabled={pending || pendingTx !== undefined || !autoEnabled}
+                        variant="outline"
+                        className="mt-3 w-full"
+                      >
+                        {pending ? "Memproses…" : "Bayar Otomatis"}
+                      </Button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutOpen(false)}
+                    className="text-muted-foreground mx-auto block text-xs hover:underline"
+                  >
+                    Kembali atur tagihan
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-          {/* ---------------- Metode pembayaran ---------------- */}
-          <div className="grid gap-4 border-t pt-5 sm:grid-cols-2">
-            <div className="rounded-2xl border p-4">
-              <div className="flex items-center gap-2.5">
-                <span className="bg-role-soft text-role-strong flex size-9 shrink-0 items-center justify-center rounded-xl">
-                  <Banknote className="size-4.5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">Transfer Manual</p>
-                  {bank?.bankName && bank?.bankNo ? (
-                    <p className="text-muted-foreground truncate font-mono text-xs">
-                      {bank.bankName} · {bank.bankNo}
-                    </p>
-                  ) : (
-                    <p className="text-muted-foreground truncate text-xs">Rekening belum diatur</p>
-                  )}
-                </div>
-              </div>
-              {bank?.bankAccount && <p className="text-muted-foreground mt-1.5 text-xs">a.n. {bank.bankAccount}</p>}
-              <Button
-                onClick={() => handlePay("MANUAL")}
-                disabled={pending || selectedCount === 0 || pendingTx !== undefined}
-                className="bg-gradient-brand mt-3 w-full hover:opacity-90"
-              >
-                {pending ? "Memproses…" : selectedCount > 0 ? `Bayar ${rupiah(total)} via Transfer` : "Bayar via Transfer"}
-              </Button>
-            </div>
-
-            <div className="rounded-2xl border p-4">
-              <div className="flex items-center gap-2.5">
-                <span className="bg-role-soft text-role-strong flex size-9 shrink-0 items-center justify-center rounded-xl">
-                  <QrCode className="size-4.5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">Otomatis (QRIS / e-wallet)</p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {autoEnabled ? `QRIS · VA · e-wallet · min ${rupiah(IPAYMU_MIN_TOTAL)}` : "Belum diaktifkan"}
-                  </p>
-                </div>
-              </div>
-              <Button
-                onClick={() => handlePay("IPAYMU")}
-                disabled={pending || selectedCount === 0 || pendingTx !== undefined || !autoEnabled}
-                variant="outline"
-                className="mt-3 w-full"
-              >
-                {pending ? "Memproses…" : "Bayar Otomatis"}
-              </Button>
-            </div>
-          </div>
           {bank?.instructions && (
             <p className="text-muted-foreground text-xs leading-relaxed">{bank.instructions}</p>
           )}
         </CardContent>
       </Card>
 
-      {/* Riwayat transaksi */}
-      <Card className="shadow-card rounded-2xl">
-        <CardContent className="pt-6">
-          <h3 className="mb-4 text-base font-semibold text-foreground">Riwayat Pembayaran Saya</h3>
-          {transactions.length === 0 ? (
-            <p className="text-muted-foreground py-6 text-center text-sm">Belum ada transaksi.</p>
-          ) : (
-            <ul className="divide-y">
+      {/* V48.3 — Riwayat gabungan: transaksi + per bulan dalam satu kartu bertab. */}
+      <Card className="shadow-card overflow-hidden rounded-2xl">
+        <div className="bg-role-soft border-role/15 relative overflow-hidden border-l-4 px-5 py-4">
+          <div className="relative flex flex-wrap items-center gap-3">
+            <span className="bg-role text-role-ink shadow-card flex size-10 shrink-0 items-center justify-center rounded-xl">
+              <History className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-role-strong text-base font-bold tracking-tight">Riwayat Infak</h3>
+              <p className="text-muted-foreground text-xs">Transaksi dan rincian per bulan dalam satu tempat.</p>
+            </div>
+          </div>
+        </div>
+        <CardContent className="pt-4">
+          <Tabs value={histTab} onValueChange={(v) => setHistTab(v as "transaksi" | "bulanan")}>
+            <TabsList className="mb-3">
+              <TabsTrigger value="transaksi" className="gap-1.5">
+                <ReceiptText className="size-3.5" /> Transaksi ({transactions.length})
+              </TabsTrigger>
+              <TabsTrigger value="bulanan" className="gap-1.5">
+                <CalendarDays className="size-3.5" /> Per Bulan
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="transaksi" className="mt-0">
+              {transactions.length === 0 ? (
+                <p className="text-muted-foreground py-6 text-center text-sm">Belum ada transaksi.</p>
+              ) : (
+                <ul className="divide-y">
               {transactions.map((t) => (
                 <li key={t.id} className="flex flex-wrap items-start justify-between gap-2 py-3">
                   <div className="min-w-0">
@@ -742,7 +807,13 @@ export function WaliPaymentPanel({
                 </li>
               ))}
             </ul>
-          )}
+              )}
+            </TabsContent>
+
+            <TabsContent value="bulanan" className="mt-0">
+              <InfakHistoryInline history={history} />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
