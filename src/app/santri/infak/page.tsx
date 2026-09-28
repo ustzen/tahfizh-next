@@ -1,6 +1,6 @@
-import { HandCoins, Info, Lock } from "lucide-react";
+import { Info, Lock } from "lucide-react";
 
-import { PageHeader, CardBox } from "@/components/dashboard/section";
+import { CardBox } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import {
   getPaymentGate,
@@ -42,13 +42,7 @@ export default async function SantriInfakPage() {
 
   if (locked) {
     return (
-      <div>
-        <PageHeader
-          title="Infak Pengembangan"
-          description="Akses Anda dibatasi hingga pembayaran bulan ini terkonfirmasi."
-          icon={<HandCoins className="size-6" />}
-        />
-
+      <div className="space-y-6">
         <CardBox className="border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
@@ -68,40 +62,33 @@ export default async function SantriInfakPage() {
           </div>
         </CardBox>
 
-        <div className="mt-6">
-          <WaliPaymentPanel
-            kids={invoices?.children ?? []}
-            others={invoices?.others ?? []}
-            defaultAmount={invoices?.defaultAmount ?? 1000}
-            academicYear={invoices?.academicYear ?? "-"}
-            bank={bank}
-            transactions={transactions}
-            autoEnabled={isIpaymuConfigured()}
-            currentY={gate?.year ?? new Date().getFullYear()}
-            currentM={gate?.month ?? new Date().getMonth() + 1}
-            waiverKids={waiverKids}
-            waiverRequests={waiverRequests}
-          />
-        </div>
+        <WaliPaymentPanel
+          kids={invoices?.children ?? []}
+          others={invoices?.others ?? []}
+          defaultAmount={invoices?.defaultAmount ?? 1000}
+          academicYear={invoices?.academicYear ?? "-"}
+          bank={bank}
+          transactions={transactions}
+          autoEnabled={isIpaymuConfigured()}
+          currentY={gate?.year ?? new Date().getFullYear()}
+          currentM={gate?.month ?? new Date().getMonth() + 1}
+          waiverKids={waiverKids}
+          waiverRequests={waiverRequests}
+        />
 
-        <InfakHistoryCard className="mt-6" history={history} />
+        <InfakHistoryCard history={history} />
       </div>
     );
   }
 
   return (
-    <div>
-      <PageHeader
-        title="Infak Pengembangan"
-        description="Dukung pengembangan TAHFIZH — mulai Rp1.000 per bulan per santri. Bisa untuk beberapa bulan sekaligus dan untuk santri lain di lembaga Anda."
-        icon={<HandCoins className="size-6" />}
-      />
-
-      {/* V18 — panel infak SELALU tampil. Bila RPC tagihan sedang tidak dapat
+    <div className="space-y-6">
+      {/* V18 — panel infak SELALU tampil (jadi header halaman sekaligus panel
+          pembayaran). Bila RPC tagihan sedang tidak dapat
           dibaca, panel tetap dirender dengan nilai dasar agar santri tetap bisa
           melihat nominal, rekening, dan riwayatnya. */}
       {!invoices && (
-        <CardBox className="mb-6 border-sky-200 bg-sky-50 dark:border-sky-500/25 dark:bg-sky-500/10">
+        <CardBox className="border-sky-200 bg-sky-50 dark:border-sky-500/25 dark:bg-sky-500/10">
           <div className="flex items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
               <Info className="size-4.5" />
@@ -115,22 +102,20 @@ export default async function SantriInfakPage() {
         </CardBox>
       )}
 
-      <div className="space-y-6">
-        <WaliPaymentPanel
-          kids={invoices?.children ?? []}
-          others={invoices?.others ?? []}
-          defaultAmount={invoices?.defaultAmount ?? 1000}
-          academicYear={invoices?.academicYear ?? "-"}
-          bank={bank}
-          transactions={transactions}
-          autoEnabled={isIpaymuConfigured()}
-          currentY={invoices?.y ?? new Date().getFullYear()}
-          currentM={invoices?.m ?? new Date().getMonth() + 1}
-          waiverKids={waiverKids}
-          waiverRequests={waiverRequests}
-        />
-        <InfakHistoryCard history={history} />
-      </div>
+      <WaliPaymentPanel
+        kids={invoices?.children ?? []}
+        others={invoices?.others ?? []}
+        defaultAmount={invoices?.defaultAmount ?? 1000}
+        academicYear={invoices?.academicYear ?? "-"}
+        bank={bank}
+        transactions={transactions}
+        autoEnabled={isIpaymuConfigured()}
+        currentY={invoices?.y ?? new Date().getFullYear()}
+        currentM={invoices?.m ?? new Date().getMonth() + 1}
+        waiverKids={waiverKids}
+        waiverRequests={waiverRequests}
+      />
+      <InfakHistoryCard history={history} />
     </div>
   );
 }
