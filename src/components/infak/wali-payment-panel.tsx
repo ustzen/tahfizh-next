@@ -65,6 +65,14 @@ function arrearsTone(count: number) {
     : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300";
 }
 
+/** Aksen avatar anak — berputar per anak agar kartu terlihat hidup tapi tetap serasi. */
+const CHILD_TONES = [
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
+  "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+];
+
 export function WaliPaymentPanel({
   kids,
   others,
@@ -277,57 +285,83 @@ export function WaliPaymentPanel({
             </p>
           )}
 
-          {/* ---------------- Nominal infak — chip ringkas sebaris ---------------- */}
-          <section className="bg-role-soft/40 flex flex-wrap items-center gap-1.5 rounded-2xl border p-3">
-            <p className="text-foreground/80 mr-1 text-xs font-semibold">Nominal per bulan</p>
-            <Button
-              type="button"
-              size="sm"
-              variant={customAmount === null ? "default" : "outline"}
-              className="h-8 rounded-full px-3.5 text-xs"
-              onClick={() => {
-                setCustomAmount(null);
-                setCustomText("");
-              }}
-            >
-              Sesuai tagihan
-            </Button>
-            {QUICK_AMOUNTS.filter((a) => a > defaultAmount).map((a) => (
-              <Button
-                key={a}
-                type="button"
-                size="sm"
-                variant={customAmount === a ? "default" : "outline"}
-                className="h-8 rounded-full px-3.5 text-xs"
-                onClick={() => {
-                  setCustomAmount(a);
-                  setCustomText(a.toLocaleString("id-ID"));
-                }}
-              >
-                {rupiah(a)}
-              </Button>
-            ))}
-            <Input
-              id="infak-per-month"
-              inputMode="numeric"
-              value={customText}
-              onChange={(e) => setCustom(e.target.value)}
-              placeholder="Nominal lain…"
-              className="h-8 w-28 rounded-full bg-white dark:bg-transparent"
-              aria-label="Nominal infak per bulan lainnya"
+          {/* ---------------- Tagihan Saya — nominal + daftar anak dalam satu kartu ---------------- */}
+          <section className="shadow-card border-role/15 bg-role-soft/30 relative overflow-hidden rounded-2xl border">
+            <span
+              aria-hidden
+              className="bg-dots text-role/15 pointer-events-none absolute -top-4 -right-4 h-28 w-44 [mask-image:linear-gradient(to_left,black,transparent)]"
             />
-          </section>
+            {/* Header strip: chip ikon + judul + pengatur nominal sebaris */}
+            <div className="bg-role-soft/60 border-role/15 relative flex flex-wrap items-center gap-x-3 gap-y-3 border-b px-5 py-4 sm:px-6">
+              <span className="bg-role text-role-ink shadow-card flex size-10 shrink-0 items-center justify-center rounded-xl">
+                <HandCoins className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <h4 className="text-role-strong text-base font-bold tracking-tight sm:text-lg">Tagihan Saya</h4>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Nominal infak <span className="text-role-strong font-semibold">{rupiah(customAmount ?? defaultAmount)}</span> per
+                  bulan / santri
+                </p>
+              </div>
+              <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className={cn(
+                    "h-8 rounded-full px-3.5 text-xs",
+                    customAmount === null
+                      ? "border-transparent bg-role text-role-ink hover:bg-role/90 hover:text-role-ink"
+                      : "border-role/30 bg-white text-role-strong hover:bg-role-soft hover:text-role-strong dark:bg-transparent"
+                  )}
+                  onClick={() => {
+                    setCustomAmount(null);
+                    setCustomText("");
+                  }}
+                >
+                  Sesuai tagihan
+                </Button>
+                {QUICK_AMOUNTS.filter((a) => a > defaultAmount).map((a) => (
+                  <Button
+                    key={a}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={cn(
+                      "h-8 rounded-full px-3.5 text-xs",
+                      customAmount === a
+                        ? "border-transparent bg-role text-role-ink hover:bg-role/90 hover:text-role-ink"
+                        : "border-role/30 bg-white text-role-strong hover:bg-role-soft hover:text-role-strong dark:bg-transparent"
+                    )}
+                    onClick={() => {
+                      setCustomAmount(a);
+                      setCustomText(a.toLocaleString("id-ID"));
+                    }}
+                  >
+                    {rupiah(a)}
+                  </Button>
+                ))}
+                <Input
+                  id="infak-per-month"
+                  inputMode="numeric"
+                  value={customText}
+                  onChange={(e) => setCustom(e.target.value)}
+                  placeholder="Nominal lain…"
+                  className="border-role/30 h-8 w-28 rounded-full bg-white dark:bg-transparent"
+                  aria-label="Nominal infak per bulan lainnya"
+                />
+              </div>
+            </div>
 
-          {/* ---------------- Anak sendiri ---------------- */}
-          <section className="space-y-3.5">
-            <h4 className="text-base font-semibold text-foreground">Tagihan Saya</h4>
+            {/* Daftar tagihan per anak */}
             {kids.length === 0 && (
-              <p className="text-muted-foreground py-4 text-center text-sm">
+              <p className="border-role/25 bg-role-soft/40 text-muted-foreground mx-5 mb-4 mt-5 rounded-xl border border-dashed px-4 py-6 text-center text-sm sm:mx-6">
                 Tagihan infak bulan ini belum diterbitkan lembaga. Anda tetap dapat berinfak untuk santri lain di daftar bawah.
               </p>
             )}
-            <div className="grid gap-4 md:grid-cols-2">
-              {kids.map((child) => {
+            <div className="grid gap-4 px-5 py-5 md:grid-cols-2 sm:px-6">
+              {kids.map((child, ci) => {
+                const tone = CHILD_TONES[ci % CHILD_TONES.length];
                 const openSelectable = child.invoices.filter(isSelectable);
                 const openSelected = openSelectable.filter((i) => keyOf(child.studentId, i.y, i.m) in selected).length;
                 const allOpenSelected = openSelectable.length > 0 && openSelected === openSelectable.length;
@@ -337,12 +371,20 @@ export function WaliPaymentPanel({
                 return (
                   <div
                     key={child.studentId}
-                    className="shadow-card rounded-2xl border border-slate-200 p-5 transition-shadow hover:shadow-md dark:border-slate-500/20"
+                    className="shadow-card bg-white rounded-2xl border border-slate-200 p-5 transition-shadow hover:shadow-md dark:border-slate-500/20 dark:bg-card"
                   >
                     <div className="mb-4 flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-foreground">{child.name}</p>
-                        <p className="text-muted-foreground font-mono text-xs">{child.code}</p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          className={cn("flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold", tone)}
+                          aria-hidden
+                        >
+                          {child.name.charAt(0).toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-foreground">{child.name}</p>
+                          <p className="text-muted-foreground font-mono text-xs">{child.code}</p>
+                        </div>
                       </div>
                       {openSelectable.length > 1 && (
                         <label className="text-muted-foreground flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
@@ -378,7 +420,7 @@ export function WaliPaymentPanel({
                     )}
 
                     {/* Bayar di muka */}
-                    <div className="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-500/5">
+                    <div className="bg-role-soft/40 mt-3 rounded-xl p-3">
                       <button
                         type="button"
                         onClick={() => setAheadOpen((p) => ({ ...p, [child.studentId]: !isAheadOpen }))}
@@ -454,9 +496,9 @@ export function WaliPaymentPanel({
                                       className={cn(
                                         "rounded-lg border px-2 py-1.5 text-center text-xs transition-colors",
                                         on
-                                          ? "border-blue-500 bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                                          ? "border-role bg-role-soft font-semibold text-role-strong"
                                           : ok
-                                            ? "border-slate-200 bg-white text-slate-700 hover:border-blue-300 dark:border-slate-500/20 dark:bg-transparent"
+                                            ? "border-slate-200 bg-white text-slate-700 hover:border-role/40 dark:border-slate-500/20 dark:bg-transparent"
                                             : "border-slate-100 bg-slate-50 text-slate-400 dark:border-slate-500/10 dark:bg-transparent",
                                         !ok && "cursor-not-allowed"
                                       )}
@@ -890,8 +932,8 @@ function MonthRow({
       className={cn(
         "flex w-full items-center justify-between rounded-xl border-2 px-4 py-3.5 text-left text-sm transition-all",
         checked
-          ? "border-blue-500 bg-blue-50 shadow-sm dark:bg-blue-500/10"
-          : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/40 dark:border-slate-500/20 dark:bg-transparent",
+          ? "border-role bg-role-soft shadow-sm"
+          : "border-slate-200 bg-white hover:border-role/40 hover:bg-role-soft/40 dark:border-slate-500/20 dark:bg-transparent",
         disabled && "cursor-not-allowed opacity-60"
       )}
     >
@@ -915,7 +957,7 @@ function MonthRow({
         <span
           className={cn(
             "flex size-6 items-center justify-center rounded-full border-2 transition-colors",
-            checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"
+            checked ? "border-role bg-role text-role-ink" : "border-slate-300"
           )}
         >
           {checked && <CheckCircle2 className="size-4" strokeWidth={2.5} />}
