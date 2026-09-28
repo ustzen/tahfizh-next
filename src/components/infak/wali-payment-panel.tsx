@@ -216,35 +216,31 @@ export function WaliPaymentPanel({
   return (
     <div className="space-y-6">
       <Card className="shadow-card overflow-hidden rounded-2xl">
-        <div className="bg-gradient-brand relative overflow-hidden px-5 py-6 sm:px-7 sm:py-7">
+        <div className="bg-gradient-brand relative overflow-hidden px-5 py-5 sm:px-7">
           <span
             aria-hidden
             className="bg-dots text-role/20 pointer-events-none absolute -top-4 -right-4 h-32 w-52 [mask-image:linear-gradient(to_left,black,transparent)]"
           />
-          <div className="relative flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white shadow-card backdrop-blur-sm sm:size-14">
-                <HandCoins className="size-6 sm:size-7" />
-              </span>
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold text-white sm:text-xl">Tagihan Infak Pengembangan</h3>
-                <p className="mt-0.5 text-sm text-white/85">
-                  Tahun ajaran {academicYear} · dana untuk pengembangan platform TAHFIZH
-                </p>
-                {waiverKids.length > 0 && (
-                  <WaiverRequestLink kids={waiverKids} requests={waiverRequests} />
-                )}
-              </div>
+          <div className="relative flex flex-wrap items-center gap-3">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white backdrop-blur-sm">
+              <HandCoins className="size-6" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-bold text-white sm:text-lg">Infak Pengembangan {academicYear}</h3>
+              <p className="text-xs text-white/85">Dana pengembangan platform · mulai {rupiah(defaultAmount)}/bulan/santri</p>
             </div>
             {selectedCount > 0 && (
-              <div className="rounded-2xl bg-white/15 px-4 py-3 text-right shadow-card backdrop-blur-sm sm:px-5">
-                <p className="text-xs font-medium text-white/80">
-                  {selectedCount} tagihan dipilih
-                </p>
-                <p className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">{rupiah(total)}</p>
+              <div className="rounded-xl bg-white/15 px-3.5 py-1.5 text-right backdrop-blur-sm">
+                <p className="text-[0.65rem] font-medium text-white/80">{selectedCount} dipilih</p>
+                <p className="text-base font-extrabold tracking-tight text-white">{rupiah(total)}</p>
               </div>
             )}
           </div>
+          {waiverKids.length > 0 && (
+            <div className="relative mt-2.5">
+              <WaiverRequestLink kids={waiverKids} requests={waiverRequests} />
+            </div>
+          )}
         </div>
         <CardContent className="space-y-6 pt-6">
           {error && (
@@ -258,56 +254,45 @@ export function WaliPaymentPanel({
             </p>
           )}
 
-          {/* ---------------- Nominal infak (selalu tampil, tinggal klik) ---------------- */}
-          <section className="rounded-2xl border-2 border-blue-200 bg-blue-50/60 p-4 dark:border-blue-500/20 dark:bg-blue-500/5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">
-                  Nominal infak: <span className="text-role-strong">{rupiah(customAmount ?? defaultAmount)}/bulan</span>
-                </p>
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  Minimal {rupiah(defaultAmount)} per santri per bulan — pilih di bawah untuk mengubah, atau ketik nominal sendiri.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={customAmount === null ? "default" : "outline"}
-                  className="h-8"
-                  onClick={() => {
-                    setCustomAmount(null);
-                    setCustomText("");
-                  }}
-                >
-                  Sesuai tagihan
-                </Button>
-                {QUICK_AMOUNTS.filter((a) => a > defaultAmount).map((a) => (
-                  <Button
-                    key={a}
-                    type="button"
-                    size="sm"
-                    variant={customAmount === a ? "default" : "outline"}
-                    className="h-8"
-                    onClick={() => {
-                      setCustomAmount(a);
-                      setCustomText(a.toLocaleString("id-ID"));
-                    }}
-                  >
-                    {rupiah(a)}
-                  </Button>
-                ))}
-                <Input
-                  id="infak-per-month"
-                  inputMode="numeric"
-                  value={customText}
-                  onChange={(e) => setCustom(e.target.value)}
-                  placeholder="Nominal lain"
-                  className="h-8 w-32 bg-white dark:bg-transparent"
-                  aria-label="Nominal infak per bulan lainnya"
-                />
-              </div>
-            </div>
+          {/* ---------------- Nominal infak — chip ringkas sebaris ---------------- */}
+          <section className="bg-role-soft/40 flex flex-wrap items-center gap-1.5 rounded-2xl border p-3">
+            <p className="text-foreground/80 mr-1 text-xs font-semibold">Nominal per bulan</p>
+            <Button
+              type="button"
+              size="sm"
+              variant={customAmount === null ? "default" : "outline"}
+              className="h-8 rounded-full px-3.5 text-xs"
+              onClick={() => {
+                setCustomAmount(null);
+                setCustomText("");
+              }}
+            >
+              Sesuai tagihan
+            </Button>
+            {QUICK_AMOUNTS.filter((a) => a > defaultAmount).map((a) => (
+              <Button
+                key={a}
+                type="button"
+                size="sm"
+                variant={customAmount === a ? "default" : "outline"}
+                className="h-8 rounded-full px-3.5 text-xs"
+                onClick={() => {
+                  setCustomAmount(a);
+                  setCustomText(a.toLocaleString("id-ID"));
+                }}
+              >
+                {rupiah(a)}
+              </Button>
+            ))}
+            <Input
+              id="infak-per-month"
+              inputMode="numeric"
+              value={customText}
+              onChange={(e) => setCustom(e.target.value)}
+              placeholder="Nominal lain…"
+              className="h-8 w-28 rounded-full bg-white dark:bg-transparent"
+              aria-label="Nominal infak per bulan lainnya"
+            />
           </section>
 
           {/* ---------------- Anak sendiri ---------------- */}
@@ -481,34 +466,28 @@ export function WaliPaymentPanel({
           {/* ---------------- Santri lain (menunggak) ---------------- */}
           {others.length > 0 && (
             <section className="space-y-3 rounded-xl bg-slate-50 p-4 dark:bg-slate-500/5">
-              <div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <HandHeart className="size-4 text-role" />
                   <h4 className="text-sm font-semibold text-foreground">Bayarkan untuk santri lain</h4>
+                  <Badge variant="outline" className="text-[0.65rem]">{others.length} menunggak</Badge>
                 </div>
-                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                  Santri di lembaga Anda yang belum membayar infak, diurutkan dari yang <span className="font-medium">paling lama
-                  menunggak</span>. Centang santri lalu bayarkan — semua bulan tunggakannya ikut terpilih (bisa diatur lewat
-                  “Pilih bulan”). Santri yang bersangkutan akan melihat siapa yang membayarkan.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-muted-foreground text-xs">Bantu yang paling lama menunggak:</span>
-                {[1, 3, 5].map((n) => (
-                  <Button
-                    key={n}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 bg-white px-2.5 text-xs dark:bg-transparent"
-                    disabled={locked || others.length < n}
-                    onClick={() => pickOldestOthers(n)}
-                  >
-                    {n} santri
-                  </Button>
-                ))}
-                <span className="text-muted-foreground text-xs">({others.length} santri menunggak)</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-muted-foreground text-xs">Bantu terlama:</span>
+                  {[1, 3, 5].map((n) => (
+                    <Button
+                      key={n}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 bg-white px-2.5 text-xs dark:bg-transparent"
+                      disabled={locked || others.length < n}
+                      onClick={() => pickOldestOthers(n)}
+                    >
+                      {n} santri
+                    </Button>
+                  ))}
+                </div>
               </div>
 
               <div className="relative">
@@ -607,104 +586,85 @@ export function WaliPaymentPanel({
 
           {/* ---------------- Ringkasan pilihan + nominal ---------------- */}
           {selectedCount > 0 && (
-            <div className="rounded-2xl border-2 border-blue-200 bg-blue-50/60 p-5 dark:border-blue-500/20 dark:bg-blue-500/5">
+            <div className="bg-role-soft/50 space-y-3 rounded-2xl border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-base font-semibold text-foreground">
-                    {selectedCount} tagihan dipilih · {studentCount} santri
-                  </p>
-                  <p className="text-muted-foreground mt-0.5 text-sm">
-                    Total <span className="text-lg font-bold text-foreground">{rupiah(total)}</span>
-                  </p>
-                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  {selectedCount} tagihan · {studentCount} santri · <span className="text-role-strong">{rupiah(total)}</span>
+                </p>
                 <Button type="button" variant="ghost" size="sm" onClick={clearAll} disabled={pending}>
-                  Kosongkan pilihan
+                  Kosongkan
                 </Button>
               </div>
-              {customAmount !== null && (
-                <p className="text-muted-foreground mt-2 text-xs">
-                  Nominal {rupiah(customAmount)}/bulan diterapkan ke semua tagihan terpilih. Ubah di bagian
-                  "Nominal infak" di atas bila perlu.
-                </p>
-              )}
-
-              {studentCount > 0 && (
-                <div className="mt-3 space-y-1.5">
-                  <Label htmlFor="infak-alias" className="text-xs">
-                    Dibayarkan atas nama (opsional) — nama ini yang dilihat santri penerima
-                  </Label>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Input
-                      id="infak-alias"
-                      value={payerAlias}
-                      onChange={(e) => setPayerAlias(e.target.value)}
-                      maxLength={60}
-                      placeholder="Kosongkan untuk memakai nama Anda"
-                      className="h-8 w-56 bg-white dark:bg-transparent"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={payerAlias === ANONYMOUS_PAYER_NAME ? "default" : "outline"}
-                      className="h-8"
-                      onClick={() =>
-                        setPayerAlias((v) => (v === ANONYMOUS_PAYER_NAME ? "" : ANONYMOUS_PAYER_NAME))
-                      }
-                    >
-                      {ANONYMOUS_PAYER_NAME}
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground text-xs">Atas nama:</span>
+                <Input
+                  value={payerAlias}
+                  onChange={(e) => setPayerAlias(e.target.value)}
+                  maxLength={60}
+                  placeholder="Nama Anda (opsional)"
+                  className="h-8 w-44 rounded-full bg-white text-xs dark:bg-transparent"
+                  aria-label="Dibayarkan atas nama"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={payerAlias === ANONYMOUS_PAYER_NAME ? "default" : "outline"}
+                  className="h-8 rounded-full px-3 text-xs"
+                  onClick={() =>
+                    setPayerAlias((v) => (v === ANONYMOUS_PAYER_NAME ? "" : ANONYMOUS_PAYER_NAME))
+                  }
+                >
+                  {ANONYMOUS_PAYER_NAME}
+                </Button>
+              </div>
             </div>
           )}
 
           {/* ---------------- Metode pembayaran ---------------- */}
           <div className="grid gap-4 border-t pt-5 sm:grid-cols-2">
-            <div className="shadow-card rounded-2xl border border-slate-200 p-5 transition-shadow hover:shadow-md dark:border-slate-500/20">
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-role-soft text-role-strong">
-                  <Banknote className="size-5" />
+            <div className="rounded-2xl border p-4">
+              <div className="flex items-center gap-2.5">
+                <span className="bg-role-soft text-role-strong flex size-9 shrink-0 items-center justify-center rounded-xl">
+                  <Banknote className="size-4.5" />
                 </span>
-                <p className="text-base font-semibold">Transfer Manual</p>
-              </div>
-              {bank && (bank.bankName || bank.bankNo) ? (
-                <div className="text-muted-foreground mt-3 space-y-1 text-sm">
-                  {bank.bankName && <p>Bank: <span className="font-semibold text-foreground/85">{bank.bankName}</span></p>}
-                  {bank.bankNo && <p>No. rekening: <span className="font-mono text-[0.95rem] font-semibold text-foreground/85">{bank.bankNo}</span></p>}
-                  {bank.bankAccount && <p>a.n. {bank.bankAccount}</p>}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Transfer Manual</p>
+                  {bank?.bankName && bank?.bankNo ? (
+                    <p className="text-muted-foreground truncate font-mono text-xs">
+                      {bank.bankName} · {bank.bankNo}
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground truncate text-xs">Rekening belum diatur</p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-muted-foreground mt-3 text-sm">Rekening penerima infak belum diatur. Silakan hubungi pengelola TAHFIZH.</p>
-              )}
+              </div>
+              {bank?.bankAccount && <p className="text-muted-foreground mt-1.5 text-xs">a.n. {bank.bankAccount}</p>}
               <Button
                 onClick={() => handlePay("MANUAL")}
                 disabled={pending || selectedCount === 0 || pendingTx !== undefined}
-                size="lg"
-                className="mt-4 w-full bg-gradient-brand text-base hover:opacity-90"
+                className="bg-gradient-brand mt-3 w-full hover:opacity-90"
               >
                 {pending ? "Memproses…" : selectedCount > 0 ? `Bayar ${rupiah(total)} via Transfer` : "Bayar via Transfer"}
               </Button>
             </div>
 
-            <div className="shadow-card rounded-2xl border border-slate-200 p-5 transition-shadow hover:shadow-md dark:border-slate-500/20">
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-role-soft text-role-strong">
-                  <QrCode className="size-5" />
+            <div className="rounded-2xl border p-4">
+              <div className="flex items-center gap-2.5">
+                <span className="bg-role-soft text-role-strong flex size-9 shrink-0 items-center justify-center rounded-xl">
+                  <QrCode className="size-4.5" />
                 </span>
-                <p className="text-base font-semibold">Otomatis (QRIS / e-wallet)</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Otomatis (QRIS / e-wallet)</p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {autoEnabled ? `QRIS · VA · e-wallet · min ${rupiah(IPAYMU_MIN_TOTAL)}` : "Belum diaktifkan"}
+                  </p>
+                </div>
               </div>
-              <p className="text-muted-foreground mt-3 text-sm">
-                {autoEnabled
-                  ? `Bayar langsung via QRIS, VA, atau e-wallet. Minimal ${rupiah(IPAYMU_MIN_TOTAL)}.`
-                  : "Pembayaran otomatis belum diaktifkan."}
-              </p>
               <Button
                 onClick={() => handlePay("IPAYMU")}
                 disabled={pending || selectedCount === 0 || pendingTx !== undefined || !autoEnabled}
                 variant="outline"
-                size="lg"
-                className="mt-4 w-full text-base"
+                className="mt-3 w-full"
               >
                 {pending ? "Memproses…" : "Bayar Otomatis"}
               </Button>
