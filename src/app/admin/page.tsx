@@ -77,7 +77,7 @@ export default async function AdminDashboardPage() {
   const activeHalaqah = halaqahList.filter((h) => h.status === "ACTIVE");
   const setupItems = [
     { label: "Tahun ajaran", done: steps.tahunAjaran, href: "/admin/akademik" },
-    { label: "Jadwal belajar", done: steps.jadwal, href: "/admin/akademik/jadwal" },
+    { label: "Jadwal belajar", done: steps.jadwal, href: "/admin/jadwal" },
     { label: `Data ${terms.guru.toLowerCase()}`, done: steps.guru, href: "/admin/guru" },
     { label: `Data ${terms.santri.toLowerCase()}`, done: steps.santri, href: "/admin/santri" },
     { label: terms.halaqah, done: steps.halaqah, href: "/admin/halaqah" },

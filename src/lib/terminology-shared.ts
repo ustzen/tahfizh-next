@@ -73,6 +73,7 @@ export type NavKey =
   | "target"
   | "raport"
   | "halaqah"
+  | "jadwal"
   | "presensi"
   | "anak"
   | "prestasi"

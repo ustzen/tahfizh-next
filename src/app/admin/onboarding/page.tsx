@@ -62,7 +62,7 @@ export default async function AdminOnboardingPage() {
       n: 4,
       label: "Jadwal Pembelajaran",
       description: "Pilih hari & jam pembelajaran, plus jadwal per halaqah bila perlu.",
-      href: "/admin/akademik/jadwal",
+      href: "/admin/jadwal",
       done: dataDone.jadwal,
     },
     {

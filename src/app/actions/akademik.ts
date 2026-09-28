@@ -285,8 +285,8 @@ export async function finishOnboardingAction(): Promise<V11Result> {
 function invalidateAkademik() {
   revalidateSection(
     "/admin",
+    "/admin/jadwal",
     "/admin/akademik",
-    "/admin/akademik/jadwal",
     "/admin/akademik/mutasi",
     "/admin/akademik/arsip",
     "/admin/onboarding",

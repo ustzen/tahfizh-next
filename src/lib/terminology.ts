@@ -87,6 +87,7 @@ const NAV_GROUP_OF: Record<NavKey, NavGroupKey> = {
   guru: "master",
   santri: "master",
   halaqah: "master",
+  jadwal: "master",
   akademik: "utama",
   onboarding: "utama",
   tahfidz: "pembelajaran",
@@ -135,6 +136,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "guru", label: "Data Guru", href: "/admin/guru" }, // V12: menu terpisah + export/import Excel
     { key: "santri", label: "Data Santri", href: "/admin/santri" },
     { key: "halaqah", label: "Halaqah", href: "/admin/halaqah" },
+    // V47 — Jadwal masuk Master Data (dipindah dari Akademik agar mudah ditemukan).
+    { key: "jadwal", label: "Jadwal", href: "/admin/jadwal" },
     { key: "raport", label: "Raport", href: "/admin/raport" },
     { key: "akademik", label: "Akademik", href: "/admin/akademik" },
     { key: "onboarding", label: "Onboarding", href: "/admin/onboarding" },
@@ -148,6 +151,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "guru", label: "Data Guru", href: "/koordinator/guru" }, // V12: menu terpisah
     { key: "santri", label: "Data Santri", href: "/koordinator/santri" },
     { key: "halaqah", label: "Halaqah", href: "/koordinator/halaqah" },
+    // V47 — Jadwal Master Data (read-only untuk koordinator).
+    { key: "jadwal", label: "Jadwal", href: "/koordinator/jadwal" },
     { key: "hadits", label: "Hadits", href: "/koordinator/hadits" }, // V12.11: menu grid penilaian (halaman V12.7)
     { key: "doa", label: "Doa Harian", href: "/koordinator/doa" },
     { key: "perkembangan", label: "Riwayat Perkembangan", href: "/koordinator/perkembangan" },
@@ -169,6 +174,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "jurnal", label: "Custom Jurnal", href: "/ustadz/jurnal" },
     { key: "target", label: "Target", href: "/ustadz/target" },
     { key: "halaqah", label: "Halaqah", href: "/ustadz/halaqah" },
+    // V47 — Jadwal sesi mengajar guru.
+    { key: "jadwal", label: "Jadwal", href: "/ustadz/jadwal" },
     { key: "presensi", label: "Presensi", href: "/ustadz/presensi" },
     { key: "perkembangan", label: "Riwayat Perkembangan", href: "/ustadz/perkembangan" },
     { key: "raport", label: "Raport", href: "/ustadz/raport" },
