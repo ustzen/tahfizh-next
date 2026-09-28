@@ -15,8 +15,8 @@ import { ScheduleManager } from "@/components/akademik/schedule-manager";
 import { CardBox, SectionTitle } from "@/components/dashboard/section";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { DAY_LABEL, WEEK_DAYS, formatTanggalSingkat } from "@/lib/jadwal";
-import type { JadwalBoard as Board, MissingPresensi } from "@/lib/jadwal";
+import { DAY_LABEL, WEEK_DAYS, formatTanggalSingkat } from "@/lib/jadwal-shared";
+import type { JadwalBoardData as Board, MissingPresensi } from "@/lib/jadwal-shared";
 
 /**
  * TAHFIZH V47 — Papan Jadwal (Master Data).

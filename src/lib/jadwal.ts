@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
 import { getAdminHalaqahList, getTeacherHalaqahList } from "@/lib/halaqah";
 import type { ScheduleRow } from "@/lib/akademik";
+import { WEEK_DAYS, type JadwalBoardData, type MissingPresensi } from "@/lib/jadwal-shared";
 
 /**
  * TAHFIZH V47 — Menu Jadwal (Master Data) untuk ADMIN / KOORDINATOR / USTADZ.
@@ -15,17 +16,11 @@ import type { ScheduleRow } from "@/lib/akademik";
  * ada sesi presensi ("Belum Dipresensi") agar guru/admin tidak lupa mengisi.
  */
 
-export const WEEK_DAYS = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"] as const;
+export type { JadwalBoardData, MissingPresensi };
+export { WEEK_DAYS, DAY_LABEL, formatTanggalSingkat } from "@/lib/jadwal-shared";
 
-export const DAY_LABEL: Record<string, string> = {
-  SENIN: "Senin",
-  SELASA: "Selasa",
-  RABU: "Rabu",
-  KAMIS: "Kamis",
-  JUMAT: "Jumat",
-  SABTU: "Sabtu",
-  MINGGU: "Minggu",
-};
+/** Batas lampau yang dipindai: maksimal 28 hari ke belakang (hemat query). */
+const LOOKBACK_DAYS = 28;
 
 /** JS getDay() (0=Minggu) → kode hari internal. */
 function jsDayToCode(js: number): string {
@@ -38,48 +33,16 @@ function isoOf(d: Date): string {
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 }
 
-export type MissingPresensi = {
-  halaqahId: string;
-  halaqahName: string;
-  halaqahCode: string;
-  /** Tanggal jadwal yang lewat (YYYY-MM-DD). */
-  date: string;
-  dayLabel: string;
-  startTime: string;
-  endTime: string;
-  room: string | null;
-  /** Hari kalender menuju/tanggal tersebut (negatif = lampau). */
-  daysOverdue: number;
-  /** True bila tanggalnya hari ini tetapi jam mulai sudah terlewati. */
-  isToday: boolean;
-};
-
-export type JadwalBoard = {
-  /** Jadwal semua hari (grouping di client). */
-  schedules: ScheduleRow[];
-  /** Jadwal hari ini (kode hari). */
-  todayCode: string;
-  /** Tanggal hari ini (ISO, zona lokal). */
-  todayISO: string;
-  /** Tanggal-tanggal lewat yang belum dipresensi (terlama dulu). */
-  missing: MissingPresensi[];
-  /** Boleh mengelola jadwal (ADMIN only, sesuai RPC learning_schedule_save). */
-  canManage: boolean;
-};
-
-/** Batas lampau yang dipindai: maksimal 28 hari ke belakang (hemat query). */
-const LOOKBACK_DAYS = 28;
-
 /**
  * Board jadwal untuk role saat ini. Guru hanya melihat jadwal halaqah yang
  * diampu; admin/koordinator melihat seluruh jadwal tenant. Deteksi "belum
- * dipresensi" hanya untuk pengampu/halaqah yang relevan bagi role tsb.
+ * dipresensi" hanya untuk halaqah yang relevan bagi role tsb.
  */
-export const getJadwalBoard = cache(async (): Promise<JadwalBoard> => {
+export const getJadwalBoard = cache(async (): Promise<JadwalBoardData> => {
   const profile = await getSessionProfile();
   const supabase = await createClient();
 
-  const empty: JadwalBoard = {
+  const empty: JadwalBoardData = {
     schedules: [],
     todayCode: jsDayToCode(new Date().getDay()),
     todayISO: isoOf(new Date()),
@@ -136,7 +99,7 @@ export const getJadwalBoard = cache(async (): Promise<JadwalBoard> => {
         halaqahName: s.halaqahName,
         halaqahCode: s.halaqahCode,
         date,
-        dayLabel: DAY_LABEL[code] ?? code,
+        dayLabel: code,
         startTime: s.startTime,
         endTime: s.endTime,
         room: s.room,
@@ -161,10 +124,12 @@ async function getSchedulesForRole(isTeacher: boolean): Promise<ScheduleRow[]> {
 
   if (isTeacher) {
     // RLS sudah membatasi per tenant; filter eksplisit ke halaqah yang diampu.
+    const teacherId = await resolveTeacherId();
+    if (!teacherId) return [];
     const { data: assigned } = await supabase
       .from("halaqah_teachers")
       .select("halaqah_id")
-      .eq("teacher_id", (await resolveTeacherId()) ?? "");
+      .eq("teacher_id", teacherId);
     const ids = (assigned ?? []).map((a) => a.halaqah_id);
     if (ids.length === 0) return [];
     query = query.in("halaqah_id", ids);
@@ -209,11 +174,4 @@ async function resolveTeacherId(): Promise<string | null> {
     .limit(1)
     .maybeSingle();
   return byName.data?.id ?? null;
-}
-
-/** Label tanggal Indonesia ringkas: "Sen, 21 Sep". */
-export function formatTanggalSingkat(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat("id-ID", { weekday: "short", day: "numeric", month: "short" }).format(d);
 }
