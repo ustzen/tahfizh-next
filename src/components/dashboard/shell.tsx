@@ -84,9 +84,18 @@ export async function DashboardShell({
           <SidebarNav groups={navGroups} iconOverrides={iconOverrides} />
         </div>
         <div className="bg-role-soft mt-3 flex items-center gap-3 rounded-2xl p-3">
-          <span className="bg-role text-role-ink flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold">
-            {fullName?.[0]?.toUpperCase() ?? "?"}
-          </span>
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt=""
+              className="size-10 shrink-0 rounded-xl object-cover ring-1 ring-black/5"
+            />
+          ) : (
+            <span className="bg-role text-role-ink flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold">
+              {fullName?.[0]?.toUpperCase() ?? "?"}
+            </span>
+          )}
           <div className="min-w-0">
             <p className="truncate text-[0.82rem] font-semibold">{fullName}</p>
             <p className="text-muted-foreground mt-0.5 truncate text-xs">

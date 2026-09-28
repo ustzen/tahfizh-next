@@ -73,6 +73,8 @@ export function moduleTone(key: string) {
 }
 
 export type PrestasiCard = {
+  /** Path storage foto santri (dari profil akun; V49) — di-sign saat render. */
+  avatarPath?: string | null;
   studentId: string;
   studentName: string;
   businessCode: string | null;

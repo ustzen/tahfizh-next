@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { requireRole } from "@/lib/auth";
 import { getPantauanFeed, getPrestasiCards } from "@/lib/santri-pantauan";
+import { signAvatarPath } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import {
   moduleLabel,
@@ -37,6 +38,16 @@ export default async function SantriPantauanPage({
     getPrestasiCards(),
     getPantauanFeed(selected, 40),
   ]);
+
+  // V49 — foto santri (path profil akun → signed URL per render).
+  const avatarUrls = new Map<string, string>();
+  await Promise.all(
+    cards.map(async (c) => {
+      if (!c.avatarPath) return;
+      const url = await signAvatarPath(c.avatarPath);
+      if (url) avatarUrls.set(c.studentId, url);
+    })
+  );
 
   const byStudent = new Map<string, PantauanItem[]>();
   for (const it of feed) {
@@ -105,9 +116,18 @@ export default async function SantriPantauanPage({
             <CardBox key={c.studentId} className="relative overflow-hidden">
               <span aria-hidden className="bg-role absolute inset-x-0 top-0 h-1" />
               <div className="flex items-center gap-3">
-                <span className="bg-role-soft text-role-strong flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold">
-                  {c.studentName.trim().charAt(0).toUpperCase()}
-                </span>
+                {avatarUrls.get(c.studentId) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrls.get(c.studentId)!}
+                    alt={c.studentName}
+                    className="size-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200 dark:ring-white/10"
+                  />
+                ) : (
+                  <span className="bg-role-soft text-role-strong flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold">
+                    {c.studentName.trim().charAt(0).toUpperCase()}
+                  </span>
+                )}
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-foreground">{c.studentName}</p>
                   <p className="text-muted-foreground truncate text-xs">{c.halaqahName ?? "Belum tergabung halaqah"}</p>

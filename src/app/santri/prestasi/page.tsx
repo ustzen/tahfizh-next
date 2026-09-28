@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { cleanNis } from "@/lib/nis";
+import { signAvatarPath } from "@/lib/avatar";
 import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getPrestasiCards, getHalaqahRank, getMeterTotals, getSantriTargetProgress } from "@/lib/santri-pantauan";
@@ -395,6 +396,16 @@ export default async function SantriPrestasiPage() {
     getHalaqahRank(),
   ]);
 
+  // V49 — foto santri: path storage dari profil akun di-sign per render.
+  const avatarUrls = new Map<string, string>();
+  await Promise.all(
+    data.map(async (c) => {
+      if (!c.avatarPath) return;
+      const url = await signAvatarPath(c.avatarPath);
+      if (url) avatarUrls.set(c.studentId, url);
+    })
+  );
+
   const cards: PrestasiCard[] =
     data.length > 0
       ? data
@@ -432,6 +443,7 @@ export default async function SantriPrestasiPage() {
           const meters = buildMeters(c, targets, meterTotals.get(c.studentId));
           const rankInfo = ranks.get(c.studentId);
           const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
+          const avatarUrl = avatarUrls.get(c.studentId) ?? null;
           // V41 — subtitle: HALAQAH - NIS/NISN lembaga (bukan nomor ID web).
           const nisTampil = cleanNis(c.nis, c.businessCode);
           const idLembaga = [nisTampil, (c.nisn ?? "").trim() || null]
@@ -447,9 +459,18 @@ export default async function SantriPrestasiPage() {
               <span aria-hidden className="bg-role absolute inset-x-0 top-0 h-1" />
 
               <div className="flex items-start gap-3 px-4 pt-4 lg:gap-4 lg:px-6 lg:pt-6">
-                <span className="bg-role-soft text-role-strong flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold lg:size-14 lg:text-lg">
-                  {initial}
-                </span>
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt={c.studentName}
+                    className="size-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200 lg:size-14 dark:ring-white/10"
+                  />
+                ) : (
+                  <span className="bg-role-soft text-role-strong flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold lg:size-14 lg:text-lg">
+                    {initial}
+                  </span>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[0.95rem] font-bold tracking-tight text-foreground lg:text-xl">
                     {c.studentName}
