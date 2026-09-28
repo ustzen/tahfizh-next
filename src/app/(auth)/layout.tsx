@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BadgeCheck, Building2, ShieldCheck, Sparkles } from "lucide-react";
+import { BookOpenCheck, CalendarCheck2, HeartHandshake, Sparkles } from "lucide-react";
 
 import { Logo } from "@/components/logo";
 
@@ -17,13 +17,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </Link>
         <div className="relative max-w-md">
           <h1 className="text-3xl font-bold tracking-tight">
-            Kelola Tahfizh Lebih Mudah, Pantau Perkembangan Santri Lebih Terarah.
+            Satu aplikasi untuk setoran hafalan, jadwal halaqah, dan laporan santri.
           </h1>
           <ul className="mt-8 space-y-4 text-sm text-blue-100">
             {[
-              { icon: Building2, text: "Multi-tenant — data lembaga Anda terpisah total dari lembaga lain" },
-              { icon: ShieldCheck, text: "Row Level Security menjaga data santri di tingkat database" },
-              { icon: BadgeCheck, text: "Gratis untuk lembaga, didukung infak pengembangan" },
+              { icon: BookOpenCheck, text: "Pencatatan setoran & murojaah rapi — tanpa buku catatan" },
+              { icon: CalendarCheck2, text: "Jadwal halaqah, presensi, dan rekap laporan otomatis" },
+              { icon: HeartHandshake, text: "Wali santri ikut memantau perkembangan anaknya langsung" },
             ].map((i) => (
               <li key={i.text} className="flex items-start gap-3">
                 <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/10">
@@ -35,7 +35,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </ul>
         </div>
         <p className="relative flex items-center gap-2 text-xs text-blue-200">
-          <Sparkles className="size-3.5" /> TAHFIZH V1 — fondasi platform pengelolaan tahfizh
+          <Sparkles className="size-3.5" /> TAHFIZH — platform pengelolaan tahfizh untuk lembaga Al-Qur&apos;an
         </p>
       </div>
 

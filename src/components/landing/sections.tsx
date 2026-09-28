@@ -64,8 +64,8 @@ export function Hero() {
           </Badge>
 
           <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
-            Kelola Tahfizh Lebih Mudah,{" "}
-            <span className="text-gradient-brand">Pantau Perkembangan Santri Lebih Terarah.</span>
+            Satu aplikasi untuk{" "}
+            <span className="text-gradient-brand">setoran hafalan, jadwal halaqah, dan laporan santri.</span>
           </h1>
 
           <p className="text-muted-foreground mt-5 max-w-xl text-base leading-relaxed sm:text-lg">
