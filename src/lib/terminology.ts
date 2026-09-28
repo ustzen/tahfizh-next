@@ -100,6 +100,7 @@ const NAV_GROUP_OF: Record<NavKey, NavGroupKey> = {
   jurnal: "pembelajaran",
   target: "pembelajaran",
   presensi: "presensi",
+  "riwayat-presensi": "presensi",
   perkembangan: "laporan",
   raport: "laporan",
   anak: "master",
@@ -177,6 +178,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     // V47 — Jadwal sesi mengajar guru.
     { key: "jadwal", label: "Jadwal", href: "/ustadz/jadwal" },
     { key: "presensi", label: "Presensi", href: "/ustadz/presensi" },
+    // V48 — Riwayat Presensi: menu tersendiri di bawah Presensi.
+    { key: "riwayat-presensi", label: "Riwayat Presensi", href: "/ustadz/presensi-riwayat" },
     { key: "perkembangan", label: "Riwayat Perkembangan", href: "/ustadz/perkembangan" },
     { key: "raport", label: "Raport", href: "/ustadz/raport" },
     { key: "obrolan", label: "Obrolan", href: "/ustadz/obrolan" },

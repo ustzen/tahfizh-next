@@ -55,6 +55,7 @@ export const ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   halaqah: Users2,
   jadwal: CalendarDays,
   presensi: CalendarCheck,
+  "riwayat-presensi": History,
   anak: GraduationCap,
   infak: HandCoins,
   akademik: CalendarRange,

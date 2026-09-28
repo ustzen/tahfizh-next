@@ -198,6 +198,52 @@ export const getAttendanceHistoryPage = cache(
   }
 );
 
+export type AttendanceLeaderRow = {
+  studentId: string;
+  studentName: string;
+  studentCode: string;
+  hadir: number;
+  izin: number;
+  sakit: number;
+  alpa: number;
+  total: number;
+  persen: number;
+};
+
+/**
+ * V48 — Rangkuman presensi: 10 santri paling rajin (rasio hadir tertinggi)
+ * dan 10 paling sering tidak hadir (alpa terbanyak). Otorisasi di RPC.
+ */
+export const getAttendanceLeaderboard = cache(
+  async (
+    halaqahId: string
+  ): Promise<{ rajin: AttendanceLeaderRow[]; alpa: AttendanceLeaderRow[] }> => {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("attendance_leaderboard", {
+      p_halaqah_id: halaqahId,
+      p_limit: 10,
+    });
+    if (error) {
+      console.error("attendance_leaderboard failed:", error.message);
+      return { rajin: [], alpa: [] };
+    }
+    const d = (data ?? {}) as { rajin?: Record<string, unknown>[]; alpa?: Record<string, unknown>[] };
+    const map = (rows: Record<string, unknown>[]): AttendanceLeaderRow[] =>
+      rows.map((r) => ({
+        studentId: String(r.studentId ?? ""),
+        studentName: String(r.studentName ?? ""),
+        studentCode: String(r.studentCode ?? ""),
+        hadir: Number(r.hadir ?? 0),
+        izin: Number(r.izin ?? 0),
+        sakit: Number(r.sakit ?? 0),
+        alpa: Number(r.alpa ?? 0),
+        total: Number(r.total ?? 0),
+        persen: Number(r.persen ?? 0),
+      }));
+    return { rajin: map(d.rajin ?? []), alpa: map(d.alpa ?? []) };
+  }
+);
+
 export async function getStudentAttendanceSummary(
   studentId: string,
   from: string,

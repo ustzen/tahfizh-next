@@ -75,6 +75,7 @@ export type NavKey =
   | "halaqah"
   | "jadwal"
   | "presensi"
+  | "riwayat-presensi"
   | "anak"
   | "prestasi"
   | "pantauan"

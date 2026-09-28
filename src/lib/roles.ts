@@ -110,6 +110,7 @@ export const ROLE_NAV: Record<AppRole, NavItem[]> = {
     { label: "Halaqah", href: "/ustadz/halaqah" },
     { label: "Jadwal", href: "/ustadz/jadwal" },
     { label: "Presensi", href: "/ustadz/presensi" },
+    { label: "Riwayat Presensi", href: "/ustadz/presensi-riwayat" },
     { label: "Riwayat Perkembangan", href: "/ustadz/perkembangan" },
     { label: "Raport", href: "/ustadz/raport" },
     { label: "WhatsApp", href: "/ustadz/whatsapp" },
