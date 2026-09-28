@@ -683,6 +683,64 @@ export function WaliPaymentPanel({
                   Kosongkan
                 </Button>
               </div>
+              {/* Identitas pembayar — muncul begitu ada tagihan dipilih,
+                  sebelum lanjut ke pembayaran (juga berlaku untuk infak santri lain). */}
+              <div className="border-role/15 mt-3 rounded-2xl border bg-white/70 p-3 dark:bg-transparent">
+                <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-semibold">
+                  <UserRound className="size-3.5 text-role" />
+                  Dibayarkan atas nama
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={payerChipCls(payerMode === "self")}
+                    onClick={() => togglePayerMode("self")}
+                    aria-pressed={payerMode === "self"}
+                  >
+                    <CircleUserRound className="size-3.5" />
+                    {payerName || "Nama saya"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={payerChipCls(payerMode === "anon")}
+                    onClick={() => togglePayerMode("anon")}
+                    aria-pressed={payerMode === "anon"}
+                  >
+                    <HandHeart className="size-3.5" />
+                    {ANONYMOUS_PAYER_NAME}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={payerChipCls(payerMode === "custom")}
+                    onClick={() => togglePayerMode("custom")}
+                    aria-pressed={payerMode === "custom"}
+                  >
+                    <PencilLine className="size-3.5" />
+                    Ketik sendiri
+                  </Button>
+                  {payerMode === "custom" && (
+                    <Input
+                      value={payerCustom}
+                      onChange={(e) => setPayerCustom(e.target.value)}
+                      maxLength={60}
+                      autoFocus
+                      placeholder="Tulis nama yang ditampilkan…"
+                      className="h-8 w-48 rounded-full bg-white text-xs dark:bg-transparent"
+                      aria-label="Nama pembayar kustom"
+                    />
+                  )}
+                </div>
+                <p className="text-muted-foreground mt-2 text-[0.7rem] leading-relaxed">
+                  Nama ini yang tercatat sebagai pembayar infak — pilih Hamba Allah bila ingin anonim.
+                </p>
+              </div>
+
               {!checkoutOpen ? (
                 <Button
                   type="button"
@@ -694,60 +752,6 @@ export function WaliPaymentPanel({
                 </Button>
               ) : (
                 <div className="mt-3 space-y-3">
-                  {/* Identitas pembayar — pilihan nama yang ditampilkan */}
-                  <div className="bg-white/70 border-role/15 rounded-2xl border p-3 dark:bg-transparent">
-                    <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-semibold">
-                      <UserRound className="size-3.5 text-role" />
-                      Dibayarkan atas nama
-                    </p>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={payerChipCls(payerMode === "self")}
-                        onClick={() => togglePayerMode("self")}
-                        aria-pressed={payerMode === "self"}
-                      >
-                        <CircleUserRound className="size-3.5" />
-                        {payerName || "Nama saya"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={payerChipCls(payerMode === "anon")}
-                        onClick={() => togglePayerMode("anon")}
-                        aria-pressed={payerMode === "anon"}
-                      >
-                        <HandHeart className="size-3.5" />
-                        {ANONYMOUS_PAYER_NAME}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={payerChipCls(payerMode === "custom")}
-                        onClick={() => togglePayerMode("custom")}
-                        aria-pressed={payerMode === "custom"}
-                      >
-                        <PencilLine className="size-3.5" />
-                        Ketik sendiri
-                      </Button>
-                      {payerMode === "custom" && (
-                        <Input
-                          value={payerCustom}
-                          onChange={(e) => setPayerCustom(e.target.value)}
-                          maxLength={60}
-                          autoFocus
-                          placeholder="Tulis nama yang ditampilkan…"
-                          className="h-8 w-48 rounded-full bg-white text-xs dark:bg-transparent"
-                          aria-label="Nama pembayar kustom"
-                        />
-                      )}
-                    </div>
-                  </div>
-
                   {/* Metode pembayaran — muncul setelah lanjut */}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl border p-4">
