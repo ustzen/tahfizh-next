@@ -74,6 +74,7 @@ export default async function SantriInfakPage() {
           waiverKids={waiverKids}
           waiverRequests={waiverRequests}
           history={history}
+          payerName={profile.fullName}
         />
       </div>
     );
@@ -113,6 +114,7 @@ export default async function SantriInfakPage() {
         waiverKids={waiverKids}
         waiverRequests={waiverRequests}
         history={history}
+        payerName={profile.fullName}
       />
     </div>
   );

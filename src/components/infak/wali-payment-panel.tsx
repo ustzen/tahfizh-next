@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, FileUp, HandCoins, HandHeart, History, QrCode, ReceiptText, Search, X } from "lucide-react";
+import { Banknote, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, FileUp, HandCoins, HandHeart, History, PencilLine, QrCode, ReceiptText, Search, UserRound, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -65,6 +65,16 @@ function arrearsTone(count: number) {
     : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300";
 }
 
+/** Gaya chip identitas pembayar: aktif = solid warna role, nonaktif = outline lembut. */
+function payerChipCls(active: boolean) {
+  return cn(
+    "h-8 max-w-56 rounded-full px-3.5 text-xs",
+    active
+      ? "border-transparent bg-role text-role-ink shadow-sm hover:bg-role/90 hover:text-role-ink"
+      : "border-role/30 bg-white text-role-strong hover:bg-role-soft hover:text-role-strong dark:bg-transparent"
+  );
+}
+
 /** Aksen avatar anak — berputar per anak agar kartu terlihat hidup tapi tetap serasi. */
 const CHILD_TONES = [
   "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
@@ -86,6 +96,7 @@ export function WaliPaymentPanel({
   waiverKids,
   waiverRequests,
   history,
+  payerName,
 }: {
   kids: WaliChild[];
   others: WaliOtherStudent[];
@@ -100,6 +111,8 @@ export function WaliPaymentPanel({
   waiverRequests: WaiverRequestRow[];
   /** Riwayat per bulan (tab kedua kartu Riwayat gabungan). */
   history: WaliHistoryChild[];
+  /** Nama asli wali (dari profil) — pilihan default "atas nama". */
+  payerName: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -116,7 +129,11 @@ export function WaliPaymentPanel({
   const [othersOpen, setOthersOpen] = useState<Record<string, boolean>>({});
   // "Dibayarkan atas nama" — dipakai bila ingin infak untuk santri lain tanpa
   // menampilkan nama asli (mis. "Hamba Allah").
-  const [payerAlias, setPayerAlias] = useState("");
+  // Mode identitas: "self" = nama asli wali (dikirim apa adanya), "anon" = Hamba Allah,
+  // "custom" = bebas diketik. Default "self" sehingga nama tercatat otomatis.
+  const [payerMode, setPayerMode] = useState<"self" | "anon" | "custom">("self");
+  const [payerCustom, setPayerCustom] = useState("");
+  const payerAlias = payerMode === "self" ? payerName : payerMode === "anon" ? ANONYMOUS_PAYER_NAME : payerCustom.trim();
   // V48.3 — kartu metode bayar hanya muncul setelah pengguna klik lanjut.
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   // Tab kartu Riwayat gabungan.
@@ -174,6 +191,12 @@ export function WaliPaymentPanel({
     setCustomText("");
     setError(null);
     setCheckoutOpen(false);
+  }
+
+  /** Klik chip identitas: pilih mode, atau batal (kembali ke "nama saya") bila sudah aktif. */
+  function togglePayerMode(mode: "self" | "anon" | "custom") {
+    setPayerMode(mode);
+    if (mode === "custom" && payerMode === "custom") setPayerCustom("");
   }
 
   /** Pilih N santri lain dengan tunggakan paling lama (seluruh bulannya). */
@@ -671,27 +694,58 @@ export function WaliPaymentPanel({
                 </Button>
               ) : (
                 <div className="mt-3 space-y-3">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-muted-foreground text-xs">Atas nama:</span>
-                    <Input
-                      value={payerAlias}
-                      onChange={(e) => setPayerAlias(e.target.value)}
-                      maxLength={60}
-                      placeholder="Nama Anda (opsional)"
-                      className="h-8 w-44 rounded-full bg-white text-xs dark:bg-transparent"
-                      aria-label="Dibayarkan atas nama"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={payerAlias === ANONYMOUS_PAYER_NAME ? "default" : "outline"}
-                      className="h-8 rounded-full px-3 text-xs"
-                      onClick={() =>
-                        setPayerAlias((v) => (v === ANONYMOUS_PAYER_NAME ? "" : ANONYMOUS_PAYER_NAME))
-                      }
-                    >
-                      {ANONYMOUS_PAYER_NAME}
-                    </Button>
+                  {/* Identitas pembayar — pilihan nama yang ditampilkan */}
+                  <div className="bg-white/70 border-role/15 rounded-2xl border p-3 dark:bg-transparent">
+                    <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-semibold">
+                      <UserRound className="size-3.5 text-role" />
+                      Dibayarkan atas nama
+                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={payerChipCls(payerMode === "self")}
+                        onClick={() => togglePayerMode("self")}
+                        aria-pressed={payerMode === "self"}
+                      >
+                        <CircleUserRound className="size-3.5" />
+                        {payerName || "Nama saya"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={payerChipCls(payerMode === "anon")}
+                        onClick={() => togglePayerMode("anon")}
+                        aria-pressed={payerMode === "anon"}
+                      >
+                        <HandHeart className="size-3.5" />
+                        {ANONYMOUS_PAYER_NAME}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={payerChipCls(payerMode === "custom")}
+                        onClick={() => togglePayerMode("custom")}
+                        aria-pressed={payerMode === "custom"}
+                      >
+                        <PencilLine className="size-3.5" />
+                        Ketik sendiri
+                      </Button>
+                      {payerMode === "custom" && (
+                        <Input
+                          value={payerCustom}
+                          onChange={(e) => setPayerCustom(e.target.value)}
+                          maxLength={60}
+                          autoFocus
+                          placeholder="Tulis nama yang ditampilkan…"
+                          className="h-8 w-48 rounded-full bg-white text-xs dark:bg-transparent"
+                          aria-label="Nama pembayar kustom"
+                        />
+                      )}
+                    </div>
                   </div>
 
                   {/* Metode pembayaran — muncul setelah lanjut */}
