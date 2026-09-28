@@ -6,6 +6,10 @@
 -- sering tidak hadir (alpa terbanyak, tie-break izin+sakit, lalu nama).
 -- Satu RPC SECURITY DEFINER, guard identik attendance_day (V8).
 --
+-- Fix revisi: agregat per santri dihitung SEKALI di CTE `agg` agar ORDER BY
+-- boleh memakai ekspresi (izin + sakit) — versi sebelumnya memakai alias
+-- output di dalam ekspresi ORDER BY sehingga RPC gagal dipanggil.
+--
 -- Output: { rajin: [{studentId, studentName, studentCode, hadir, izin, sakit,
 --          alpa, total, persen}], alpa: [...] }
 -- Idempotent: create or replace + grant.
@@ -46,13 +50,7 @@ begin
 
   return jsonb_build_object(
     'rajin', coalesce((
-      select jsonb_agg(jsonb_build_object(
-        'studentId', t.student_id, 'studentName', t.student_name,
-        'studentCode', t.student_code, 'hadir', t.hadir,
-        'izin', t.izin, 'sakit', t.sakit, 'alpa', t.alpa,
-        'total', t.total, 'persen', t.persen
-      ))
-      from (
+      with agg as (
         select
           s.id as student_id,
           s.full_name as student_name,
@@ -61,10 +59,7 @@ begin
           count(r.id) filter (where r.status = 'IZIN')  as izin,
           count(r.id) filter (where r.status = 'SAKIT') as sakit,
           count(r.id) filter (where r.status = 'ALPA')  as alpa,
-          count(r.id) as total,
-          coalesce(round(
-            count(r.id) filter (where r.status = 'HADIR')::numeric
-            / nullif(count(r.id), 0) * 100, 0), 0) as persen
+          count(r.id) as total
         from public.halaqah_students hs
         join public.students s on s.id = hs.student_id
         left join public.attendance_records r
@@ -73,20 +68,24 @@ begin
         where hs.halaqah_id = p_halaqah_id
           and hs.left_at is null
           and s.tenant_id = v_tenant
-        group by s.id, s.full_name, s.business_code
-        having count(r.id) > 0
-        order by persen desc, hadir desc, s.full_name asc
-        limit least(coalesce(p_limit, 10), 50)
-      ) t
+        group by s.id
+      )
+      select jsonb_agg(
+        jsonb_build_object(
+          'studentId', a.student_id, 'studentName', a.student_name,
+          'studentCode', a.student_code, 'hadir', a.hadir,
+          'izin', a.izin, 'sakit', a.sakit, 'alpa', a.alpa,
+          'total', a.total,
+          'persen', coalesce(round(a.hadir::numeric / nullif(a.total, 0) * 100, 0), 0)
+        ) order by
+          (a.hadir::numeric / nullif(a.total, 0)) desc nulls last,
+          a.hadir desc, a.student_name asc
+      )
+      from agg a
+      where a.total > 0
     ), '[]'::jsonb),
     'alpa', coalesce((
-      select jsonb_agg(jsonb_build_object(
-        'studentId', t.student_id, 'studentName', t.student_name,
-        'studentCode', t.student_code, 'hadir', t.hadir,
-        'izin', t.izin, 'sakit', t.sakit, 'alpa', t.alpa,
-        'total', t.total, 'persen', t.persen
-      ))
-      from (
+      with agg as (
         select
           s.id as student_id,
           s.full_name as student_name,
@@ -95,10 +94,7 @@ begin
           count(r.id) filter (where r.status = 'IZIN')  as izin,
           count(r.id) filter (where r.status = 'SAKIT') as sakit,
           count(r.id) filter (where r.status = 'ALPA')  as alpa,
-          count(r.id) as total,
-          coalesce(round(
-            count(r.id) filter (where r.status = 'HADIR')::numeric
-            / nullif(count(r.id), 0) * 100, 0), 0) as persen
+          count(r.id) as total
         from public.halaqah_students hs
         join public.students s on s.id = hs.student_id
         left join public.attendance_records r
@@ -107,11 +103,20 @@ begin
         where hs.halaqah_id = p_halaqah_id
           and hs.left_at is null
           and s.tenant_id = v_tenant
-        group by s.id, s.full_name, s.business_code
-        having count(r.id) > 0
-        order by alpa desc, (izin + sakit) desc, s.full_name asc
-        limit least(coalesce(p_limit, 10), 50)
-      ) t
+        group by s.id
+      )
+      select jsonb_agg(
+        jsonb_build_object(
+          'studentId', a.student_id, 'studentName', a.student_name,
+          'studentCode', a.student_code, 'hadir', a.hadir,
+          'izin', a.izin, 'sakit', a.sakit, 'alpa', a.alpa,
+          'total', a.total,
+          'persen', coalesce(round(a.hadir::numeric / nullif(a.total, 0) * 100, 0), 0)
+        ) order by
+          a.alpa desc, (a.izin + a.sakit) desc, a.student_name asc
+      )
+      from agg a
+      where a.total > 0
     ), '[]'::jsonb)
   );
 end;

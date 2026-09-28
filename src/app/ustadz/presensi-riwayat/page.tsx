@@ -37,7 +37,7 @@ export default async function UstadzPresensiRiwayatPage({
         getAttendanceHistoryPage(selectedId, page),
         getAttendanceLeaderboard(selectedId),
       ])
-    : [{ rows: [], total: 0 }, { rajin: [], alpa: [] }];
+    : [{ rows: [], total: 0 }, { rajin: [], alpa: [], unavailable: false }];
 
   return (
     <div className="space-y-6">
@@ -59,7 +59,11 @@ export default async function UstadzPresensiRiwayatPage({
             options={halaqahList.map((h) => ({ id: h.id, name: h.name }))}
           />
 
-          <AttendanceLeaderboard rajin={leaderboard.rajin} alpa={leaderboard.alpa} />
+          <AttendanceLeaderboard
+            rajin={leaderboard.rajin}
+            alpa={leaderboard.alpa}
+            unavailable={leaderboard.unavailable}
+          />
 
           <AttendanceHistoryTable
             halaqahId={selectedId}

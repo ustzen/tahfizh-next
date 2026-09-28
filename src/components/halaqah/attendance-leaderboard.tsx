@@ -100,10 +100,27 @@ function LeaderPanel({
 export function AttendanceLeaderboard({
   rajin,
   alpa,
+  unavailable,
 }: {
   rajin: AttendanceLeaderRow[];
   alpa: AttendanceLeaderRow[];
+  /** True bila RPC belum tersedia (migration V48 belum dijalankan). */
+  unavailable?: boolean;
 }) {
+  if (unavailable) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-6 text-center dark:border-amber-500/30 dark:bg-amber-500/10">
+        <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+          Rangkuman belum tersedia
+        </p>
+        <p className="text-muted-foreground mt-1 text-xs">
+          Fungsi database <code className="font-mono">attendance_leaderboard</code> belum ada.
+          Jalankan migration <span className="font-mono">V48</span> di Supabase, lalu muat ulang halaman.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <SectionTitle

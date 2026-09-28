@@ -217,15 +217,16 @@ export type AttendanceLeaderRow = {
 export const getAttendanceLeaderboard = cache(
   async (
     halaqahId: string
-  ): Promise<{ rajin: AttendanceLeaderRow[]; alpa: AttendanceLeaderRow[] }> => {
+  ): Promise<{ rajin: AttendanceLeaderRow[]; alpa: AttendanceLeaderRow[]; unavailable?: boolean }> => {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("attendance_leaderboard", {
       p_halaqah_id: halaqahId,
       p_limit: 10,
     });
     if (error) {
+      // RPC 404 = migration V48 belum dijalankan; jangan diam-diam kosong.
       console.error("attendance_leaderboard failed:", error.message);
-      return { rajin: [], alpa: [] };
+      return { rajin: [], alpa: [], unavailable: true };
     }
     const d = (data ?? {}) as { rajin?: Record<string, unknown>[]; alpa?: Record<string, unknown>[] };
     const map = (rows: Record<string, unknown>[]): AttendanceLeaderRow[] =>
