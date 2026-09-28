@@ -153,6 +153,51 @@ export const getAttendanceRekap = cache(
   }
 );
 
+export type AttendanceHistoryRow = {
+  date: string;
+  hadir: number;
+  izin: number;
+  sakit: number;
+  alpa: number;
+  total: number;
+};
+
+export const PAGE_SIZE_PRESENSI = 10;
+
+/**
+ * V47 — Riwayat presensi per tanggal untuk satu halaqah (terpaginasi,
+ * terbaru dulu). Otorisasi di RPC: USTADZ hanya halaqah yang diampu.
+ */
+export const getAttendanceHistoryPage = cache(
+  async (
+    halaqahId: string,
+    page: number
+  ): Promise<{ rows: AttendanceHistoryRow[]; total: number }> => {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("attendance_history_page", {
+      p_halaqah_id: halaqahId,
+      p_limit: PAGE_SIZE_PRESENSI,
+      p_offset: Math.max(page, 0) * PAGE_SIZE_PRESENSI,
+    });
+    if (error) {
+      console.error("attendance_history_page failed:", error.message);
+      return { rows: [], total: 0 };
+    }
+    const d = (data ?? {}) as { total?: number; rows?: Record<string, unknown>[] };
+    return {
+      total: Number(d.total ?? 0),
+      rows: (d.rows ?? []).map((r) => ({
+        date: String(r.date ?? ""),
+        hadir: Number(r.hadir ?? 0),
+        izin: Number(r.izin ?? 0),
+        sakit: Number(r.sakit ?? 0),
+        alpa: Number(r.alpa ?? 0),
+        total: Number(r.total ?? 0),
+      })),
+    };
+  }
+);
+
 export async function getStudentAttendanceSummary(
   studentId: string,
   from: string,
