@@ -106,6 +106,7 @@ export const KOORDINATOR_QUICK_MENU_DEFAULT_KEYS: string[] = [
 
 /** Menu Cepat bawaan untuk role WALI_SANTRI (dasbor santri/wali). */
 export const SANTRI_QUICK_MENU: QuickMenuItem[] = [
+  { key: "jurnal-ibadah", href: "/santri/jurnal-ibadah", label: "Jurnal Ibadah", icon: "NotebookPen", chip: "bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300" },
   { key: "pantauan", href: "/santri/pantauan", label: "Pantauan", icon: "Activity", chip: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
   { key: "target", href: "/santri/target", label: "Target", icon: "Target", chip: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
   { key: "presensi", href: "/santri/presensi", label: "Presensi", icon: "CalendarCheck", chip: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300" },
@@ -119,6 +120,7 @@ export const SANTRI_QUICK_MENU: QuickMenuItem[] = [
 
 /** Menu Cepat yang tampil secara bawaan untuk role WALI_SANTRI (8 item). */
 export const SANTRI_QUICK_MENU_DEFAULT_KEYS: string[] = [
+  "jurnal-ibadah",
   "pantauan",
   "target",
   "presensi",

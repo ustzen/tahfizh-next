@@ -102,6 +102,7 @@ const NAV_GROUP_OF: Record<NavKey, NavGroupKey> = {
   presensi: "presensi",
   "riwayat-presensi": "presensi",
   perkembangan: "laporan",
+  "jurnal-ibadah": "utama",
   raport: "laporan",
   anak: "master",
   prestasi: "laporan",
@@ -140,6 +141,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     // V47 — Jadwal masuk Master Data (dipindah dari Akademik agar mudah ditemukan).
     { key: "jadwal", label: "Jadwal", href: "/admin/jadwal" },
     { key: "raport", label: "Raport", href: "/admin/raport" },
+    // V51 — katalog kegiatan jurnal ibadah harian santri.
+    { key: "jurnal-ibadah", label: "Jurnal Ibadah", href: "/admin/jurnal-ibadah" },
     { key: "akademik", label: "Akademik", href: "/admin/akademik" },
     { key: "onboarding", label: "Onboarding", href: "/admin/onboarding" },
     // V20 — obrolan 1 lembaga, pesan otomatis terhapus 24 jam.
@@ -158,6 +161,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "doa", label: "Doa Harian", href: "/koordinator/doa" },
     { key: "perkembangan", label: "Riwayat Perkembangan", href: "/koordinator/perkembangan" },
     { key: "raport", label: "Raport", href: "/koordinator/raport" },
+    // V51 — katalog kegiatan jurnal ibadah harian santri.
+    { key: "jurnal-ibadah", label: "Jurnal Ibadah", href: "/koordinator/jurnal-ibadah" },
     { key: "obrolan", label: "Obrolan", href: "/koordinator/obrolan" },
     { key: "saran", label: "Kritik & Saran", href: "/koordinator/saran" },
     { key: "pengaturan", label: "Pengaturan", href: "/koordinator/pengaturan" },
@@ -173,6 +178,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "tajwid", label: "Tajwid", href: "/ustadz/tajwid" },
     { key: "tugas", label: "Tugas", href: "/ustadz/tugas" },
     { key: "jurnal", label: "Custom Jurnal", href: "/ustadz/jurnal" },
+    // V51 — katalog kegiatan jurnal ibadah harian santri.
+    { key: "jurnal-ibadah", label: "Jurnal Ibadah", href: "/ustadz/jurnal-ibadah" },
     { key: "target", label: "Target", href: "/ustadz/target" },
     { key: "halaqah", label: "Halaqah", href: "/ustadz/halaqah" },
     // V47 — Jadwal sesi mengajar guru.
@@ -190,6 +197,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "dashboard", label: "Dashboard", href: "/santri" },
     // V18 — pantauan mandiri santri, sinkron dengan penilaian guru.
     { key: "pantauan", label: "Pantauan Pembelajaran", href: "/santri/pantauan" },
+    // V51 — jurnal ibadah harian (checklist sholat, muraja'ah, tilawah, …).
+    { key: "jurnal-ibadah", label: "Jurnal Ibadah", href: "/santri/jurnal-ibadah" },
     { key: "target", label: "Target", href: "/santri/target" },
     { key: "presensi", label: "Presensi", href: "/santri/presensi" },
     { key: "prestasi", label: "Kartu Prestasi", href: "/santri/prestasi" },

@@ -50,6 +50,7 @@ export const ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   tajwid: SpellCheck,
   tugas: ListChecks,
   jurnal: NotebookPen,
+  "jurnal-ibadah": NotebookPen,
   target: TargetIcon,
   raport: FileText,
   halaqah: Users2,

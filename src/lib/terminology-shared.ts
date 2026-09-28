@@ -70,6 +70,7 @@ export type NavKey =
   | "tajwid"
   | "tugas"
   | "jurnal"
+  | "jurnal-ibadah"
   | "target"
   | "raport"
   | "halaqah"
