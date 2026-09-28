@@ -7,6 +7,7 @@ import { CalendarDays, Check, NotebookPen, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -188,13 +189,12 @@ export function AttendanceSheet({
           </div>
           <div className="space-y-1.5">
             <Label>Tanggal</Label>
-            <Input
-              type="date"
+            <DateInput
               value={date}
               max={todayISO()}
-              onChange={(e) => handleDateChange(e.target.value)}
+              onChange={handleDateChange}
               disabled={isPending}
-              aria-label="Tanggal presensi"
+              ariaLabel="Tanggal presensi"
             />
           </div>
         </CardContent>

@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Select,
   SelectContent,
@@ -108,19 +109,17 @@ export function PeriodFilter({
       </div>
 
       <div className="flex flex-1 items-center gap-1.5">
-        <Input
-          type="date"
+        <DateInput
           value={dari}
-          onChange={(e) => setDari(e.target.value)}
-          aria-label="Dari tanggal"
+          onChange={setDari}
+          ariaLabel="Dari tanggal"
           className="h-9 text-xs"
         />
         <span className="text-xs text-muted-foreground/80">s/d</span>
-        <Input
-          type="date"
+        <DateInput
           value={sampai}
-          onChange={(e) => setSampai(e.target.value)}
-          aria-label="Sampai tanggal"
+          onChange={setSampai}
+          ariaLabel="Sampai tanggal"
           className="h-9 text-xs"
         />
         <Button
