@@ -33,6 +33,22 @@ export const getDisplayProfile = cache(async (): Promise<DisplayProfile | null> 
 
   const tenant = Array.isArray(profile.tenants) ? profile.tenants[0] : profile.tenants;
 
+  // avatar_url menyimpan PATH storage (mis. "user-id/avatar.jpg"), bukan URL.
+  // Konversi ke signed URL bucket privat di sini — satu titik untuk semua role.
+  let avatarUrl: string | null = null;
+  const stored = profile.avatar_url ?? null;
+  if (stored) {
+    if (stored.startsWith("http")) {
+      // Data lama yang sudah berupa URL penuh — lewatkan apa adanya.
+      avatarUrl = stored;
+    } else {
+      const { data: signed } = await supabase.storage
+        .from("profile-photos")
+        .createSignedUrl(stored, 60 * 60);
+      avatarUrl = signed?.signedUrl ?? null;
+    }
+  }
+
   return {
     id: profile.id,
     email: user.email ?? "",
@@ -45,6 +61,6 @@ export const getDisplayProfile = cache(async (): Promise<DisplayProfile | null> 
     gender: profile.gender ?? null,
     frontTitle: profile.front_title ?? null,
     backTitle: profile.back_title ?? null,
-    avatarUrl: profile.avatar_url ?? null,
+    avatarUrl,
   } satisfies DisplayProfile;
 });
