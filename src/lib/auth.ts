@@ -28,6 +28,15 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
 
   if (!user) return null;
 
+  // V50 — laporkan aktivitas untuk kolom "terakhir online" di Data Santri.
+  // Fire-and-forget: gagal (mis. migration belum di-run) tidak boleh
+  // mengganggu pemuatan halaman. RPC-nya sendiri sudah membatasi update
+  // minimal sekali per menit per akun.
+  supabase.rpc("touch_last_seen").then(
+    () => {},
+    () => {}
+  );
+
   const { data: profile } = await supabase
     .from("profiles")
     .select(

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WaChatButton } from "@/components/santri/wa-chat-button";
+import { OnlineCell } from "@/components/santri/online-cell";
 import { genderLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import type { TeacherStudentRow } from "@/lib/teacher-students";
@@ -122,6 +123,7 @@ export function SantriClient({
                     <TableHead>Gender</TableHead>
                     <TableHead>{halaqahLabel}</TableHead>
                     <TableHead>Wali</TableHead>
+                    <TableHead>Online</TableHead>
                     <TableHead className="px-5 text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -165,6 +167,9 @@ export function SantriClient({
                             </div>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <OnlineCell iso={s.wali_last_online} />
                       </TableCell>
                       <TableCell className="px-5">
                         <div className="flex items-center justify-end">

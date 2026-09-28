@@ -28,6 +28,8 @@ export type TeacherStudentRow = {
   guardian_whatsapp: string | null;
   halaqah_id: string | null;
   halaqah_name: string | null;
+  /** V50 — kapan terakhir akun wali santri ini online (null = belum pernah login). */
+  wali_last_online: string | null;
 };
 
 type FbStudent = {
@@ -155,6 +157,7 @@ export const getTeacherStudentsDetailed = cache(async (): Promise<TeacherStudent
       guardian_whatsapp: st.guardian_whatsapp,
       halaqah_id: row.halaqah_id,
       halaqah_name: nameById.get(row.halaqah_id) ?? null,
+      wali_last_online: null, // fallback path tidak memuat status online (kolom opsional di UI)
     });
   }
 

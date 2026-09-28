@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { StatusBadge } from "@/components/status-badge";
 import { genderLabel } from "@/lib/roles";
+import { OnlineCell } from "@/components/santri/online-cell";
 import { getTerminology } from "@/lib/terminology";
 import { getActiveYear } from "@/lib/akademik";
 import { TeacherDialog } from "./teacher-form";
@@ -261,6 +262,7 @@ type StudentRow = {
   guardian_name: string | null;
   guardian_whatsapp: string | null;
   login_username: string | null;
+  wali_last_online: string | null;
 };
 
 /** V12.13 — ukuran halaman tabel Data Santri (daftar terbesar di aplikasi). */
@@ -295,11 +297,13 @@ export async function SantriManager({
       status: "ACTIVE" | "INACTIVE"; guardian_name: string | null;
       guardian_whatsapp: string | null; login_username: string | null;
       halaqah_id: string | null; halaqah_name: string | null;
+      wali_last_online: string | null;
     }[]).map((r) => ({
       id: r.id, business_code: r.business_code, nis: r.nis, nisn: r.nisn,
       full_name: r.full_name, nickname: r.nickname, gender: r.gender,
       status: r.status, guardian_name: r.guardian_name,
       guardian_whatsapp: r.guardian_whatsapp, login_username: r.login_username ?? null,
+      wali_last_online: r.wali_last_online ?? null,
     }));
     for (const r of rpc.data as { id: string; halaqah_id: string | null; halaqah_name: string | null }[]) {
       if (r.halaqah_id) {
@@ -389,6 +393,7 @@ export async function SantriManager({
                     <ColoredHead index={6} label={terms.halaqah} className="w-[16%] whitespace-normal" />
                     <ColoredHead index={7} label="Wali" className="w-[18%] whitespace-normal" />
                     <ColoredHead index={9} label="Username" className="w-24" />
+                    <ColoredHead index={10} label="Online" className="w-28 whitespace-normal" />
                     <TableHead className="w-16 px-3 text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -443,6 +448,9 @@ export async function SantriManager({
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-xs whitespace-normal">{s.login_username ?? "—"}</TableCell>
+                      <TableCell className="whitespace-normal">
+                        <OnlineCell iso={s.wali_last_online} />
+                      </TableCell>
                       <TableCell className="px-3">
                         <div className="flex items-center justify-end gap-1">
                           <StudentDialog
