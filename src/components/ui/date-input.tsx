@@ -11,9 +11,10 @@ import { cn } from "@/lib/utils";
  *
  * <input type="date"> native mengikuti locale browser sehingga bisa tampil
  * mm/dd/yyyy. Komponen ini menampilkan TEKS dd/mm/yyyy (mask + auto-slash)
- * dan menyediakan tombol kalender (native date input transparan) untuk memilih
- * tanggal. Nilai yang dikirim ke onChange tetap ISO yyyy-mm-dd sehingga URL
- * ?tanggal= dan RPC attendance_save_batch tidak berubah.
+ * untuk diketik, plus TOMBOL KALENDER yang membuka picker tanggal native
+ * lewat showPicker() (Chrome/Edge 99+, Safari 16+, Firefox 101+).
+ * Nilai yang dikirim ke onChange tetap ISO yyyy-mm-dd sehingga URL ?tanggal=
+ * dan RPC attendance_save_batch tidak berubah.
  */
 
 function isoToDisplay(iso: string): string {
@@ -62,9 +63,9 @@ export function DateInput({
   className?: string;
 }) {
   const [display, setDisplay] = useState(() => (value ? isoToDisplay(value) : ""));
-  const pickerRef = useRef<HTMLInputElement>(null);
+  const nativeRef = useRef<HTMLInputElement>(null);
 
-  // Sinkron bila nilai berubah dari luar (mis. ?tanggal= di URL).
+  // Sinkron bila nilai berubah dari luar (mis. ?tanggal= di URL atau kalender).
   useEffect(() => {
     setDisplay((prev) => {
       const prevIso = displayToIso(prev);
@@ -94,13 +95,21 @@ export function DateInput({
     if (iso !== value) onChange(iso);
   }
 
-  function openPicker() {
-    const el = pickerRef.current as (HTMLInputElement & { showPicker?: () => void }) | null;
-    el?.showPicker?.();
+  /** Buka kalender native. Harus dipanggil dari gesture pengguna (klik). */
+  function openCalendar() {
+    const el = nativeRef.current;
+    if (!el) return;
+    try {
+      el.showPicker();
+    } catch {
+      // Browser lama menolak showPicker — fokuskan saja kontrol native.
+      el.focus();
+    }
   }
 
   return (
     <span className="relative block">
+      {/* Area ketik dd/mm/yyyy */}
       <Input
         type="text"
         inputMode="numeric"
@@ -112,23 +121,33 @@ export function DateInput({
         aria-label={ariaLabel}
         className={cn("pr-10 font-mono", className)}
       />
-      <span className="pointer-events-none absolute inset-y-0 right-0 flex w-10 items-center justify-center">
+
+      {/* Tombol kalender + kontrol native tersembunyi (tetap dirender agar
+          showPicker() valid — bukan display:none). */}
+      <span className="absolute inset-y-0 right-0 flex w-10 items-center justify-center">
+        <button
+          type="button"
+          onClick={openCalendar}
+          disabled={disabled}
+          aria-label={ariaLabel ? `Buka kalender ${ariaLabel}` : "Buka kalender"}
+          className="text-muted-foreground hover:text-role flex h-full w-full cursor-pointer items-center justify-center disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <CalendarDays className="size-4" />
+        </button>
         <input
-          ref={pickerRef}
+          ref={nativeRef}
           type="date"
           value={value}
           max={max}
           min={min}
+          disabled={disabled}
           onChange={(e) => {
             if (e.target.value) onChange(e.target.value);
           }}
-          onClick={openPicker}
-          disabled={disabled}
-          className="pointer-events-auto absolute inset-0 h-full w-full cursor-pointer opacity-0"
           tabIndex={-1}
           aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-1/2 size-px -translate-x-1/2 -translate-y-1/2 opacity-0"
         />
-        <CalendarDays className="text-muted-foreground size-4" />
       </span>
     </span>
   );
