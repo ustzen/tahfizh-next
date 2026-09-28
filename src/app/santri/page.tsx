@@ -7,6 +7,8 @@ import { requireRole } from "@/lib/auth";
 import { SANTRI_QUICK_MENU, SANTRI_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 import { createClient } from "@/lib/supabase/server";
 import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
+import { PerkembanganSummaryCard } from "@/components/santri/perkembangan-summary-card";
+import { getPrestasiCards, getPresensiRekap } from "@/lib/santri-pantauan";
 
 export const metadata = { title: "Dashboard Santri" };
 
@@ -32,13 +34,16 @@ async function getDashboardQuickMenuOrder(userId: string) {
 export default async function SantriDashboardPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri");
 
-  const [savedQuickMenu, ownProfileRes, iconOverrides] = await Promise.all([
+  const [savedQuickMenu, ownProfileRes, iconOverrides, prestasiCards, presensiRekap] = await Promise.all([
     getDashboardQuickMenuOrder(profile.id),
     createClient().then((supabase) =>
       supabase.from("profiles").select("must_change_password").eq("id", profile.id).single()
     ),
     // V39: override ikon menu platform.
     getMenuIconOverrides(),
+    // V51: ringkasan perkembangan (RPC V18) — gagal = array kosong (card disembunyikan).
+    getPrestasiCards(),
+    getPresensiRekap(6),
   ]);
   const mustChangePassword = ownProfileRes.data?.must_change_password === true;
 
@@ -55,6 +60,9 @@ export default async function SantriDashboardPage() {
       />
 
       {mustChangePassword && <ForceChangePasswordCard />}
+
+      {/* V51 — Ringkasan perkembangan ananda: statistik, grafik, lencana. */}
+      {prestasiCards.length > 0 && <PerkembanganSummaryCard cards={prestasiCards} presensi={presensiRekap} />}
 
       {/* Menu Cepat — satu-satunya isi dasbor (V31, dapat diatur per akun) */}
       <CardBox>
