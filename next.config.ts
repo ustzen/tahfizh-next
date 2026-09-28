@@ -11,12 +11,13 @@ const nextConfig: NextConfig = {
     cpus: 2,
     // Router Cache klien: halaman yang sudah pernah dibuka dirender ulang
     // instan dari cache browser (terasa seperti klik antar-tab) selama
-    // staleTime-nya belum lewat. `dynamic` sebelumnya 0 (default) — setiap
-    // klik menu selalu menunggu render server penuh. `revalidatePath` dari
-    // server action tetap meng-invalidate cache ini, jadi data tidak basi
-    // setelah simpan/edit.
+    // staleTime-nya belum lewat. `dynamic` 0 (default) mematikan cache ini —
+    // setiap klik menu selalu menunggu render server penuh (terasa lambat
+    // di mobile). 30 detik membuat navigasi ulang instan; data tetap segar
+    // karena setiap server action memanggil revalidatePath (meng-invalidate
+    // cache ini setelah simpan/edit).
     staleTimes: {
-      dynamic: 0,
+      dynamic: 30,
       static: 180,
     },
   },

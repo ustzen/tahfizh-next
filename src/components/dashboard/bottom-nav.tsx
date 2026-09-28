@@ -64,6 +64,7 @@ export function BottomNav({
             <Link
               key={item.key}
               href={item.href}
+              prefetch
               aria-current={active ? "page" : undefined}
               className={cn(
                 "flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[0.66rem] font-medium transition-colors",

@@ -178,10 +178,12 @@ export function DashboardHeader({
             </div>
 
             <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-8">
+              {/* Prefetch aktif di mobile juga — tanpa ini setiap tap menu
+                  mobile selalu menunggu render server penuh (terasa lambat).
+                  Data tetap segar karena server action me-revalidate path. */}
               <SidebarNav
                 groups={navGroups}
                 onNavigate={() => setOpen(false)}
-                prefetch={false}
                 iconOverrides={iconOverrides}
               />
             </div>
