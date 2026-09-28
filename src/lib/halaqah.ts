@@ -216,12 +216,16 @@ export type AttendanceLeaderRow = {
  */
 export const getAttendanceLeaderboard = cache(
   async (
-    halaqahId: string
+    halaqahId: string,
+    from?: string | null,
+    to?: string | null
   ): Promise<{ rajin: AttendanceLeaderRow[]; alpa: AttendanceLeaderRow[]; unavailable?: boolean }> => {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("attendance_leaderboard", {
       p_halaqah_id: halaqahId,
       p_limit: 10,
+      p_from: from ?? null,
+      p_to: to ?? null,
     });
     if (error) {
       // RPC 404 = migration V48 belum dijalankan; jangan diam-diam kosong.

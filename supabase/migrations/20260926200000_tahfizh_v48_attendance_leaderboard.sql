@@ -7,8 +7,12 @@
 -- Satu RPC SECURITY DEFINER, guard identik attendance_day (V8).
 --
 -- Fix revisi: agregat per santri dihitung SEKALI di CTE `agg` agar ORDER BY
--- boleh memakai ekspresi (izin + sakit) — versi sebelumnya memakai alias
--- output di dalam ekspresi ORDER BY sehingga RPC gagal dipanggil.
+-- boleh memakai ekspresi — versi sebelumnya memakai alias output di dalam
+-- ekspresi ORDER BY sehingga RPC gagal dipanggil.
+--
+-- Revisi 2: p_from/p_to (rentang sesi presensi, filter via session_date) untuk
+-- sortir per bulan/semester/tahun ajaran, dan panel "tidak hadir" kini
+-- menggabungkan ALPA + IZIN + SAKIT sebagai satu ukuran absensi.
 --
 -- Output: { rajin: [{studentId, studentName, studentCode, hadir, izin, sakit,
 --          alpa, total, persen}], alpa: [...] }
@@ -17,7 +21,9 @@
 
 create or replace function public.attendance_leaderboard(
   p_halaqah_id uuid,
-  p_limit integer default 10
+  p_limit integer default 10,
+  p_from date default null,
+  p_to   date default null
 )
 returns jsonb
 language plpgsql
@@ -65,6 +71,12 @@ begin
         left join public.attendance_records r
           on r.student_id = s.id
          and r.halaqah_id = p_halaqah_id
+         and r.session_id in (
+           select s2.id from public.attendance_sessions s2
+           where s2.halaqah_id = p_halaqah_id
+             and (p_from is null or s2.session_date >= p_from)
+             and (p_to   is null or s2.session_date <= p_to)
+         )
         where hs.halaqah_id = p_halaqah_id
           and hs.left_at is null
           and s.tenant_id = v_tenant
@@ -100,6 +112,12 @@ begin
         left join public.attendance_records r
           on r.student_id = s.id
          and r.halaqah_id = p_halaqah_id
+         and r.session_id in (
+           select s2.id from public.attendance_sessions s2
+           where s2.halaqah_id = p_halaqah_id
+             and (p_from is null or s2.session_date >= p_from)
+             and (p_to   is null or s2.session_date <= p_to)
+         )
         where hs.halaqah_id = p_halaqah_id
           and hs.left_at is null
           and s.tenant_id = v_tenant
@@ -113,7 +131,7 @@ begin
           'total', a.total,
           'persen', coalesce(round(a.hadir::numeric / nullif(a.total, 0) * 100, 0), 0)
         ) order by
-          a.alpa desc, (a.izin + a.sakit) desc, a.student_name asc
+          (a.izin + a.sakit + a.alpa) desc, a.alpa desc, a.student_name asc
       )
       from agg a
       where a.total > 0
@@ -122,4 +140,4 @@ begin
 end;
 $$;
 
-grant execute on function public.attendance_leaderboard(uuid, integer) to authenticated;
+grant execute on function public.attendance_leaderboard(uuid, integer, date, date) to authenticated;

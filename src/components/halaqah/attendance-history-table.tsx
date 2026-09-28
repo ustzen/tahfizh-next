@@ -30,6 +30,8 @@ export function AttendanceHistoryTable({
   total,
   page,
   pageSize,
+  periode,
+  bulan,
 }: {
   halaqahId: string;
   basePath: string;
@@ -37,6 +39,9 @@ export function AttendanceHistoryTable({
   total: number;
   page: number;
   pageSize: number;
+  /** Konteks filter agar pagination tidak menghilangkan periode terpilih. */
+  periode?: string;
+  bulan?: number;
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const hasPrev = page > 0;
@@ -47,6 +52,8 @@ export function AttendanceHistoryTable({
   const pageHref = (p: number) => {
     const q = new URLSearchParams();
     if (halaqahId) q.set("halaqah", halaqahId);
+    if (periode) q.set("periode", periode);
+    if (periode === "bulan" && bulan) q.set("bulan", String(bulan));
     q.set("hal", String(p + 1));
     return `${basePath}?${q.toString()}`;
   };

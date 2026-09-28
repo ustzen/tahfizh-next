@@ -147,11 +147,11 @@ export function AttendanceLeaderboard({
         />
         <LeaderPanel
           title="Paling Sering Tidak Hadir"
-          description="Alpa terbanyak (diikuti izin & sakit)"
+          description="Alpa + izin + sakit tergabung"
           icon={<ShieldAlert className="size-5 text-white" />}
           tone="bg-gradient-to-r from-red-500 to-rose-500"
           rows={alpa}
-          valueLabel={(r) => `${r.alpa}× alpa`}
+          valueLabel={(r) => `${r.izin + r.sakit + r.alpa}× absen`}
           valueClass="bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
           barClass="bg-gradient-to-r from-red-400 to-rose-500"
           rankStyle={(i) =>
