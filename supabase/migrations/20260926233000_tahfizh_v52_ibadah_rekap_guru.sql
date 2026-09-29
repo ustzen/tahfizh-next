@@ -14,6 +14,10 @@
 -- aktif, serta breakdown per kegiatan (JSONB) untuk ranking "paling rajin".
 -- Hanya santri dengan minimal 1 catatan yang dikembalikan (peringkat rajin).
 --
+-- V52b: resolusi guru pakai halaqah_current_teacher() (link UUID profil→guru
+-- dulu, nama sebagai fallback) sehingga sama dengan semua modul lain; jendela
+-- tanggal memakai “hari ini” zona Asia/Jakarta (WIB), bukan UTC server.
+--
 -- Idempoten: drop + create ulang. SECURITY DEFINER, tenant dari profil.
 -- ============================================================================
 
@@ -41,6 +45,7 @@ declare
   v_role    text;
   v_teacher uuid;
   v_from    date;
+  v_today   date;
   v_days    integer;
 begin
   if v_uid is null then
@@ -57,21 +62,20 @@ begin
     raise exception 'AKSES_DITOLAK';
   end if;
 
-  -- Resolusi teacher dari nama profil (pola yang sama dengan modul lain).
+  -- Resolusi guru: sama dengan semua modul halaqah (V12.11).
+  -- Utama = link UUID profil→guru; fallback = pencocokan nama.
   if v_role = 'USTADZ' then
-    select t.id into v_teacher
-    from public.teachers t
-    where t.tenant_id = v_tenant
-      and lower(btrim(t.full_name)) = lower(btrim((select full_name from public.profiles where id = v_uid)))
-    order by t.created_at desc
-    limit 1;
+    v_teacher := public.halaqah_current_teacher();
     if v_teacher is null then
       return;
     end if;
   end if;
 
   v_days := greatest(1, least(coalesce(p_days, 30), 90));
-  v_from := current_date - (v_days - 1);
+  -- “Hari ini” versi WIB: ibadah dicatat vs tanggal kalender di Indonesia,
+  -- bukan tanggal UTC server (yang bisa masih kemarin saat malam WIB).
+  v_today := (now() at time zone 'Asia/Jakarta')::date;
+  v_from := v_today - (v_days - 1);
 
   return query
     with scope as (
@@ -86,7 +90,6 @@ begin
       ) hs on true
       left join public.halaqahs h on h.id = hs.halaqah_id
       where s.tenant_id = v_tenant
-        and s.status = 'ACTIVE'
         and (
           v_role <> 'USTADZ'
           or exists (
@@ -102,7 +105,7 @@ begin
       from public.ibadah_logs l
       where l.tenant_id = v_tenant
         and l.done
-        and l.log_date between v_from and current_date
+        and l.log_date between v_from and v_today
     ),
     per_student as (
       select

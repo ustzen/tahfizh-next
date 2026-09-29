@@ -163,7 +163,12 @@ begin
       where g.profile_id = v_uid and gs.student_id = p_student_id
     ) into v_ok;
     if not v_ok then raise exception 'AKSES_DITOLAK'; end if;
-    if p_date > current_date then raise exception 'TANGGAL_FUTUR'; end if;
+    -- Bandingkan dengan tanggal WIB, bukan current_date UTC — pagi hari WIB
+    -- (sebelum ~07.00) tanggal UTC masih kemarin sehingga isian "hari ini"
+    -- keliru ditolak sebagai tanggal futur.
+    if p_date > (now() at time zone 'Asia/Jakarta')::date then
+      raise exception 'TANGGAL_FUTUR';
+    end if;
   end if;
 
   insert into public.ibadah_logs (tenant_id, student_id, activity_id, log_date, done, note, filled_by)
