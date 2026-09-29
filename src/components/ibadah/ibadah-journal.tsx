@@ -296,6 +296,33 @@ export function IbadahJournal({
     month: "long",
   });
 
+  // Akun belum tertaut ke baris santri manapun — centangan butuh studentId,
+  // jadi tampilkan panduan, bukan kartu yang terlihat bisa diklik tapi diam.
+  if (kids.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="border-role/15 bg-role-soft/20 shadow-card relative overflow-hidden rounded-2xl border">
+          <div className="relative flex flex-wrap items-center gap-3 px-5 py-4">
+            <span className="bg-role text-role-ink shadow-card flex size-10 shrink-0 items-center justify-center rounded-xl">
+              <NotebookPen className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-bold tracking-tight">Jurnal Ibadah Harian</h3>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Tap kartu untuk mencatat ibadah — tersimpan otomatis.
+              </p>
+            </div>
+          </div>
+        </div>
+        <p className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">
+          Akun ini belum terhubung ke data santri, jadi jurnal belum bisa diisi.
+          Buka halaman lain di menu Santri untuk memicu penautan otomatis, atau
+          hubungi admin lembaga agar akun ananda ditautkan ke profil santri.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Header ringkasan */}
@@ -438,7 +465,7 @@ export function IbadahJournal({
                   <button
                     type="button"
                     onClick={() => toggle(a)}
-                    disabled={pending}
+                    disabled={pending || !studentId}
                     aria-pressed={on}
                     className={cn(
                       "flex w-full flex-col items-start gap-2.5 rounded-2xl border-2 p-3.5 text-left transition-all active:scale-[0.98]",

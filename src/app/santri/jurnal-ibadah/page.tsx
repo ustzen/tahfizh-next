@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
+import { ensureSantriSelfLink, getPrestasiCards } from "@/lib/santri-pantauan";
 import { createClient } from "@/lib/supabase/server";
 import { IbadahJournal, type IbadahActivity, type IbadahLogRow } from "@/components/ibadah/ibadah-journal";
 
@@ -24,6 +25,11 @@ export default async function SantriJurnalIbadahPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/jurnal-ibadah");
   const supabase = await createClient();
 
+  // Layout /santri juga memanggil ini, tapi layout & page dirender paralel —
+  // tanpa panggilan ulang di sini, tautan akun→santri bisa belum ada saat
+  // query di bawah jalan (kids kosong → kartu tidak bisa diklik). Idempoten.
+  await ensureSantriSelfLink();
+
   // Anak milik akun ini: guardian → guardian_students → students.
   const kidsRes = await supabase
     .from("guardians")
@@ -32,12 +38,19 @@ export default async function SantriJurnalIbadahPage() {
   type GuardianRow = {
     guardian_students: { student_id: string; students: { full_name: string }[] | null }[];
   };
-  const kids = ((kidsRes.data ?? []) as unknown as GuardianRow[]).flatMap((g) =>
+  let kids = ((kidsRes.data ?? []) as unknown as GuardianRow[]).flatMap((g) =>
     (g.guardian_students ?? []).map((m) => ({
       studentId: m.student_id,
       name: m.students?.[0]?.full_name ?? "Ananda",
     }))
   );
+
+  // Fallback: kartu prestasi sudah berisi studentId + nama — dipakai bila
+  // embed guardian gagal (mis. relasi wali dibuat belakangan).
+  if (kids.length === 0) {
+    const cards = await getPrestasiCards();
+    kids = cards.map((c) => ({ studentId: c.studentId, name: c.studentName }));
+  }
 
   const today = todayJakarta();
   const from = new Date(today + "T00:00:00");
