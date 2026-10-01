@@ -122,6 +122,18 @@ export function SantriHomeCard({
   const targetTampil = `${selected.surahSelesai}/${selected.surahTotal}`;
   const totalSurah = selected.surahTotalKatalog ?? selected.surahTotal;
 
+  // V59b — pil Pencapaian Target = capaian vs target guru (sama dengan tile
+  // Tahfidz): dibatasi maksimum target sehingga 25 penilaian pada target 18
+  // surat tampil 18/18 (100%), bukan 25/18.
+  const tTarget = targets.find(
+    (t) => t.studentId === selected.studentId && t.category === "TAHFIDZ" && t.targetValue > 0
+  );
+  const targetPillValue = tTarget
+    ? `${Math.min(tTarget.capaian, tTarget.targetValue)}/${tTarget.targetValue}`
+    : pakaiTarget
+      ? targetTampil
+      : "—";
+
   // Bulan (terbaru dulu) sesuai mode toggle.
   const months = [...(pres?.months ?? [])].slice(-(bulanMode)).reverse();
 
@@ -164,7 +176,7 @@ export function SantriHomeCard({
           icon={<Target className="size-5" />}
           chip="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"
           accent=""
-          value={pakaiTarget ? targetTampil : "—"}
+          value={targetPillValue}
           label="Pencapaian Target"
         />
         <StatPill
