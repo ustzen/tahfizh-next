@@ -281,8 +281,10 @@ declare
   v_name  text;
   i       integer;
 begin
+  -- V57 — NULL (bukan '{}') bila tak ada item katalog, agar pemanggil bisa
+  -- fallback ke kolom items (target teks lama).
   if p_ids is null or array_length(p_ids, 1) is null then
-    return v_names;
+    return null;
   end if;
 
   for i in 1..array_length(p_ids, 1) loop
@@ -340,6 +342,8 @@ begin
     select a.student_id, a.student_name, ah.halaqah_name,
            ht.id as target_id, ht.category, ht.target_value,
            ht.scope, ht.items, ht.item_ids, ht.description,
+           -- V57 — wajib ada: dipakai target_scope_period di CTE progres.
+           ht.start_date, ht.end_date,
            tc.full_name as teacher_name
     from anak a
     join anak_halaqah ah on ah.student_id = a.student_id
