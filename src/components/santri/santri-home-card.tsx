@@ -17,7 +17,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { persen, predikat } from "@/lib/santri-pantauan-shared";
-import type { PrestasiCard, PresensiRekap, TargetProgress } from "@/lib/santri-pantauan-shared";
+import type { MeterTotals, PrestasiCard, PresensiRekap, TargetProgress } from "@/lib/santri-pantauan-shared";
 
 /**
  * TAHFIZH V57 — Dasbor santri bergaya "Santri Hebat".
@@ -87,11 +87,14 @@ export function SantriHomeCard({
   cards,
   presensi,
   targets,
+  meterTotals,
 }: {
   cards: PrestasiCard[];
   presensi: PresensiRekap[];
   /** V57b — target guru per anak (RPC santri_target_progress) utk tile Tahfidz. */
   targets: TargetProgress[];
+  /** V57c — penyebut modul lain (tugas/hadits/doa/tajwid) per anak. */
+  meterTotals: MeterTotals[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = cards.find((c) => c.studentId === selectedId) ?? cards[0];
@@ -202,7 +205,11 @@ export function SantriHomeCard({
           </span>
         </div>
 
-        <SantriModuleTiles card={selected} targets={targets} />
+        <SantriModuleTiles
+          card={selected}
+          targets={targets}
+          meterTotals={meterTotals.find((m) => m.studentId === selected.studentId)}
+        />
       </div>
 
       {/* Kehadiran bulanan */}
@@ -286,12 +293,22 @@ export function SantriHomeCard({
 }
 
 /**
- * Tile per modul dengan bar kemajuan.
- * V57b — Tahfidz murni berbasis TARGET guru: "berapa surat dari N surat target
- * yang sudah dikuasai" (mis. target 18 → maksimal tampil 18/18 + badge 100%),
- * bukan total hafalan anak (25 surat) dibanding target.
+ * Tile per modul dengan bar kemajuan + badge persen (V57c).
+ * Tahfidz murni berbasis TARGET guru: "berapa surat dari N surat target yang
+ * sudah dikuasai" (maksimal 18/18 + badge 100%), bukan total hafalan anak.
+ * Hadits/Doa: pakai target guru bila ada (capaian per item-ID), selain itu
+ * penilaian LULUS dibanding jumlah materi. Tugas/Tajwid: penilaian vs total
+ * tugas/materi aktif dari santri_meter_totals.
  */
-function SantriModuleTiles({ card, targets }: { card: PrestasiCard; targets: TargetProgress[] }) {
+function SantriModuleTiles({
+  card,
+  targets,
+  meterTotals,
+}: {
+  card: PrestasiCard;
+  targets: TargetProgress[];
+  meterTotals?: MeterTotals;
+}) {
   const MODULES = [
     { key: "TAHFIDZ", label: "Tahfidz", icon: BookOpen, chip: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300", bar: "bg-emerald-500" },
     { key: "TUGAS", label: "Tugas", icon: ScrollText, chip: "bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300", bar: "bg-orange-500" },
@@ -321,12 +338,34 @@ function SantriModuleTiles({ card, targets }: { card: PrestasiCard; targets: Tar
         const stat = card.moduleStats?.[m.key];
         const count = stat?.count ?? card.modules?.[m.key] ?? 0;
         const isTahfidz = m.key === "TAHFIDZ";
-        const pct = isTahfidz
-          ? tahfidzPct
-          : maxCount > 0
-            ? Math.min(100, (count / maxCount) * 100)
-            : 0;
+        const t = targets.find(
+          (x) => x.studentId === card.studentId && x.category === m.key && x.targetValue > 0
+        );
+
+        // Penyebut & pembilang per modul.
+        let done = 0;
+        let total = 0;
+        if (isTahfidz) {
+          done = tahfidzDone;
+          total = tahfidzTotal;
+        } else if (t) {
+          done = Math.min(t.capaian, t.targetValue);
+          total = t.targetValue;
+        } else {
+          done = count;
+          total =
+            m.key === "TUGAS"
+              ? meterTotals?.tugasTotal ?? 0
+              : m.key === "HADITS"
+                ? meterTotals?.haditsTotal ?? 0
+                : m.key === "DOA"
+                  ? meterTotals?.doaTotal ?? 0
+                  : meterTotals?.tajwidTotal ?? 0;
+        }
+        const pakaiRatio = total > 0;
+        const pct = pakaiRatio ? Math.min(100, Math.round((done / total) * 100)) : 0;
         const Icon = m.icon;
+
         return (
           <div key={m.key} className={cn("rounded-2xl border border-transparent p-3", m.chip)}>
             <div className="flex items-center justify-between gap-2">
@@ -334,28 +373,32 @@ function SantriModuleTiles({ card, targets }: { card: PrestasiCard; targets: Tar
                 <Icon className="size-4" />
                 {m.label}
               </span>
-              {isTahfidz ? (
+              {pakaiRatio ? (
                 <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[0.6rem] font-extrabold tabular-nums dark:bg-slate-500/20">
-                  {tahfidzTotal > 0 ? `${tahfidzPct}%` : "—"}
+                  {pct}%
                 </span>
               ) : (
                 <ChevronRight className="size-3.5 opacity-60" />
               )}
             </div>
             <p className="mt-1.5 text-sm font-extrabold tabular-nums">
-              {isTahfidz
-                ? tahfidzTotal > 0
-                  ? `${tahfidzDone}/${tahfidzTotal}`
-                  : "—"
-                : `${count}×`}
+              {pakaiRatio ? `${done}/${total}` : isTahfidz ? "—" : `${count}×`}
             </p>
             <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/70 dark:bg-slate-500/20">
               <div
                 className={cn("h-full rounded-full", m.bar)}
-                style={{ width: pct <= 0 ? "0%" : `${Math.max(4, pct)}%` }}
+                style={{
+                  width: pakaiRatio
+                    ? pct <= 0
+                      ? "0%"
+                      : `${Math.max(4, pct)}%`
+                    : count <= 0
+                      ? "0%"
+                      : `${Math.max(4, Math.min(100, (count / maxCount) * 100))}%`,
+                }}
               />
             </div>
-            {isTahfidz && tahfidzTotal === 0 && (
+            {isTahfidz && !pakaiRatio && (
               <p className="mt-1 text-[0.58rem] font-semibold opacity-80">Belum ada target ustadz</p>
             )}
           </div>

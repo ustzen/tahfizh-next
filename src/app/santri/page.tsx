@@ -10,7 +10,7 @@ import { SANTRI_QUICK_MENU, SANTRI_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } f
 import { createClient } from "@/lib/supabase/server";
 import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
 import { SantriHomeCard } from "@/components/santri/santri-home-card";
-import { getPrestasiCards, getPresensiRekap, getSantriTargetProgress } from "@/lib/santri-pantauan";
+import { getPrestasiCards, getPresensiRekap, getSantriTargetProgress, getMeterTotals } from "@/lib/santri-pantauan";
 
 export const metadata = { title: "Dashboard Santri" };
 
@@ -43,7 +43,7 @@ function hariIniJakarta(): string {
 export default async function SantriDashboardPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri");
 
-  const [savedQuickMenu, ownProfileRes, iconOverrides, prestasiCards, presensiRekap, santriTargets, display] =
+  const [savedQuickMenu, ownProfileRes, iconOverrides, prestasiCards, presensiRekap, santriTargets, meterTotalsMap, display] =
     await Promise.all([
       getDashboardQuickMenuOrder(profile.id),
       createClient().then((supabase) =>
@@ -54,6 +54,8 @@ export default async function SantriDashboardPage() {
       getPresensiRekap(6),
       // V57b — target guru (untuk tile Tahfidz berbasis target).
       getSantriTargetProgress(),
+      // V57c — penyebut modul lain (tugas/hadits/doa/tajwid, sudah target-aware).
+      getMeterTotals(),
       getDisplayProfile(),
     ]);
   const mustChangePassword = ownProfileRes.data?.must_change_password === true;
@@ -111,7 +113,12 @@ export default async function SantriDashboardPage() {
 
       {/* V57 — kartu ringkasan: statistik, modul, kehadiran, motivasi. */}
       {prestasiCards.length > 0 && (
-        <SantriHomeCard cards={prestasiCards} presensi={presensiRekap} targets={santriTargets} />
+        <SantriHomeCard
+          cards={prestasiCards}
+          presensi={presensiRekap}
+          targets={santriTargets}
+          meterTotals={Array.from(meterTotalsMap.values())}
+        />
       )}
 
       {/* Menu Cepat besar (dapat diatur per akun) */}
