@@ -52,6 +52,8 @@ type BuilderProps = {
   logoUrl: string | null;
   watermarkUrl: string | null;
   saveAction: (layout: ReportLayout) => Promise<{ error?: string; success?: string }>;
+  /** V59 — modul kustom lembaga utk pilihan isi Tabel Nilai di SCORE_TABLE. */
+  customModules?: { id: string; label: string }[];
 };
 
 type DragState =
@@ -77,6 +79,7 @@ export function ReportBuilder({
   logoUrl,
   watermarkUrl,
   saveAction,
+  customModules = [],
 }: BuilderProps) {
   const [layout, setLayout] = useState<ReportLayout>(initialLayout);
   const [pageIndex, setPageIndex] = useState(0);
@@ -660,6 +663,46 @@ export function ReportBuilder({
                         checked={selected.props?.showHead !== false}
                         onCheckedChange={(v) => updateProps(selected.id, { showHead: v })}
                       />
+                    </div>
+                  </div>
+                )}
+
+                {/* V59 — pilihan modul kustom mana yang dicetak di Tabel Nilai.
+                    Kosong (belum diatur) = semua modul graded + in_raport. */}
+                {selected.type === "SCORE_TABLE" && customModules.length > 0 && (
+                  <div className="space-y-1.5 border-t pt-2">
+                    <Label className="text-xs text-muted-foreground">
+                      Modul kustom di tabel nilai
+                    </Label>
+                    <p className="text-[10px] text-muted-foreground/80">
+                      Tanpa pilihan = semua modul yang "masuk raport" ikut dicetak.
+                    </p>
+                    <div className="space-y-1">
+                      {customModules.map((cm) => {
+                        const sel: string[] = Array.isArray(selected.props?.customModules)
+                          ? (selected.props!.customModules as string[])
+                          : [];
+                        const checked = sel.includes(cm.id);
+                        return (
+                          <label
+                            key={cm.id}
+                            className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-xs hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                  ? [...sel, cm.id]
+                                  : sel.filter((x) => x !== cm.id);
+                                updateProps(selected.id, { customModules: next });
+                              }}
+                              className="size-3.5 accent-blue-600"
+                            />
+                            <span className="truncate">{cm.label}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

@@ -421,7 +421,7 @@ function SantriModuleTiles({
         );
       })}
 
-      {/* V58 — modul kustom lembaga */}
+      {/* V58 — modul kustom lembaga; V59: dengan menu tersendiri bisa diklik */}
       {customModules.map((cm) => {
         const IconC = customModuleIconFor(cm.icon);
         const tone = customModuleToneFor(cm.tone);
@@ -429,8 +429,8 @@ function SantriModuleTiles({
         const total = cm.poinTarget;
         const pakaiRatio = total > 0;
         const pct = pakaiRatio ? Math.min(100, Math.round((done / total) * 100)) : 0;
-        return (
-          <div key={cm.id} className={cn("rounded-2xl border border-transparent p-3", tone.tile)}>
+        const tile = (
+          <>
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 text-xs font-bold">
                 <IconC className="size-4" />
@@ -455,6 +455,17 @@ function SantriModuleTiles({
                 }}
               />
             </div>
+          </>
+        );
+        return (
+          <div key={cm.id} className={cn("rounded-2xl border border-transparent p-3", tone.tile)}>
+            {cm.showAsMenu ? (
+              <Link href={`/santri/modul/${cm.id}`} className="block" aria-label={`Buka menu ${cm.label}`}>
+                {tile}
+              </Link>
+            ) : (
+              tile
+            )}
           </div>
         );
       })}

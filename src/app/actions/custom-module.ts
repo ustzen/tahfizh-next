@@ -22,6 +22,7 @@ const ERROR_MAP: { match: RegExp; message: string }[] = [
   { match: /MODUL_TIDAK_DITEMUKAN/, message: "Modul tidak ditemukan — muat ulang halaman." },
   { match: /SANTRI_TIDAK_VALID/, message: "Santri tidak ada dalam cakupan Anda." },
   { match: /TANGGAL_FUTUR/, message: "Tanggal tidak boleh lebih dari hari ini." },
+  { match: /NILAI_TIDAK_VALID/, message: "Nilai harus angka 0–100." },
 ];
 
 function friendlyError(message: string): string {
@@ -33,6 +34,7 @@ function friendlyError(message: string): string {
 
 function revalidateSemua() {
   revalidatePath("/santri");
+  revalidatePath("/santri/modul/[id]", "page");
   revalidatePath("/ustadz/modul");
   revalidatePath("/admin/modul");
   revalidatePath("/koordinator/modul");
@@ -45,6 +47,12 @@ export async function saveCustomModuleAction(input: {
   tone: string;
   poinTarget: number;
   sortOrder?: number;
+  /** V59 — catatan boleh disertai nilai 0–100. */
+  graded?: boolean;
+  /** V59 — tampil sebagai menu tersendiri di dasbor santri. */
+  showAsMenu?: boolean;
+  /** V59 — ikut Tabel Nilai raport. */
+  inRaport?: boolean;
 }): Promise<ModulActionResult> {
   const profile = await getSessionProfile();
   if (!profile || !["ADMIN", "KOORDINATOR"].includes(profile.role)) {
@@ -66,6 +74,9 @@ export async function saveCustomModuleAction(input: {
     p_tone: input.tone || "emerald",
     p_poin_target: poinTarget,
     p_sort: input.sortOrder ?? 100,
+    p_graded: input.graded ?? false,
+    p_show_as_menu: input.showAsMenu ?? false,
+    p_in_raport: input.inRaport ?? false,
   });
   if (error) return { error: friendlyError(error.message) };
 
@@ -93,6 +104,8 @@ export async function logCustomModuleAction(input: {
   moduleId: string;
   date: string;
   note?: string | null;
+  /** V59 — nilai opsional 0–100 (hanya modul graded). */
+  scoreValue?: number | null;
 }): Promise<ModulActionResult> {
   const profile = await getSessionProfile();
   if (!profile) return { error: "Session Anda telah berakhir. Silakan login kembali." };
@@ -101,12 +114,21 @@ export async function logCustomModuleAction(input: {
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { error: "Tanggal tidak valid." };
 
+  const scoreValue =
+    input.scoreValue == null || input.scoreValue === ("" as unknown as number)
+      ? null
+      : Number(input.scoreValue);
+  if (scoreValue != null && (!Number.isFinite(scoreValue) || scoreValue < 0 || scoreValue > 100)) {
+    return { error: "Nilai harus angka 0–100." };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.rpc("custom_module_log_save", {
     p_student_id: input.studentId,
     p_module_id: input.moduleId,
     p_log_date: input.date,
     p_note: (input.note ?? "").trim() || null,
+    p_score_value: scoreValue,
   });
   if (error) return { error: friendlyError(error.message) };
 

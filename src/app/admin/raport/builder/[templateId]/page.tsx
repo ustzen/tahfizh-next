@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getReportLiveData, getReportSettings, getTemplateDetail, getReportAssetUrl } from "@/lib/report";
+import { getCustomModules } from "@/lib/custom-module";
 import { ReportBuilder } from "@/components/report/report-builder";
 import { saveReportTemplateLayoutAction } from "@/app/actions/report-layout";
 import type { CanvasContext } from "@/components/report/component-content";
@@ -33,6 +34,8 @@ export default async function ReportBuilderPage({
   const settings = await getReportSettings();
   const logoUrl = await getReportAssetUrl(settings.logoPath);
   const watermarkUrl = await getReportAssetUrl(settings.watermarkPath);
+  // V59 — modul kustom utk pilihan isi Tabel Nilai.
+  const customModules = await getCustomModules(true);
 
   // Prefer an existing report's student/period; fall back to the first student
   // of the tenant purely for preview values (never persisted).
@@ -82,6 +85,7 @@ export default async function ReportBuilderPage({
         data={data ?? SAMPLE_REPORT_DATA}
         logoUrl={logoUrl}
         watermarkUrl={watermarkUrl}
+        customModules={customModules.map((m) => ({ id: m.id, label: m.label }))}
         saveAction={async (layout) => saveReportTemplateLayoutAction({ templateId: template.id, layout })}
       />
     </div>

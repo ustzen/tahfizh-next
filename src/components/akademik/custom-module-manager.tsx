@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 /**
  * TAHFIZH V58 — Kelola modul kustom lembaga (ADMIN/KOORDINATOR).
@@ -32,9 +33,24 @@ type FormState = {
   icon: string;
   tone: string;
   poinTarget: string;
+  /** V59 — catatan disertai nilai 0–100. */
+  graded: boolean;
+  /** V59 — menu tersendiri di dasbor santri. */
+  showAsMenu: boolean;
+  /** V59 — ikut Tabel Nilai raport (butuh graded). */
+  inRaport: boolean;
 };
 
-const EMPTY_FORM: FormState = { id: null, label: "", icon: "star", tone: "emerald", poinTarget: "" };
+const EMPTY_FORM: FormState = {
+  id: null,
+  label: "",
+  icon: "star",
+  tone: "emerald",
+  poinTarget: "",
+  graded: false,
+  showAsMenu: false,
+  inRaport: false,
+};
 
 export function CustomModuleManager({ modules }: { modules: CustomModuleItem[] }) {
   const router = useRouter();
@@ -64,6 +80,9 @@ export function CustomModuleManager({ modules }: { modules: CustomModuleItem[] }
         tone: form.tone,
         poinTarget,
         sortOrder: 100,
+        graded: form.graded,
+        showAsMenu: form.showAsMenu,
+        inRaport: form.graded && form.inRaport,
       });
       if (res.error) {
         toast.error(res.error);
@@ -82,6 +101,9 @@ export function CustomModuleManager({ modules }: { modules: CustomModuleItem[] }
       icon: m.icon,
       tone: m.tone,
       poinTarget: m.poinTarget > 0 ? String(m.poinTarget) : "",
+      graded: m.graded,
+      showAsMenu: m.showAsMenu,
+      inRaport: m.inRaport,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -174,6 +196,49 @@ export function CustomModuleManager({ modules }: { modules: CustomModuleItem[] }
           </div>
         </div>
 
+        <div className="mt-4 space-y-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-500/20 dark:bg-transparent">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Label className="text-xs">Beri nilai saat mencatat</Label>
+              <p className="text-muted-foreground text-[0.62rem]">
+                Guru mengisi nilai 0–100 tiap catatan (selain hitungan poin).
+              </p>
+            </div>
+            <Switch
+              checked={form.graded}
+              onCheckedChange={(v) =>
+                setForm((f) => ({ ...f, graded: v, inRaport: v ? f.inRaport : false }))
+              }
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Label className="text-xs">Tampilkan sebagai menu tersendiri</Label>
+              <p className="text-muted-foreground text-[0.62rem]">
+                Menu khusus modul ini muncul di dasbor santri (riwayat & rincian).
+              </p>
+            </div>
+            <Switch
+              checked={form.showAsMenu}
+              onCheckedChange={(v) => setForm((f) => ({ ...f, showAsMenu: v }))}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Label className="text-xs">Masukkan ke raport</Label>
+              <p className="text-muted-foreground text-[0.62rem]">
+                Rata-rata nilai modul dicetak di Tabel Nilai raport
+                {form.graded ? "." : " — butuh pilihan beri nilai aktif."}
+              </p>
+            </div>
+            <Switch
+              checked={form.graded && form.inRaport}
+              disabled={!form.graded}
+              onCheckedChange={(v) => setForm((f) => ({ ...f, inRaport: v }))}
+            />
+          </div>
+        </div>
+
         <div className="mt-4 flex items-center gap-2">
           <Button onClick={submit} disabled={pending} className="bg-role text-role-ink hover:brightness-95">
             <Plus className="size-4" />
@@ -216,6 +281,9 @@ export function CustomModuleManager({ modules }: { modules: CustomModuleItem[] }
                     <p className="truncate text-sm font-bold">{m.label}</p>
                     <p className="text-muted-foreground text-[0.65rem] font-semibold">
                       {m.poinTarget > 0 ? `Target ${m.poinTarget} poin` : "Tanpa target poin"}
+                      {m.graded && " · dinilai"}
+                      {m.showAsMenu && " · menu"}
+                      {m.graded && m.inRaport && " · raport"}
                       {!m.isActive && " · nonaktif"}
                     </p>
                   </div>

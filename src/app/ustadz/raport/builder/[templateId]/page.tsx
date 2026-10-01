@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getTemplateDetail } from "@/lib/report";
+import { getCustomModules } from "@/lib/custom-module";
 import { ReportBuilder } from "@/components/report/report-builder";
 import { saveReportTemplateLayoutAction } from "@/app/actions/report-layout";
 import { SAMPLE_REPORT_CTX, SAMPLE_REPORT_DATA } from "@/lib/report-shared";
@@ -24,6 +25,8 @@ export default async function UstadzReportBuilderPage({
   const template = await getTemplateDetail(templateId);
   if (!template) notFound();
   if (!template.tenantId || template.tenantId !== profile.tenantId) redirect("/ustadz/raport");
+  // V59 — modul kustom utk pilihan isi Tabel Nilai.
+  const customModules = await getCustomModules(true);
 
   return (
     <div className="space-y-4">
@@ -41,6 +44,7 @@ export default async function UstadzReportBuilderPage({
         data={SAMPLE_REPORT_DATA}
         logoUrl={null}
         watermarkUrl={null}
+        customModules={customModules.map((m) => ({ id: m.id, label: m.label }))}
         saveAction={async (layout) => saveReportTemplateLayoutAction({ templateId: template.id, layout })}
       />
     </div>

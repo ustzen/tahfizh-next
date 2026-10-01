@@ -53,6 +53,7 @@ export function ModulClient({
   const [moduleId, setModuleId] = useState("");
   const [date, setDate] = useState(today);
   const [note, setNote] = useState("");
+  const [score, setScore] = useState("");
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
@@ -60,6 +61,7 @@ export function ModulClient({
     () => new Map(modules.map((m) => [m.id, m])),
     [modules]
   );
+  const selectedModule = moduleId ? moduleById.get(moduleId) ?? null : null;
 
   async function submit() {
     if (!studentId) {
@@ -75,7 +77,13 @@ export function ModulClient({
       return;
     }
     setSaving(true);
-    const res = await logCustomModuleAction({ studentId, moduleId, date, note });
+    const res = await logCustomModuleAction({
+      studentId,
+      moduleId,
+      date,
+      note,
+      scoreValue: selectedModule?.graded && score.trim() !== "" ? Number(score) : null,
+    });
     setSaving(false);
     if (res.error) {
       toast.error(res.error);
@@ -83,6 +91,7 @@ export function ModulClient({
     }
     toast.success("Poin kemajuan dicatat.");
     setNote("");
+    setScore("");
     router.refresh();
   }
 
@@ -208,6 +217,23 @@ export function ModulClient({
               />
             </div>
 
+            {selectedModule?.graded && (
+              <div className="space-y-1.5">
+                <Label htmlFor="modul-nilai">Nilai (0–100, opsional)</Label>
+                <Input
+                  id="modul-nilai"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="1"
+                  value={score}
+                  onChange={(e) => setScore(e.target.value)}
+                  placeholder="mis. 85"
+                  className="sm:w-40"
+                />
+              </div>
+            )}
+
             <Button onClick={submit} disabled={saving} className="bg-role text-role-ink hover:brightness-95">
               {saving ? (
                 <>
@@ -252,6 +278,7 @@ export function ModulClient({
                     </p>
                     <p className="text-muted-foreground truncate text-[0.65rem] font-semibold">
                       {fmtDMY(log.logDate)}
+                      {log.scoreValue != null ? ` · Nilai ${log.scoreValue}` : ""}
                       {log.note ? ` · ${log.note}` : ""}
                     </p>
                   </div>

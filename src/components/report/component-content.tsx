@@ -275,6 +275,11 @@ export function ReportComponentContent({ comp, ctx, data, logoUrl, watermarkUrl 
     case "SCORE_TABLE": {
       type Row = { key: string; materi: string; nilai: string; ket: string };
       const mode = s.mode;
+      // V59 — pilihan modul kustom (id) yang dicetak; kosong = semua modul
+      // graded+in_raport (perilaku default, raport lama tanpa props tetap benar).
+      const customSel = Array.isArray(comp.props?.customModules)
+        ? (comp.props.customModules as string[]).filter((x) => typeof x === "string")
+        : null;
       const rows: Row[] = [];
       const t = scores.tahfidz;
       if (t && (t.count ?? 0) > 0)
@@ -298,6 +303,21 @@ export function ReportComponentContent({ comp, ctx, data, logoUrl, watermarkUrl 
       const tk = scores.tugas;
       if (tk && (tk.total ?? 0) > 0)
         rows.push({ key: "tugas", materi: MODULE_LABELS.TUGAS, nilai: scoreText(mode, tk.avgValue, null), ket: `${tk.dinilai}/${tk.total} dinilai` });
+      // V59 — modul kustom lembaga (rata-rata nilai dalam periode). Dipilih
+      // via id (tahan rename); props kosong = semua modul graded+in_raport.
+      const customRows = (scores.custom ?? []).filter(
+        (c) =>
+          (customSel === null || customSel.includes(c.id)) &&
+          (c.count ?? 0) > 0
+      );
+      for (const c of customRows) {
+        rows.push({
+          key: `custom-${c.id}`,
+          materi: c.label,
+          nilai: scoreText(mode, c.avgValue ?? null, null),
+          ket: `${c.count} penilaian`,
+        });
+      }
 
       return (
         <div className={cn(base, "text-slate-800")} style={css}>

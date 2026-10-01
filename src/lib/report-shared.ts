@@ -152,6 +152,8 @@ export type ReportData = {
     tajwid?: { count?: number; total?: number; avgValue?: number | null; lastLabel?: string | null };
     tugas?: { total?: number; dinilai?: number; avgValue?: number | null };
     jurnal?: number;
+    /** V59 — modul kustom lembaga (graded + in_raport) dalam periode. */
+    custom?: CustomScoreRow[];
   };
   attendance?: { hadir?: number; izin?: number; sakit?: number; alpa?: number; persen?: number } | null;
   period?: { start?: string; end?: string };
@@ -166,6 +168,9 @@ export const MODULE_LABELS: Record<string, string> = {
   TAJWID: "Tajwid",
   TUGAS: "Tugas",
 };
+
+/** V59 — ringkasan nilai modul kustom utk Tabel Nilai (dari scores.custom). */
+export type CustomScoreRow = { id: string; label: string; count?: number; avgValue?: number | null };
 
 /** Watermark opacity defaults (rule #22). */
 export const WATERMARK_OPACITY_OPTIONS = [10, 15, 20, 25, 30] as const;
