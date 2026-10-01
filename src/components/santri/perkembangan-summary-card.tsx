@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Flame,
   Star,
+  Target,
   TrendingUp,
 } from "lucide-react";
 
@@ -149,7 +150,7 @@ export function PerkembanganSummaryCard({
       )}
 
       {/* Statistik utama */}
-      <div className="grid grid-cols-2 gap-2.5 px-5 py-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 px-5 py-4 sm:grid-cols-3 lg:grid-cols-5">
         <StatBox
           icon={<Star className="size-4" />}
           value={selected.avgScore !== null ? selected.avgScore.toFixed(0) : "—"}
@@ -157,16 +158,28 @@ export function PerkembanganSummaryCard({
           sub={`${selected.totalPenilaian} penilaian total`}
           tone="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
         />
+        {/* V57 — dua stat terpisah: pencapaian target guru vs total surah lembaga. */}
+        <StatBox
+          icon={<Target className="size-4" />}
+          value={
+            selected.surahTotalIsTarget === true
+              ? `${selected.surahSelesai}/${selected.surahTotal}`
+              : "—"
+          }
+          label="Pencapaian Target"
+          sub={
+            selected.surahTotalIsTarget === true
+              ? "surat target ustadz yang sudah dikuasai"
+              : "guru belum menetapkan target"
+          }
+          tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+        />
         <StatBox
           icon={<BookOpenCheck className="size-4" />}
           value={`${selected.surahSelesai}`}
-          label="Surat dikuasai"
-          sub={
-            selected.surahTotalIsTarget === true
-              ? `dari target ${selected.surahTotal} surat (ustadz)`
-              : `total surah aktif di lembaga: ${selected.surahTotal}`
-          }
-          tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+          label="Total Surat"
+          sub={`dari ${selected.surahTotalKatalog ?? selected.surahTotal} surah aktif lembaga`}
+          tone="bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300"
         />
         <StatBox
           icon={<CalendarCheck2 className="size-4" />}

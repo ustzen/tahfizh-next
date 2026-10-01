@@ -96,6 +96,7 @@ export type NavGroupKey =
   | "master"
   | "pembelajaran"
   | "presensi"
+  | "lainnya"
   | "laporan"
   | "keuangan"
   | "komunitas"

@@ -4,16 +4,24 @@ import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { IbadahCatalogManager } from "@/components/ibadah/ibadah-catalog-manager";
+import { IbadahRekapCard } from "@/components/ibadah/ibadah-rekap-card";
+import { getIbadahRekapGuru } from "@/lib/ibadah";
 import type { IbadahActivity } from "@/components/ibadah/ibadah-journal";
 
 export const metadata: Metadata = { title: "Jurnal Ibadah" };
 
 type ActivityRow = { id: string; label: string; icon: string; tone: string; is_builtin: boolean };
 
-/** TAHFIZH V51 — Kelola katalog kegiatan Jurnal Ibadah (admin/koordinator). */
+/**
+ * TAHFIZH V57 — Jurnal Ibadah admin: rekap ibadah seluruh santri lembaga +
+ * kelola katalog kegiatan dalam satu menu.
+ */
 export default async function AdminJurnalIbadahPage() {
   await requireRole(["ADMIN", "KOORDINATOR"], "/admin/jurnal-ibadah");
-  const supabase = await createClient();
+  const [supabase, rekap] = await Promise.all([
+    createClient(),
+    getIbadahRekapGuru(30),
+  ]);
   const { data } = await supabase.rpc("ibadah_activities_list");
 
   const activities: IbadahActivity[] = ((data ?? []) as ActivityRow[]).map((a) => ({
@@ -28,8 +36,9 @@ export default async function AdminJurnalIbadahPage() {
     <div className="space-y-4">
       <PageHeader
         title="Jurnal Ibadah"
-        description="Atur kegiatan ibadah harian yang dicentang santri — sholat 5 waktu, dhuha, muraja'ah, tilawah, atau kegiatan lain milik lembaga."
+        description="Rekap ibadah seluruh santri lembaga 30 hari terakhir, plus pengaturan kegiatan yang dicentang santri."
       />
+      <IbadahRekapCard rows={rekap} days={30} manageHref={null} />
       <IbadahCatalogManager activities={activities} />
     </div>
   );

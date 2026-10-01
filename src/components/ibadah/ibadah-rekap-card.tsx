@@ -28,7 +28,16 @@ const PILL_TONES = [
   "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
 ];
 
-export function IbadahRekapCard({ rows, days = 30 }: { rows: IbadahRekapRow[]; days?: number }) {
+export function IbadahRekapCard({
+  rows,
+  days = 30,
+  /** V57 — tautan kelola katalog; sembunyikan bila kartu tampil di menu katalog itu sendiri. */
+  manageHref = "/ustadz/jurnal-ibadah",
+}: {
+  rows: IbadahRekapRow[];
+  days?: number;
+  manageHref?: string | null;
+}) {
   const totalDone = rows.reduce((s, r) => s + r.totalDone, 0);
   const totalActiveDays = rows.reduce((s, r) => s + r.activeDays, 0);
 
@@ -60,12 +69,14 @@ export function IbadahRekapCard({ rows, days = 30 }: { rows: IbadahRekapRow[]; d
             Catatan jurnal ibadah {days} hari terakhir — bahan evaluasi halaqah.
           </p>
         </div>
-        <Link
-          href="/ustadz/jurnal-ibadah"
-          className="border-role/25 text-muted-foreground hover:bg-role-soft/60 rounded-full border bg-white px-3 py-1 text-xs font-semibold transition-colors dark:bg-transparent"
-        >
-          Kelola Katalog
-        </Link>
+        {manageHref && (
+          <Link
+            href={manageHref}
+            className="border-role/25 text-muted-foreground hover:bg-role-soft/60 rounded-full border bg-white px-3 py-1 text-xs font-semibold transition-colors dark:bg-transparent"
+          >
+            Kelola Katalog
+          </Link>
+        )}
       </div>
 
       {rows.length === 0 ? (

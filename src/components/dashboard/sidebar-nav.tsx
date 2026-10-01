@@ -38,6 +38,11 @@ const GROUP_STYLES: Record<string, { label: string; dot: string; active: string 
     dot: "bg-orange-500",
     active: "bg-orange-500 text-white shadow-card hover:bg-orange-500",
   },
+  lainnya: {
+    label: "Lain-lain",
+    dot: "bg-slate-400",
+    active: "bg-slate-600 text-white shadow-card hover:bg-slate-600",
+  },
   laporan: {
     label: "Laporan",
     dot: "bg-violet-500",

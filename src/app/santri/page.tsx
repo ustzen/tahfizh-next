@@ -80,7 +80,8 @@ export default async function SantriDashboardPage() {
             />
           }
         />
-        <QuickMenuGrid items={visibleQuickMenu} iconOverrides={iconOverrides} />
+        {/* V57 — dasbor santri: ubin menu cepat besar (ikon & label). */}
+        <QuickMenuGrid items={visibleQuickMenu} iconOverrides={iconOverrides} large />
       </CardBox>
     </div>
   );

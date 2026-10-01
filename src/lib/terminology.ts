@@ -98,11 +98,13 @@ const NAV_GROUP_OF: Record<NavKey, NavGroupKey> = {
   tajwid: "pembelajaran",
   tugas: "pembelajaran",
   jurnal: "pembelajaran",
-  target: "pembelajaran",
+  // V57 — Target dianggap acuan/master (dikelola dari katalog lembaga).
+  target: "master",
   presensi: "presensi",
   "riwayat-presensi": "presensi",
   perkembangan: "laporan",
-  "jurnal-ibadah": "utama",
+  // V57 — Jurnal Ibadah masuk grup Lain-lain (di bawah Pembelajaran).
+  "jurnal-ibadah": "lainnya",
   raport: "laporan",
   anak: "master",
   prestasi: "laporan",
@@ -118,6 +120,8 @@ const GROUP_ORDER: NavGroupKey[] = [
   "master",
   "presensi",
   "pembelajaran",
+  // V57 — Lain-lain tepat di bawah Pembelajaran (isi: Jurnal Ibadah).
+  "lainnya",
   "laporan",
   "keuangan",
   "komunitas",

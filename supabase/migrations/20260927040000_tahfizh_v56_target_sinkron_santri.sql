@@ -212,6 +212,9 @@ begin
                                then tt.n_items else coalesce(v_total_surah, 0) end,
         -- Penanda sumber penyebut: true = target guru, false = fallback katalog.
         'surahTotalIsTarget', coalesce(tt.n_items, 0) > 0,
+        -- V56b — jumlah seluruh surah aktif katalog (utk stat “total surat”
+        -- yang dipisah dari target di dasbor santri).
+        'surahTotalKatalog', coalesce(v_total_surah, 0),
         'avgScore',       ag.avg_score,
         'totalPenilaian', coalesce(ag.total_penilaian, 0),
         'penilaian30Hari', coalesce(ag.c_30hari, 0),

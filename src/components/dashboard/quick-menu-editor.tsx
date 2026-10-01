@@ -306,14 +306,18 @@ export function QuickMenuEditorButton({
   );
 }
 
-/** Grid Menu Cepat itu sendiri (link ke masing-masing modul). V39: ikon override-aware. */
+/** Grid Menu Cepat itu sendiri (link ke masing-masing modul). V39: ikon override-aware.
+ * V57 — varian `large` untuk dasbor santri: ubin ikon & label lebih besar. */
 export function QuickMenuGrid({
   items,
   iconOverrides = [],
+  large = false,
 }: {
   items: QuickMenuItem[];
   /** Override ikon menu platform (V39). */
   iconOverrides?: MenuIconOverride[];
+  /** V57 — varian besar (dasbor santri): ikon & tulisan lebih besar. */
+  large?: boolean;
 }) {
   if (items.length === 0) {
     return (
@@ -323,7 +327,14 @@ export function QuickMenuGrid({
     );
   }
   return (
-    <div className="mt-4 grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+    <div
+      className={cn(
+        "mt-4 grid",
+        large
+          ? "grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 lg:grid-cols-5"
+          : "grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8"
+      )}
+    >
       {items.map((item) => {
         return (
           <Link
@@ -334,7 +345,8 @@ export function QuickMenuGrid({
           >
             <span
               className={cn(
-                "flex size-14 shrink-0 items-center justify-center rounded-2xl shadow-card transition-shadow group-hover:shadow-card-lg group-active:shadow-none sm:size-16",
+                "flex shrink-0 items-center justify-center rounded-2xl shadow-card transition-shadow group-hover:shadow-card-lg group-active:shadow-none",
+                large ? "size-20 sm:size-24" : "size-14 sm:size-16",
                 item.chip
               )}
             >
@@ -342,10 +354,15 @@ export function QuickMenuGrid({
                 menuKey={item.key}
                 overrides={iconOverrides}
                 fallback={iconFor(item.icon)}
-                className="size-7 sm:size-8"
+                className={large ? "size-10 sm:size-12" : "size-7 sm:size-8"}
               />
             </span>
-            <span className="line-clamp-2 w-full text-[11px] font-medium leading-tight text-foreground sm:text-xs">
+            <span
+              className={cn(
+                "line-clamp-2 w-full font-medium leading-tight text-foreground",
+                large ? "text-xs sm:text-sm" : "text-[11px] sm:text-xs"
+              )}
+            >
               {item.label}
             </span>
           </Link>

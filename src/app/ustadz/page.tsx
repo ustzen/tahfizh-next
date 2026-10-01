@@ -7,14 +7,12 @@ import { Button } from "@/components/ui/button";
 import { QuickMenuEditorButton, QuickMenuGrid } from "@/components/dashboard/quick-menu-editor";
 import { requireRole } from "@/lib/auth";
 import { getTeacherV8Dashboard } from "@/lib/halaqah";
-import { getIbadahRekapGuru } from "@/lib/ibadah";
 import { getScheduleReminders } from "@/lib/schedule-reminder";
 import { getTerminology } from "@/lib/terminology";
 import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
 import { createClient } from "@/lib/supabase/server";
 import { USTADZ_QUICK_MENU, USTADZ_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } from "@/lib/quick-menu";
 import { ScheduleReminderBanner } from "@/components/dashboard/schedule-reminder-banner";
-import { IbadahRekapCard } from "@/components/ibadah/ibadah-rekap-card";
 
 export const metadata = { title: "Dashboard Ustadz" };
 
@@ -39,7 +37,7 @@ export default async function UstadzDashboardPage() {
   const greetingName = `${honorific} ${profile.fullName.split(" ")[0]}`;
 
   // V8 (rule #39): halaqah saya + presensi hari ini + rata-rata capaian.
-  const [v8Stats, reminders, savedQuickMenu, iconOverrides, ibadahRekap] = await Promise.all([
+  const [v8Stats, reminders, savedQuickMenu, iconOverrides] = await Promise.all([
     getTeacherV8Dashboard(),
     // V12.13: pengingat sesi halaqah hari ini & besok (H-1).
     getScheduleReminders(),
@@ -47,8 +45,6 @@ export default async function UstadzDashboardPage() {
     getDashboardQuickMenuOrder(profile.id),
     // V39: override ikon menu platform.
     getMenuIconOverrides(),
-    // V52: rekap jurnal ibadah santri 30 hari — bahan evaluasi halaqah.
-    getIbadahRekapGuru(30),
   ]);
 
   const visibleQuickMenu = resolveQuickMenu(USTADZ_QUICK_MENU, savedQuickMenu, USTADZ_QUICK_MENU_DEFAULT_KEYS);
@@ -105,9 +101,6 @@ export default async function UstadzDashboardPage() {
         />
         <QuickMenuGrid items={visibleQuickMenu} iconOverrides={iconOverrides} />
       </CardBox>
-
-      {/* V52 — Rekap ibadah santri (bahan evaluasi halaqah). */}
-      <IbadahRekapCard rows={ibadahRekap} days={30} />
     </div>
   );
 }

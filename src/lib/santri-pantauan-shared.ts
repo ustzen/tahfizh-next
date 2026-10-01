@@ -86,6 +86,8 @@ export type PrestasiCard = {
   surahTotal: number;
   /** V56 — true bila surahTotal = jumlah item target guru (bukan fallback katalog). */
   surahTotalIsTarget?: boolean;
+  /** V56b — jumlah seluruh surah aktif di katalog lembaga (stat terpisah). */
+  surahTotalKatalog?: number;
   avgScore: number | null;
   totalPenilaian: number;
   penilaian30Hari: number;
