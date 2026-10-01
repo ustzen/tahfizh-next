@@ -100,6 +100,8 @@ const NAV_GROUP_OF: Record<NavKey, NavGroupKey> = {
   jurnal: "pembelajaran",
   // V57 — Target dianggap acuan/master (dikelola dari katalog lembaga).
   target: "master",
+  // V58 — Modul kustom lembaga: kelola (admin/koor) & pencatatan poin (guru).
+  modul: "master",
   presensi: "presensi",
   "riwayat-presensi": "presensi",
   perkembangan: "laporan",
@@ -147,6 +149,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "raport", label: "Raport", href: "/admin/raport" },
     // V51 — katalog kegiatan jurnal ibadah harian santri.
     { key: "jurnal-ibadah", label: "Jurnal Ibadah", href: "/admin/jurnal-ibadah" },
+    // V58 — modul kustom lembaga (langsung tampil di dasbor santri).
+    { key: "modul", label: "Modul", href: "/admin/modul" },
     { key: "akademik", label: "Akademik", href: "/admin/akademik" },
     { key: "onboarding", label: "Onboarding", href: "/admin/onboarding" },
     // V20 — obrolan 1 lembaga, pesan otomatis terhapus 24 jam.
@@ -167,6 +171,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     { key: "raport", label: "Raport", href: "/koordinator/raport" },
     // V51 — katalog kegiatan jurnal ibadah harian santri.
     { key: "jurnal-ibadah", label: "Jurnal Ibadah", href: "/koordinator/jurnal-ibadah" },
+    // V58 — modul kustom lembaga (baca + pencatatan poin seluruh lembaga).
+    { key: "modul", label: "Modul", href: "/koordinator/modul" },
     { key: "obrolan", label: "Obrolan", href: "/koordinator/obrolan" },
     { key: "saran", label: "Kritik & Saran", href: "/koordinator/saran" },
     { key: "pengaturan", label: "Pengaturan", href: "/koordinator/pengaturan" },
@@ -185,6 +191,8 @@ const BASE_NAV: Record<AppRole, { key: NavKey; label: string; href: string }[]> 
     // V51 — katalog kegiatan jurnal ibadah harian santri.
     { key: "jurnal-ibadah", label: "Jurnal Ibadah", href: "/ustadz/jurnal-ibadah" },
     { key: "target", label: "Target", href: "/ustadz/target" },
+    // V58 — pencatatan poin modul kustom lembaga.
+    { key: "modul", label: "Modul", href: "/ustadz/modul" },
     { key: "halaqah", label: "Halaqah", href: "/ustadz/halaqah" },
     // V47 — Jadwal sesi mengajar guru.
     { key: "jadwal", label: "Jadwal", href: "/ustadz/jadwal" },

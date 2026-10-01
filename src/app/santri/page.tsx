@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
 import { SantriHomeCard } from "@/components/santri/santri-home-card";
 import { getPrestasiCards, getPresensiRekap, getSantriTargetProgress, getMeterTotals } from "@/lib/santri-pantauan";
+import { getCustomModuleCounts, getCustomModules } from "@/lib/custom-module";
 
 export const metadata = { title: "Dashboard Santri" };
 
@@ -43,7 +44,7 @@ function hariIniJakarta(): string {
 export default async function SantriDashboardPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri");
 
-  const [savedQuickMenu, ownProfileRes, iconOverrides, prestasiCards, presensiRekap, santriTargets, meterTotalsMap, display] =
+  const [savedQuickMenu, ownProfileRes, iconOverrides, prestasiCards, presensiRekap, santriTargets, meterTotalsMap, display, customModules, customCounts] =
     await Promise.all([
       getDashboardQuickMenuOrder(profile.id),
       createClient().then((supabase) =>
@@ -57,6 +58,9 @@ export default async function SantriDashboardPage() {
       // V57c — penyebut modul lain (tugas/hadits/doa/tajwid, sudah target-aware).
       getMeterTotals(),
       getDisplayProfile(),
+      // V58 — modul kustom lembaga + jumlah poin per anak.
+      getCustomModules(),
+      getCustomModuleCounts(),
     ]);
   const mustChangePassword = ownProfileRes.data?.must_change_password === true;
 
@@ -118,6 +122,10 @@ export default async function SantriDashboardPage() {
           presensi={presensiRekap}
           targets={santriTargets}
           meterTotals={Array.from(meterTotalsMap.values())}
+          customModules={customModules}
+          customCounts={Object.fromEntries(
+            customCounts.map((c) => [`${c.studentId}:${c.moduleId}`, c.cnt])
+          )}
         />
       )}
 

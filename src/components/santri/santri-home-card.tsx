@@ -18,6 +18,8 @@ import {
 import { cn } from "@/lib/utils";
 import { persen, predikat } from "@/lib/santri-pantauan-shared";
 import type { MeterTotals, PrestasiCard, PresensiRekap, TargetProgress } from "@/lib/santri-pantauan-shared";
+import type { CustomModuleItem } from "@/lib/custom-module";
+import { customModuleIconFor, customModuleToneFor } from "@/components/akademik/custom-module-shared";
 
 /**
  * TAHFIZH V57 — Dasbor santri bergaya "Santri Hebat".
@@ -88,6 +90,8 @@ export function SantriHomeCard({
   presensi,
   targets,
   meterTotals,
+  customModules,
+  customCounts,
 }: {
   cards: PrestasiCard[];
   presensi: PresensiRekap[];
@@ -95,6 +99,9 @@ export function SantriHomeCard({
   targets: TargetProgress[];
   /** V57c — penyebut modul lain (tugas/hadits/doa/tajwid) per anak. */
   meterTotals: MeterTotals[];
+  /** V58 — modul kustom lembaga + jumlah poin per anak (kunci anakId:moduleId). */
+  customModules: CustomModuleItem[];
+  customCounts: Record<string, number>;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = cards.find((c) => c.studentId === selectedId) ?? cards[0];
@@ -209,6 +216,11 @@ export function SantriHomeCard({
           card={selected}
           targets={targets}
           meterTotals={meterTotals.find((m) => m.studentId === selected.studentId)}
+          customModules={customModules}
+          customCounts={Object.fromEntries(
+            customModules
+              .map((cm) => [cm.id, customCounts[`${selected.studentId}:${cm.id}`] ?? 0] as const)
+          )}
         />
       </div>
 
@@ -304,10 +316,14 @@ function SantriModuleTiles({
   card,
   targets,
   meterTotals,
+  customModules,
+  customCounts,
 }: {
   card: PrestasiCard;
   targets: TargetProgress[];
   meterTotals?: MeterTotals;
+  customModules: CustomModuleItem[];
+  customCounts: Record<string, number>;
 }) {
   const MODULES = [
     { key: "TAHFIDZ", label: "Tahfidz", icon: BookOpen, chip: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300", bar: "bg-emerald-500" },
@@ -401,6 +417,44 @@ function SantriModuleTiles({
             {isTahfidz && !pakaiRatio && (
               <p className="mt-1 text-[0.58rem] font-semibold opacity-80">Belum ada target ustadz</p>
             )}
+          </div>
+        );
+      })}
+
+      {/* V58 — modul kustom lembaga */}
+      {customModules.map((cm) => {
+        const IconC = customModuleIconFor(cm.icon);
+        const tone = customModuleToneFor(cm.tone);
+        const done = customCounts[cm.id] ?? 0;
+        const total = cm.poinTarget;
+        const pakaiRatio = total > 0;
+        const pct = pakaiRatio ? Math.min(100, Math.round((done / total) * 100)) : 0;
+        return (
+          <div key={cm.id} className={cn("rounded-2xl border border-transparent p-3", tone.tile)}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-xs font-bold">
+                <IconC className="size-4" />
+                {cm.label}
+              </span>
+              {pakaiRatio ? (
+                <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[0.6rem] font-extrabold tabular-nums dark:bg-slate-500/20">
+                  {pct}%
+                </span>
+              ) : (
+                <ChevronRight className="size-3.5 opacity-60" />
+              )}
+            </div>
+            <p className="mt-1.5 text-sm font-extrabold tabular-nums">
+              {pakaiRatio ? `${done}/${total}` : `${done} kegiatan`}
+            </p>
+            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/70 dark:bg-slate-500/20">
+              <div
+                className={cn("h-full rounded-full", tone.bar)}
+                style={{
+                  width: !pakaiRatio || pct <= 0 ? (done > 0 ? "8%" : "0%") : `${Math.max(4, pct)}%`,
+                }}
+              />
+            </div>
           </div>
         );
       })}

@@ -33,6 +33,7 @@ import {
   MessageSquareText,
   MessageCircle,
   MessagesSquare,
+  Shapes,
   Settings,
 } from "lucide-react";
 
@@ -52,6 +53,7 @@ export const ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   jurnal: NotebookPen,
   "jurnal-ibadah": NotebookPen,
   target: TargetIcon,
+  modul: Shapes,
   raport: FileText,
   halaqah: Users2,
   jadwal: CalendarDays,

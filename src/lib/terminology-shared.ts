@@ -72,6 +72,8 @@ export type NavKey =
   | "jurnal"
   | "jurnal-ibadah"
   | "target"
+  // V58 — modul kustom lembaga (kelola + pencatatan poin).
+  | "modul"
   | "raport"
   | "halaqah"
   | "jadwal"
