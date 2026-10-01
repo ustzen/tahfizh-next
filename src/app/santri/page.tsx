@@ -10,7 +10,7 @@ import { SANTRI_QUICK_MENU, SANTRI_QUICK_MENU_DEFAULT_KEYS, resolveQuickMenu } f
 import { createClient } from "@/lib/supabase/server";
 import { getMenuIconOverrides } from "@/lib/menu-icon-overrides";
 import { SantriHomeCard } from "@/components/santri/santri-home-card";
-import { getPrestasiCards, getPresensiRekap } from "@/lib/santri-pantauan";
+import { getPrestasiCards, getPresensiRekap, getSantriTargetProgress } from "@/lib/santri-pantauan";
 
 export const metadata = { title: "Dashboard Santri" };
 
@@ -43,7 +43,7 @@ function hariIniJakarta(): string {
 export default async function SantriDashboardPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri");
 
-  const [savedQuickMenu, ownProfileRes, iconOverrides, prestasiCards, presensiRekap, display] =
+  const [savedQuickMenu, ownProfileRes, iconOverrides, prestasiCards, presensiRekap, santriTargets, display] =
     await Promise.all([
       getDashboardQuickMenuOrder(profile.id),
       createClient().then((supabase) =>
@@ -52,6 +52,8 @@ export default async function SantriDashboardPage() {
       getMenuIconOverrides(),
       getPrestasiCards(),
       getPresensiRekap(6),
+      // V57b — target guru (untuk tile Tahfidz berbasis target).
+      getSantriTargetProgress(),
       getDisplayProfile(),
     ]);
   const mustChangePassword = ownProfileRes.data?.must_change_password === true;
@@ -64,10 +66,11 @@ export default async function SantriDashboardPage() {
 
   return (
     <div className="space-y-4">
-      {/* Hero sapaan + tanggal & avatar */}
+      {/* Hero sapaan + tanggal & avatar — V57b: lebih tinggi di desktop,
+          bukan hanya memanjang horizontal. */}
       <div className="shadow-card relative overflow-hidden rounded-2xl border border-slate-100 bg-white dark:border-slate-500/20 dark:bg-card">
-        <span aria-hidden className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-emerald-50 to-transparent dark:from-emerald-500/10" />
-        <div className="relative flex flex-wrap items-center gap-3 px-5 py-4 sm:px-6">
+        <span aria-hidden className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-50 to-transparent dark:from-emerald-500/10 sm:h-32" />
+        <div className="relative flex flex-wrap items-center gap-3 px-5 py-5 sm:min-h-36 sm:px-6 sm:py-7">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Assalamu&apos;alaikum,</p>
             <h1 className="text-xl font-extrabold tracking-tight text-emerald-800 sm:text-2xl dark:text-emerald-300">
@@ -107,7 +110,9 @@ export default async function SantriDashboardPage() {
       {mustChangePassword && <ForceChangePasswordCard />}
 
       {/* V57 — kartu ringkasan: statistik, modul, kehadiran, motivasi. */}
-      {prestasiCards.length > 0 && <SantriHomeCard cards={prestasiCards} presensi={presensiRekap} />}
+      {prestasiCards.length > 0 && (
+        <SantriHomeCard cards={prestasiCards} presensi={presensiRekap} targets={santriTargets} />
+      )}
 
       {/* Menu Cepat besar (dapat diatur per akun) */}
       <CardBox>

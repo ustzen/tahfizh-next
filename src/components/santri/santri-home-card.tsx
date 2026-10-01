@@ -3,13 +3,11 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Activity,
   BookOpen,
   BookOpenCheck,
   CalendarCheck2,
   ChevronRight,
   Flame,
-  GraduationCap,
   HandHeart,
   ScrollText,
   SpellCheck,
@@ -19,7 +17,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { persen, predikat } from "@/lib/santri-pantauan-shared";
-import type { PrestasiCard, PresensiRekap } from "@/lib/santri-pantauan-shared";
+import type { PrestasiCard, PresensiRekap, TargetProgress } from "@/lib/santri-pantauan-shared";
 
 /**
  * TAHFIZH V57 — Dasbor santri bergaya "Santri Hebat".
@@ -88,9 +86,12 @@ const MONTH_COLORS = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ec4899", "#0
 export function SantriHomeCard({
   cards,
   presensi,
+  targets,
 }: {
   cards: PrestasiCard[];
   presensi: PresensiRekap[];
+  /** V57b — target guru per anak (RPC santri_target_progress) utk tile Tahfidz. */
+  targets: TargetProgress[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = cards.find((c) => c.studentId === selectedId) ?? cards[0];
@@ -201,7 +202,7 @@ export function SantriHomeCard({
           </span>
         </div>
 
-        <SantriModuleTiles card={selected} />
+        <SantriModuleTiles card={selected} targets={targets} />
       </div>
 
       {/* Kehadiran bulanan */}
@@ -284,25 +285,34 @@ export function SantriHomeCard({
   );
 }
 
-/** Tile per modul (Tahfidz/Tugas/Hadits/Doa/Tajwid/…) dengan bar kemajuan. */
-function SantriModuleTiles({ card }: { card: PrestasiCard }) {
+/**
+ * Tile per modul dengan bar kemajuan.
+ * V57b — Tahfidz murni berbasis TARGET guru: "berapa surat dari N surat target
+ * yang sudah dikuasai" (mis. target 18 → maksimal tampil 18/18 + badge 100%),
+ * bukan total hafalan anak (25 surat) dibanding target.
+ */
+function SantriModuleTiles({ card, targets }: { card: PrestasiCard; targets: TargetProgress[] }) {
   const MODULES = [
     { key: "TAHFIDZ", label: "Tahfidz", icon: BookOpen, chip: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300", bar: "bg-emerald-500" },
     { key: "TUGAS", label: "Tugas", icon: ScrollText, chip: "bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-300", bar: "bg-orange-500" },
     { key: "HADITS", label: "Hadits", icon: BookOpenCheck, chip: "bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-300", bar: "bg-violet-500" },
     { key: "DOA", label: "Doa", icon: HandHeart, chip: "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300", bar: "bg-rose-500" },
     { key: "TAJWID", label: "Tajwid", icon: SpellCheck, chip: "bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-300", bar: "bg-teal-500" },
-    { key: "TARTIL", label: "Tartil", icon: GraduationCap, chip: "bg-cyan-50 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-300", bar: "bg-cyan-500" },
-    { key: "SETORAN", label: "Setoran", icon: Activity, chip: "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300", bar: "bg-blue-500" },
   ];
 
-  const pakaiTarget = card.surahTotalIsTarget === true;
+  // Target Tahfidz anak ini (mode katalog V54: capaian = surat target yang sudah dinilai).
+  const tTahfidz = targets.find(
+    (t) => t.studentId === card.studentId && t.category === "TAHFIDZ" && t.targetValue > 0
+  );
+  const tahfidzDone = tTahfidz ? Math.min(tTahfidz.capaian, tTahfidz.targetValue) : 0;
+  const tahfidzTotal = tTahfidz ? tTahfidz.targetValue : 0;
+  const tahfidzPct = tahfidzTotal > 0 ? Math.round((tahfidzDone / tahfidzTotal) * 100) : 0;
+
   const maxCount = Math.max(
     1,
-    ...MODULES.map((m) => {
-      const c = card.moduleStats?.[m.key]?.count ?? card.modules?.[m.key] ?? 0;
-      return m.key === "TAHFIDZ" ? Math.max(c, pakaiTarget ? card.surahTotal : card.surahTotalKatalog ?? 0) : c;
-    })
+    ...MODULES.filter((m) => m.key !== "TAHFIDZ").map(
+      (m) => card.moduleStats?.[m.key]?.count ?? card.modules?.[m.key] ?? 0
+    )
   );
 
   return (
@@ -310,13 +320,12 @@ function SantriModuleTiles({ card }: { card: PrestasiCard }) {
       {MODULES.map((m) => {
         const stat = card.moduleStats?.[m.key];
         const count = stat?.count ?? card.modules?.[m.key] ?? 0;
-        const denom =
-          m.key === "TAHFIDZ"
-            ? pakaiTarget
-              ? card.surahTotal
-              : card.surahTotalKatalog ?? 0
-            : maxCount;
-        const pct = denom > 0 ? Math.min(100, (count / denom) * 100) : 0;
+        const isTahfidz = m.key === "TAHFIDZ";
+        const pct = isTahfidz
+          ? tahfidzPct
+          : maxCount > 0
+            ? Math.min(100, (count / maxCount) * 100)
+            : 0;
         const Icon = m.icon;
         return (
           <div key={m.key} className={cn("rounded-2xl border border-transparent p-3", m.chip)}>
@@ -325,16 +334,30 @@ function SantriModuleTiles({ card }: { card: PrestasiCard }) {
                 <Icon className="size-4" />
                 {m.label}
               </span>
-              <ChevronRight className="size-3.5 opacity-60" />
+              {isTahfidz ? (
+                <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[0.6rem] font-extrabold tabular-nums dark:bg-slate-500/20">
+                  {tahfidzTotal > 0 ? `${tahfidzPct}%` : "—"}
+                </span>
+              ) : (
+                <ChevronRight className="size-3.5 opacity-60" />
+              )}
             </div>
             <p className="mt-1.5 text-sm font-extrabold tabular-nums">
-              {m.key === "TAHFIDZ" && denom > 0
-                ? `${count}/${denom}`
+              {isTahfidz
+                ? tahfidzTotal > 0
+                  ? `${tahfidzDone}/${tahfidzTotal}`
+                  : "—"
                 : `${count}×`}
             </p>
             <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/70 dark:bg-slate-500/20">
-              <div className={cn("h-full rounded-full", m.bar)} style={{ width: `${Math.max(4, pct)}%` }} />
+              <div
+                className={cn("h-full rounded-full", m.bar)}
+                style={{ width: pct <= 0 ? "0%" : `${Math.max(4, pct)}%` }}
+              />
             </div>
+            {isTahfidz && tahfidzTotal === 0 && (
+              <p className="mt-1 text-[0.58rem] font-semibold opacity-80">Belum ada target ustadz</p>
+            )}
           </div>
         );
       })}
