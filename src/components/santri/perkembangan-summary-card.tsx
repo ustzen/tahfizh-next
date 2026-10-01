@@ -161,7 +161,11 @@ export function PerkembanganSummaryCard({
           icon={<BookOpenCheck className="size-4" />}
           value={`${selected.surahSelesai}`}
           label="Surat dikuasai"
-          sub={`dari target ${selected.surahTotal} surat`}
+          sub={
+            selected.surahTotalIsTarget === true
+              ? `dari target ${selected.surahTotal} surat (ustadz)`
+              : `total surah aktif di lembaga: ${selected.surahTotal}`
+          }
           tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
         />
         <StatBox
