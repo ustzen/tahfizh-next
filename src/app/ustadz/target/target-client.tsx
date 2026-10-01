@@ -5,9 +5,11 @@ import { toast } from "sonner";
 import {
   BookOpen,
   BookOpenText,
+  Check,
   HandHeart,
   Pencil,
   Plus,
+  Search,
   Target as TargetIcon,
   Trash2,
   Users,
@@ -41,13 +43,14 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/loading";
+import { cn } from "@/lib/utils";
 import {
   TARGET_CATEGORIES,
   TARGET_CATEGORY_META,
   TARGET_SCOPES,
   TARGET_SCOPE_LABEL,
-  parseTargetItems,
   type HalaqahTarget,
+  type TargetCatalogItem,
   type TargetCategory,
   type TargetHalaqah,
   type TargetScope,
@@ -89,10 +92,13 @@ type EditState = {
 export function TargetClient({
   halaqah,
   targets,
+  catalog,
   santriLabel,
 }: {
   halaqah: TargetHalaqah[];
   targets: HalaqahTarget[];
+  /** Katalog lembaga per jenis — guru memilih dari sini (V54). */
+  catalog: Record<TargetCategory, TargetCatalogItem[]>;
   santriLabel: string;
 }) {
   const [editing, setEditing] = useState<EditState | null>(null);
@@ -101,7 +107,8 @@ export function TargetClient({
 
   // Form dialog.
   const [fScope, setFScope] = useState<TargetScope>("TAHUN");
-  const [fItems, setFItems] = useState("");
+  const [fIds, setFIds] = useState<string[]>([]);
+  const [fSearch, setFSearch] = useState("");
   const [fDesc, setFDesc] = useState("");
 
   const findTarget = (halaqahId: string, category: TargetCategory) =>
@@ -111,18 +118,25 @@ export function TargetClient({
     const existing = findTarget(h.id, category);
     if (existing) {
       setFScope(existing.scope);
-      setFItems(existing.items.join("\n"));
+      setFIds(existing.itemIds);
       setFDesc(existing.description ?? "");
     } else {
       setFScope("TAHUN");
-      setFItems("");
+      setFIds([]);
       setFDesc("");
     }
+    setFSearch("");
     setEditing({ halaqah: h, category, existing });
   }
 
-  const itemCount = parseTargetItems(fItems).length;
-  const canSave = itemCount >= 1 && itemCount <= 500 && !pending;
+  function toggleItem(id: string) {
+    setFIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  const catalogOpsi = editing ? (catalog[editing.category] ?? []) : [];
+  const q = fSearch.trim().toLowerCase();
+  const opsiTersaring = q ? catalogOpsi.filter((o) => o.name.toLowerCase().includes(q)) : catalogOpsi;
+  const canSave = fIds.length >= 1 && fIds.length <= 500 && !pending;
 
   function onSave() {
     if (!editing) return;
@@ -132,7 +146,7 @@ export function TargetClient({
         halaqahId: h.id,
         category,
         scope: fScope,
-        items: fItems,
+        itemIds: fIds,
         description: fDesc || null,
       });
       if (res.error) {
@@ -315,16 +329,53 @@ export function TargetClient({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="target-items">{editingMeta?.itemsLabel} yang ditargetkan</Label>
-              <Textarea
-                id="target-items"
-                value={fItems}
-                onChange={(e) => setFItems(e.target.value)}
-                placeholder={editingMeta?.itemsPlaceholder}
-                rows={6}
-              />
+              <Label>{editingMeta?.itemsLabel}</Label>
+              <div className="relative">
+                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                <input
+                  value={fSearch}
+                  onChange={(e) => setFSearch(e.target.value)}
+                  placeholder={`Cari ${editingMeta?.unit ?? "item"}…`}
+                  className="h-9 w-full rounded-lg border pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </div>
+              <div className="max-h-56 overflow-y-auto rounded-xl border p-1.5">
+                {opsiTersaring.length === 0 ? (
+                  <p className="text-muted-foreground p-3 text-center text-xs">
+                    {catalogOpsi.length === 0
+                      ? `Katalog ${editingMeta?.label ?? ""} lembaga masih kosong — minta admin/koordinator menambahkannya di menu ${editingMeta?.label ?? ""}.`
+                      : "Tidak ada yang cocok dengan pencarian."}
+                  </p>
+                ) : (
+                  opsiTersaring.map((op) => {
+                    const on = fIds.includes(op.id);
+                    return (
+                      <button
+                        key={op.id}
+                        type="button"
+                        onClick={() => toggleItem(op.id)}
+                        aria-pressed={on}
+                        className={cn(
+                          "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
+                          on ? "bg-role-soft/60 font-semibold" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex size-5 shrink-0 items-center justify-center rounded-md border",
+                            on ? "bg-role border-role text-role-ink" : "border-slate-300 dark:border-slate-600"
+                          )}
+                        >
+                          {on && <Check className="size-3.5" />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{op.name}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
               <p className="text-muted-foreground text-xs">
-                {itemCount} {editingMeta?.unit} — jumlah target dihitung otomatis dari yang Anda ketik.
+                {fIds.length} {editingMeta?.unit} dipilih — jumlah target dihitung otomatis dari pilihan.
               </p>
             </div>
 

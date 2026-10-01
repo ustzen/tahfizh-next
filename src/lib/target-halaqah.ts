@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   isTargetCategory,
   isTargetScope,
-  parseTargetItems,
   type HalaqahTarget,
+  type TargetCatalogItem,
   type TargetHalaqah,
   type TargetOverview,
 } from "@/lib/target-shared";
@@ -26,6 +26,8 @@ type RawTarget = {
   category: string;
   scope: string;
   items: string | null;
+  itemIds: string[] | null;
+  itemNames: string | null;
   targetValue: number | string;
   description: string | null;
   updatedAt: string;
@@ -52,13 +54,19 @@ export async function getTargetOverview(): Promise<TargetOverview> {
   const targets: HalaqahTarget[] = [];
   for (const t of raw.targets ?? []) {
     if (!isTargetCategory(t.category)) continue; // abaikan nilai tak dikenal
+    // V54: mode katalog — itemNames dari join katalog; fallback teks guru.
+    const itemNames = (t.itemNames ?? t.items ?? "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
     targets.push({
       id: t.id,
       halaqahId: t.halaqahId,
       category: t.category,
       // Data lama (sebelum V38) belum punya scope → default TAHUN.
       scope: isTargetScope(t.scope) ? t.scope : "TAHUN",
-      items: t.items ? parseTargetItems(t.items) : [],
+      items: itemNames,
+      itemIds: Array.isArray(t.itemIds) ? t.itemIds : [],
       targetValue: Number(t.targetValue ?? 0),
       description: t.description ?? null,
       updatedAt: t.updatedAt,
@@ -66,4 +74,22 @@ export async function getTargetOverview(): Promise<TargetOverview> {
   }
 
   return { halaqah, targets };
+}
+
+/**
+ * V54 — Opsi katalog untuk picker target guru: surah (Tahfidz), hadits,
+ * doa — sesuai kategori. RPC SECURITY DEFINER, scope tenant dari session.
+ */
+export async function getTargetCatalog(category: string): Promise<TargetCatalogItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("target_catalog_list", { p_category: category });
+  if (error) {
+    console.error("target_catalog_list failed:", error.message);
+    return [];
+  }
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id ?? ""),
+    name: String(r.name ?? ""),
+    sortOrder: Number(r.sort_order ?? 0),
+  }));
 }

@@ -1,7 +1,8 @@
 import { Target as TargetIcon } from "lucide-react";
 
 import { requireRole } from "@/lib/auth";
-import { getTargetOverview } from "@/lib/target-halaqah";
+import { getTargetCatalog, getTargetOverview } from "@/lib/target-halaqah";
+import type { TargetCatalogItem, TargetCategory } from "@/lib/target-shared";
 import { getTerminology } from "@/lib/terminology";
 import { PageHeader } from "@/components/dashboard/section";
 import { TargetClient } from "./target-client";
@@ -19,6 +20,18 @@ export default async function TargetPage() {
   const terms = await getTerminology(profile.tenantId);
   const overview = await getTargetOverview();
 
+  // V54 — katalog acuan per jenis untuk picker (menu Tahfidz/Hadits/Doa).
+  const [surah, hadits, doa] = await Promise.all([
+    getTargetCatalog("TAHFIDZ"),
+    getTargetCatalog("HADITS"),
+    getTargetCatalog("DOA"),
+  ]);
+  const catalog: Record<TargetCategory, TargetCatalogItem[]> = {
+    TAHFIDZ: surah,
+    HADITS: hadits,
+    DOA: doa,
+  };
+
   return (
     <div>
       <PageHeader
@@ -34,6 +47,7 @@ export default async function TargetPage() {
       <TargetClient
         halaqah={overview.halaqah}
         targets={overview.targets}
+        catalog={catalog}
         santriLabel={terms.santri}
       />
     </div>

@@ -4,18 +4,17 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
-import { isTargetCategory, isTargetScope, targetItemsTooLong } from "@/lib/target-shared";
+import { isTargetCategory, isTargetScope } from "@/lib/target-shared";
 import type { ActionResult } from "@/app/actions/crud";
 
 /**
  * TAHFIZH V17 (diperbarui V38) — Aksi Target per halaqah.
  *
  * Target diatur untuk satu halaqah (bukan per santri) dengan 3 jenis:
- * TAHFIDZ, HADITS, DOA. Isi target DIKETIK guru (daftar nama — surat/hadits/
- * doa) dan cakupannya TAHUN / GANJIL / GENAP; tidak ada tanggal mulai/selesai.
- * Semua penulisan lewat RPC SECURITY DEFINER yang memverifikasi ulang
- * session → role USTADZ → tenant → halaqah yang diampu. Validasi di sini hanya
- * untuk umpan balik cepat.
+ * TAHFIDZ, HADITS, DOA. V54: isi target DIPILIH dari katalog lembaga
+ * (surah/hadits/doa) — dikirim sebagai daftar ID (`itemIds`). RPC
+ * SECURITY DEFINER memverifikasi ulang session → role USTADZ → tenant →
+ * halaqah yang diampu → ID milik katalog lembaga.
  */
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
@@ -25,9 +24,9 @@ const ERROR_MAP: { match: RegExp; message: string }[] = [
   { match: /HALAQAH_TIDAK_VALID/, message: "Halaqah tidak valid atau bukan halaqah yang Anda ampu." },
   { match: /KATEGORI_TIDAK_VALID/, message: "Jenis target tidak valid." },
   { match: /CAKUPAN_TIDAK_VALID/, message: "Cakupan target tidak valid — pilih 1 tahun ajaran, semester ganjil, atau semester genap." },
-  { match: /ISI_TARGET_KOSONG/, message: "Isi target belum diisi — ketik minimal satu nama." },
-  { match: /ISI_TARGET_TERLALU_BANYAK/, message: "Isi target terlalu banyak — maksimal 500 nama." },
-  { match: /ISI_TARGET_TERLALU_PANJANG/, message: "Isi target terlalu panjang — total maksimal 5000 karakter." },
+  { match: /ISI_TARGET_KOSONG/, message: "Isi target masih kosong — pilih minimal satu item dari katalog." },
+  { match: /ITEM_TIDAK_VALID/, message: "Ada item yang tidak ada di katalog lembaga — muat ulang halaman lalu pilih ulang." },
+  { match: /ISI_TARGET_TERLALU_BANYAK/, message: "Isi target terlalu banyak — maksimal 500 item." },
   { match: /DESKRIPSI_TERLALU_PANJANG/, message: "Keterangan maksimal 300 karakter." },
   { match: /TARGET_TIDAK_DITEMUKAN/, message: "Target tidak ditemukan — mungkin sudah dikosongkan. Muat ulang halaman." },
 ];
@@ -54,7 +53,7 @@ export async function saveHalaqahTargetAction(input: {
   halaqahId: string;
   category: string;
   scope: string;
-  items: string;
+  itemIds: string[];
   description?: string | null;
 }): Promise<ActionResult> {
   const profile = await requireUstadz();
@@ -65,9 +64,10 @@ export async function saveHalaqahTargetAction(input: {
   if (!isTargetScope(input.scope)) {
     return { error: "Cakupan target tidak valid — pilih 1 tahun ajaran, semester ganjil, atau semester genap." };
   }
-  const items = (input.items ?? "").trim();
-  if (!items) return { error: "Isi target belum diisi — ketik minimal satu nama." };
-  if (targetItemsTooLong(items)) return { error: "Isi target terlalu panjang — total maksimal 5000 karakter." };
+  const itemIds = (input.itemIds ?? []).filter((id) => UUID_RE.test(id));
+  if (itemIds.length === 0) {
+    return { error: "Isi target masih kosong — pilih minimal satu item dari katalog." };
+  }
   const description = (input.description ?? "").trim();
   if (description.length > 300) return { error: "Keterangan maksimal 300 karakter." };
 
@@ -76,7 +76,7 @@ export async function saveHalaqahTargetAction(input: {
     p_halaqah_id: input.halaqahId,
     p_category: input.category,
     p_scope: input.scope,
-    p_items: items,
+    p_item_ids: itemIds,
     p_description: description || null,
   });
   if (error) return { error: friendlyError(error.message) };
