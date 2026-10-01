@@ -20,11 +20,12 @@ export default async function TargetPage() {
   const terms = await getTerminology(profile.tenantId);
   const overview = await getTargetOverview();
 
-  // V54 — katalog acuan per jenis untuk picker (menu Tahfidz/Hadits/Doa).
+  // V54/55 — katalog acuan per jenis untuk picker & kelola (semua item,
+  // termasuk nonaktif, supaya guru bisa menampilkan lagi).
   const [surah, hadits, doa] = await Promise.all([
-    getTargetCatalog("TAHFIDZ"),
-    getTargetCatalog("HADITS"),
-    getTargetCatalog("DOA"),
+    getTargetCatalog("TAHFIDZ", true),
+    getTargetCatalog("HADITS", true),
+    getTargetCatalog("DOA", true),
   ]);
   const catalog: Record<TargetCategory, TargetCatalogItem[]> = {
     TAHFIDZ: surah,

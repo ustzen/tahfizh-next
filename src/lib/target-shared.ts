@@ -90,11 +90,12 @@ export type HalaqahTarget = {
   updatedAt: string;
 };
 
-/** Satu opsi katalog untuk picker target (V54). */
+/** Satu opsi katalog untuk picker target (V54; V55 + isActive utk kelola). */
 export type TargetCatalogItem = {
   id: string;
   name: string;
   sortOrder: number;
+  isActive: boolean;
 };
 
 export type TargetOverview = {

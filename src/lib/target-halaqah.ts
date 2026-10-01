@@ -77,12 +77,17 @@ export async function getTargetOverview(): Promise<TargetOverview> {
 }
 
 /**
- * V54 — Opsi katalog untuk picker target guru: surah (Tahfidz), hadits,
- * doa — sesuai kategori. RPC SECURITY DEFINER, scope tenant dari session.
+ * V54/55 — Opsi katalog untuk picker & manajemen target guru: surah
+ * (Tahfidz), hadits, doa — sesuai kategori. `all=true` ikut menyertakan item
+ * nonaktif (untuk dialog kelola katalog). RPC SECURITY DEFINER, scope tenant
+ * dari session.
  */
-export async function getTargetCatalog(category: string): Promise<TargetCatalogItem[]> {
+export async function getTargetCatalog(category: string, all = false): Promise<TargetCatalogItem[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("target_catalog_list", { p_category: category });
+  const { data, error } = await supabase.rpc("target_catalog_list", {
+    p_category: category,
+    p_all: all,
+  });
   if (error) {
     console.error("target_catalog_list failed:", error.message);
     return [];
@@ -91,5 +96,6 @@ export async function getTargetCatalog(category: string): Promise<TargetCatalogI
     id: String(r.id ?? ""),
     name: String(r.name ?? ""),
     sortOrder: Number(r.sort_order ?? 0),
+    isActive: r.is_active === null ? true : Boolean(r.is_active),
   }));
 }

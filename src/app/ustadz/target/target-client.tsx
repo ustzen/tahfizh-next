@@ -1,11 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   BookOpen,
   BookOpenText,
   Check,
+  Eye,
+  EyeOff,
   HandHeart,
   Pencil,
   Plus,
@@ -19,6 +22,11 @@ import {
   clearHalaqahTargetAction,
   saveHalaqahTargetAction,
 } from "@/app/actions/target-halaqah";
+import {
+  deleteTargetCatalogItemAction,
+  saveTargetCatalogItemAction,
+  toggleTargetCatalogItemAction,
+} from "@/app/actions/target-catalog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -104,11 +112,13 @@ export function TargetClient({
   const [editing, setEditing] = useState<EditState | null>(null);
   const [clearing, setClearing] = useState<EditState | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   // Form dialog.
   const [fScope, setFScope] = useState<TargetScope>("TAHUN");
   const [fIds, setFIds] = useState<string[]>([]);
   const [fSearch, setFSearch] = useState("");
+  const [newCatalogName, setNewCatalogName] = useState("");
   const [fDesc, setFDesc] = useState("");
 
   const findTarget = (halaqahId: string, category: TargetCategory) =>
@@ -126,11 +136,80 @@ export function TargetClient({
       setFDesc("");
     }
     setFSearch("");
+    setNewCatalogName("");
     setEditing({ halaqah: h, category, existing });
   }
 
   function toggleItem(id: string) {
     setFIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  // ---- V55: kelola katalog langsung dari menu Target -----------------------
+  function addCatalogItem() {
+    if (!editing) return;
+    const name = newCatalogName.trim();
+    if (name.length < 1) {
+      toast.error("Nama item belum diisi.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await saveTargetCatalogItemAction({
+        category: editing.category,
+        name,
+        sortOrder: 100,
+      });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`"${name}" ditambahkan ke katalog ${TARGET_CATEGORY_META[editing.category].label}.`);
+      if (res.id) setFIds((prev) => (prev.includes(res.id!) ? prev : [...prev, res.id!]));
+      setNewCatalogName("");
+      router.refresh(); // daftar katalog terbaru dari server
+    });
+  }
+
+  function renameCatalogItem(id: string, current: string) {
+    if (!editing) return;
+    const name = window.prompt("Ganti nama item katalog:", current)?.trim();
+    if (!name || name === current) return;
+    startTransition(async () => {
+      const res = await saveTargetCatalogItemAction({ category: editing.category, id, name });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Nama item diperbarui.");
+      router.refresh();
+    });
+  }
+
+  function toggleCatalogActive(id: string, active: boolean) {
+    if (!editing) return;
+    startTransition(async () => {
+      const res = await toggleTargetCatalogItemAction({ category: editing.category, id, active });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(active ? "Item ditampilkan." : "Item disembunyikan dari picker.");
+      router.refresh();
+    });
+  }
+
+  function deleteCatalogItem(id: string, name: string) {
+    if (!editing) return;
+    if (!confirm(`Hapus "${name}" dari katalog? Target yang memakainya akan kehilangan item ini.`)) return;
+    startTransition(async () => {
+      const res = await deleteTargetCatalogItemAction({ category: editing.category, id });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setFIds((prev) => prev.filter((x) => x !== id));
+      toast.success("Item dihapus dari katalog.");
+      router.refresh();
+    });
   }
 
   const catalogOpsi = editing ? (catalog[editing.category] ?? []) : [];
@@ -350,32 +429,92 @@ export function TargetClient({
                   opsiTersaring.map((op) => {
                     const on = fIds.includes(op.id);
                     return (
-                      <button
+                      <div
                         key={op.id}
-                        type="button"
-                        onClick={() => toggleItem(op.id)}
-                        aria-pressed={on}
                         className={cn(
-                          "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
+                          "group flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
                           on ? "bg-role-soft/60 font-semibold" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
                         )}
                       >
-                        <span
-                          className={cn(
-                            "flex size-5 shrink-0 items-center justify-center rounded-md border",
-                            on ? "bg-role border-role text-role-ink" : "border-slate-300 dark:border-slate-600"
-                          )}
+                        <button
+                          type="button"
+                          onClick={() => toggleItem(op.id)}
+                          aria-pressed={on}
+                          className="flex min-w-0 flex-1 items-center gap-2"
                         >
-                          {on && <Check className="size-3.5" />}
+                          <span
+                            className={cn(
+                              "flex size-5 shrink-0 items-center justify-center rounded-md border",
+                              on ? "bg-role border-role text-role-ink" : "border-slate-300 dark:border-slate-600"
+                            )}
+                          >
+                            {on && <Check className="size-3.5" />}
+                          </span>
+                          <span className={cn("min-w-0 flex-1 truncate", !op.isActive && "text-muted-foreground line-through opacity-60")}>
+                            {op.name}
+                          </span>
+                        </button>
+                        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={() => renameCatalogItem(op.id, op.name)}
+                            aria-label={`Ganti nama ${op.name}`}
+                            title="Ganti nama"
+                            className="text-muted-foreground/70 hover:bg-muted hover:text-foreground rounded-md p-1"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleCatalogActive(op.id, !op.isActive)}
+                            aria-label={op.isActive ? `Sembunyikan ${op.name}` : `Tampilkan ${op.name}`}
+                            title={op.isActive ? "Sembunyikan" : "Tampilkan"}
+                            className="text-muted-foreground/70 hover:bg-muted hover:text-foreground rounded-md p-1"
+                          >
+                            {op.isActive ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteCatalogItem(op.id, op.name)}
+                            aria-label={`Hapus ${op.name}`}
+                            title="Hapus"
+                            className="rounded-md p-1 text-muted-foreground/70 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
                         </span>
-                        <span className="min-w-0 flex-1 truncate">{op.name}</span>
-                      </button>
+                      </div>
                     );
                   })
                 )}
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  value={newCatalogName}
+                  onChange={(e) => setNewCatalogName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCatalogItem();
+                    }
+                  }}
+                  placeholder={`Tambah ${editingMeta?.unit ?? "item"} baru ke katalog…`}
+                  maxLength={160}
+                  className="h-9 min-w-0 flex-1 rounded-lg border px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={addCatalogItem}
+                  disabled={pending || newCatalogName.trim().length === 0}
+                >
+                  <Plus className="size-3.5" /> Tambah
+                </Button>
+              </div>
               <p className="text-muted-foreground text-xs">
                 {fIds.length} {editingMeta?.unit} dipilih — jumlah target dihitung otomatis dari pilihan.
+                Arahkan kursor ke item untuk mengganti nama, menyembunyikan, atau menghapusnya dari katalog.
               </p>
             </div>
 
