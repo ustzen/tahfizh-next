@@ -66,7 +66,7 @@ function StatPill({
 }
 
 /** Donut persentase berbasis conic-gradient — ringan tanpa library. */
-function Donut({ pct, color, size = 64 }: { pct: number; color: string; size?: number }) {
+export function Donut({ pct, color, size = 64 }: { pct: number; color: string; size?: number }) {
   const p = Math.max(0, Math.min(100, pct));
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
