@@ -1,7 +1,6 @@
 import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import {
-  DashboardPreview,
   Faq,
   Features,
   FinalCta,
@@ -17,7 +16,6 @@ export default function LandingPage() {
       <LandingHeader />
       <main>
         <Hero />
-        <DashboardPreview />
         <Features />
         <TargetUsers />
         <HowItWorks />

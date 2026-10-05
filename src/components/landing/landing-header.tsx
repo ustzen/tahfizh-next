@@ -17,12 +17,15 @@ export function LandingHeader() {
           <a href="/#keamanan" className="transition-colors hover:text-amber-700 dark:hover:text-yellow-400">Keamanan</a>
           <a href="/#faq" className="transition-colors hover:text-amber-700 dark:hover:text-yellow-400">FAQ</a>
         </nav>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" className="hidden sm:inline-flex">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Button asChild variant="ghost" className="hidden px-4 sm:inline-flex">
             <Link href="/masuk">Login</Link>
           </Button>
-          <Button asChild className="bg-gradient-brand hover:opacity-90">
-            <Link href="/daftar">Daftar Lembaga — GRATIS</Link>
+          <Button asChild size="sm" className="bg-gradient-brand h-9 px-3.5 text-[0.8rem] font-semibold hover:opacity-90 sm:h-9 sm:px-4 sm:text-sm">
+            <Link href="/daftar">
+              <span className="sm:hidden">Daftar</span>
+              <span className="hidden sm:inline">Daftar Lembaga — GRATIS</span>
+            </Link>
           </Button>
         </div>
       </div>
