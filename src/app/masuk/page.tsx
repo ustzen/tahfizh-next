@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { LoginScreen } from "@/components/auth/login-screen";
+import { brandingPublicUrl, getLoginBranding } from "@/lib/branding";
 
 export const metadata: Metadata = { title: "Masuk" };
 
@@ -17,8 +18,10 @@ export default async function MasukPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+  const branding = await getLoginBranding();
+
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-b from-sky-300 via-sky-200 to-sky-100 px-4 py-10">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-b from-sky-300 via-sky-200 to-sky-100 px-4 py-10 lg:px-10">
       {/* dekorasi langit */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute left-[6%] top-[12%] h-16 w-40 rounded-full bg-white/70 blur-[3px]" />
@@ -27,7 +30,11 @@ export default async function MasukPage({
         <div className="absolute right-[12%] bottom-[8%] h-12 w-36 rounded-full bg-white/45 blur-[3px]" />
       </div>
 
-      <LoginScreen notice={error ? NOTICES[error] : undefined} />
+      <LoginScreen
+        notice={error ? NOTICES[error] : undefined}
+        logoUrl={branding.logoPath ? brandingPublicUrl(branding.logoPath) : null}
+        heroUrl={branding.heroPath ? brandingPublicUrl(branding.heroPath) : null}
+      />
     </main>
   );
 }

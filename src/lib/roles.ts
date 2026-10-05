@@ -144,8 +144,12 @@ export function settingsSectionsFor(role: AppRole) {
     { key: "menu", label: "Tampilan & Menu", href: `${base_path}/pengaturan/menu` },
   ];
   // V39 — khusus Developer: ganti ikon menu (Phosphor / unggahan) platform-wide.
+  // V60 — khusus Developer: branding layar login (logo & hero unggahan).
   if (role === "DEVELOPER") {
-    base.push({ key: "ikon", label: "Ikon Menu", href: "/developer/pengaturan/ikon" });
+    base.push(
+      { key: "ikon", label: "Ikon Menu", href: "/developer/pengaturan/ikon" },
+      { key: "branding", label: "Branding", href: "/developer/pengaturan/branding" }
+    );
   }
   if (role === "ADMIN") {
     base.push(
