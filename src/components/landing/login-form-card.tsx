@@ -16,7 +16,7 @@ export function LoginFormCard({ className, notice }: { className?: string; notic
   const [state, formAction, pending] = useActionState(loginAction, null);
 
   return (
-    <div className={cn("w-full rounded-2xl bg-white p-6 shadow-card-lg sm:p-7 dark:bg-slate-900", className)}>
+    <div className={cn("w-full rounded-2xl border border-slate-200 bg-white p-6 sm:p-7 dark:border-slate-800 dark:bg-slate-900", className)}>
       <h2 className="text-lg font-bold text-slate-900 dark:text-white">Masuk ke TAHFIZH</h2>
       <p className="text-muted-foreground mt-1 text-sm">Kelola tahfizh lembaga Anda.</p>
 
@@ -72,7 +72,7 @@ export function LoginFormCard({ className, notice }: { className?: string; notic
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{state?.error ?? notice}</p>
         )}
 
-        <Button type="submit" disabled={pending} className="bg-gradient-brand w-full hover:opacity-90">
+        <Button type="submit" disabled={pending} className="bg-gradient-brand w-full hover:brightness-110">
           {pending && <Spinner />}
           MASUK
         </Button>

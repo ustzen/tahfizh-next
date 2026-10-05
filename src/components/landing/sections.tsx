@@ -48,9 +48,6 @@ function SectionHeading({
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-blue-50/70 dark:bg-slate-950">
-      {/* Aksen lembut satu arah — bersih tanpa orb ganda */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-white to-transparent dark:from-slate-900/60" />
-
       <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pt-28 pb-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:pt-36 lg:pb-24">
         <div>
           <Badge className="bg-yellow-100 text-yellow-800 ring-1 ring-yellow-300 hover:bg-yellow-100 dark:bg-yellow-500/15 dark:text-yellow-300 dark:ring-yellow-500/30">
@@ -69,7 +66,7 @@ export function Hero() {
           </p>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button asChild size="lg" className="bg-gradient-brand h-12 w-full px-6 text-base hover:opacity-90 sm:w-auto">
+            <Button asChild size="lg" className="bg-gradient-brand h-12 w-full px-6 text-base hover:brightness-110 sm:w-auto">
               <Link href="/daftar">Daftar Lembaga — GRATIS</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="h-12 w-full px-6 text-base sm:w-auto">
@@ -87,10 +84,7 @@ export function Hero() {
         </div>
 
         {/* LOGIN FORM — langsung terlihat di hero (rule #10) */}
-        <div className="relative">
-          <div aria-hidden className="absolute -inset-4 rounded-[2rem] bg-yellow-200/50 blur-xl dark:bg-yellow-500/10" />
-          <LoginFormCard className="relative" />
-        </div>
+        <LoginFormCard />
       </div>
     </section>
   );
@@ -148,7 +142,7 @@ export function Features() {
       />
       <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {FEATURES.map((f) => (
-          <Card key={f.title} className="shadow-card group rounded-2xl border-slate-200/80 transition-all hover:-translate-y-0.5 hover:shadow-card-lg dark:border-slate-800">
+          <Card key={f.title} className="group rounded-2xl border-slate-200 transition-colors hover:border-slate-300 dark:border-slate-800 dark:hover:border-slate-700">
             <CardContent className="px-6">
               <span className={`inline-flex size-11 items-center justify-center rounded-xl ${f.tone}`}>
                 <f.icon className="size-5" />
@@ -183,7 +177,7 @@ export function TargetUsers() {
           {TARGETS.map((t, i) => (
             <span
               key={t}
-              className="shadow-card inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-[0.95rem] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-[0.95rem] font-medium text-slate-700 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600"
             >
               <Building2 className="size-4 text-blue-600 dark:text-yellow-400" />
               {t}
@@ -228,7 +222,7 @@ export function HowItWorks() {
       <div className="mt-12 grid gap-6 md:grid-cols-3">
         {STEPS.map((s, i) => (
           <div key={s.title} className="relative">
-            <Card className="shadow-card h-full rounded-2xl border-slate-200/80 dark:border-slate-800">
+            <Card className="h-full rounded-2xl border-slate-200 dark:border-slate-800">
               <CardContent className="px-6">
                 <div className="flex items-center justify-between">
                   <span className="bg-gradient-brand flex size-11 items-center justify-center rounded-xl text-white">
@@ -308,9 +302,7 @@ export function SecurityAndFree() {
         </div>
 
         {/* GRATIS card */}
-        <div className="relative">
-          <div aria-hidden className="absolute -inset-3 rounded-[2rem] bg-yellow-400/15 blur-2xl" />
-          <div className="relative rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
             <Badge className="bg-amber-400/15 text-amber-300 hover:bg-amber-400/15">
               <HeartHandshake className="size-3.5" /> Model Bisnis Transparan
             </Badge>
@@ -337,7 +329,6 @@ export function SecurityAndFree() {
             <Button asChild size="lg" className="mt-8 w-full bg-white text-slate-900 hover:bg-slate-200">
               <Link href="/daftar">Daftarkan Lembaga Anda</Link>
             </Button>
-          </div>
         </div>
       </div>
     </section>
@@ -401,10 +392,6 @@ export function FinalCta() {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-6">
       <div className="bg-gradient-brand relative overflow-hidden rounded-3xl px-5 py-12 text-center text-white sm:px-8 sm:py-14">
-        <div aria-hidden className="absolute inset-0 opacity-30">
-          <div className="absolute -top-20 left-1/4 size-64 rounded-full bg-white/20 blur-3xl" />
-          <div className="absolute right-1/4 -bottom-24 size-72 rounded-full bg-sky-300/20 blur-3xl" />
-        </div>
         <h2 className="relative text-3xl font-bold tracking-tight sm:text-4xl">
           Siap mengelola tahfizh dengan lebih terarah?
         </h2>

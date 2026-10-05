@@ -21,7 +21,7 @@ export function LandingHeader() {
           <Button asChild variant="ghost" className="hidden px-4 sm:inline-flex">
             <Link href="/masuk">Login</Link>
           </Button>
-          <Button asChild size="sm" className="bg-gradient-brand h-9 px-3.5 text-[0.8rem] font-semibold hover:opacity-90 sm:h-9 sm:px-4 sm:text-sm">
+          <Button asChild size="sm" className="bg-gradient-brand h-9 px-3.5 text-[0.8rem] font-semibold hover:brightness-110 sm:h-9 sm:px-4 sm:text-sm">
             <Link href="/daftar">
               <span className="sm:hidden">Daftar</span>
               <span className="hidden sm:inline">Daftar Lembaga — GRATIS</span>
