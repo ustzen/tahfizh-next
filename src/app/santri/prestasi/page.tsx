@@ -1,19 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  Award,
+  ArrowUpRight,
+  BookOpen,
   BookOpenCheck,
   BookOpenText,
   CalendarCheck,
   HandHeart,
-  SpellCheck,
   ListChecks,
-  ArrowUpRight,
+  Medal,
+  SpellCheck,
+  Star,
+  TrendingUp,
+  Trophy,
+  UserRound,
 } from "lucide-react";
 
 import { cleanNis } from "@/lib/nis";
 import { signAvatarPath } from "@/lib/avatar";
-import { PageHeader } from "@/components/dashboard/section";
+import { MosqueGlyph } from "@/components/dashboard/mosque-glyph";
 import { requireRole } from "@/lib/auth";
 import { getPrestasiCards, getHalaqahRank, getMeterTotals, getSantriTargetProgress } from "@/lib/santri-pantauan";
 import { cn } from "@/lib/utils";
@@ -23,7 +28,6 @@ import {
   meterDoneLabel,
   moduleLabel,
   persen,
-  predikat,
   targetScopeLabel,
   tanggalId,
   type MeterTotals,
@@ -41,95 +45,179 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   DOA: HandHeart,
   TAJWID: SpellCheck,
   TUGAS: ListChecks,
+  KEHADIRAN: CalendarCheck,
+};
+
+/** Label ubin sesuai mockup ("Doa Harian", bukan "Doa"). */
+const TILE_LABEL: Record<string, string> = {
+  TAHFIDZ: "Tahfidz",
+  HADITS: "Hadits",
+  DOA: "Doa Harian",
+  TAJWID: "Tajwid",
+  TUGAS: "Tugas",
+  KEHADIRAN: "Kehadiran",
 };
 
 /**
- * V40 — ubin modul Kartu Prestasi: SETORAN & TARTIL dihapus, sisanya
- * diperbesar supaya lebih mudah dibaca anak.
+ * Palet ubin per modul — mockup: Tahfidz hijau, Hadits biru, Doa Harian
+ * ungu, Tugas oranye (Tajwid rose, Kehadiran biru langit).
  */
-const TILE_ORDER: ModuleKey[] = ["TAHFIDZ", "HADITS", "DOA", "TAJWID", "TUGAS"];
-
-/** Warna ikon+angka per modul + kehadiran. */
-const MODULE_ACCENT: Record<string, string> = {
-  TAHFIDZ: "text-emerald-600 dark:text-emerald-400",
-  SETORAN: "text-blue-600 dark:text-blue-400",
-  TARTIL: "text-sky-600 dark:text-sky-400",
-  HADITS: "text-violet-600 dark:text-violet-400",
-  DOA: "text-amber-600 dark:text-amber-400",
-  TAJWID: "text-rose-600 dark:text-rose-400",
-  TUGAS: "text-orange-600 dark:text-orange-400",
-  KEHADIRAN: "text-sky-600 dark:text-sky-400",
-};
-
-/** V40 — aksen warna meter persentase, konsisten dengan warna modulnya. */
-const TONE_METER: Record<string, { text: string; bar: string; track: string }> = {
+const TILE_STYLE: Record<
+  string,
+  { tile: string; iconBg: string; name: string; count: string; frac: string; pill: string; ribbon: string }
+> = {
   TAHFIDZ: {
-    text: "text-emerald-700 dark:text-emerald-300",
-    bar: "bg-emerald-500",
-    track: "bg-emerald-200/70 dark:bg-emerald-500/20",
-  },
-  SETORAN: {
-    text: "text-blue-700 dark:text-blue-300",
-    bar: "bg-blue-500",
-    track: "bg-blue-200/70 dark:bg-blue-500/20",
-  },
-  TARTIL: {
-    text: "text-sky-700 dark:text-sky-300",
-    bar: "bg-sky-500",
-    track: "bg-sky-200/70 dark:bg-sky-500/20",
+    tile: "border-emerald-200 bg-emerald-50 dark:border-emerald-500/25 dark:bg-emerald-500/10",
+    iconBg: "bg-emerald-500",
+    name: "text-emerald-700 dark:text-emerald-300",
+    count: "text-emerald-600 dark:text-emerald-300",
+    frac: "text-emerald-600/80 dark:text-emerald-300/80",
+    pill: "bg-emerald-500",
+    ribbon: "bg-emerald-600",
   },
   HADITS: {
-    text: "text-violet-700 dark:text-violet-300",
-    bar: "bg-violet-500",
-    track: "bg-violet-200/70 dark:bg-violet-500/20",
+    tile: "border-blue-200 bg-blue-50 dark:border-blue-500/25 dark:bg-blue-500/10",
+    iconBg: "bg-blue-500",
+    name: "text-blue-700 dark:text-blue-300",
+    count: "text-blue-600 dark:text-blue-300",
+    frac: "text-blue-600/80 dark:text-blue-300/80",
+    pill: "bg-blue-500",
+    ribbon: "bg-blue-600",
   },
   DOA: {
-    text: "text-amber-700 dark:text-amber-300",
-    bar: "bg-amber-500",
-    track: "bg-amber-200/70 dark:bg-amber-500/20",
-  },
-  TAJWID: {
-    text: "text-rose-700 dark:text-rose-300",
-    bar: "bg-rose-500",
-    track: "bg-rose-200/70 dark:bg-rose-500/20",
+    tile: "border-violet-200 bg-violet-50 dark:border-violet-500/25 dark:bg-violet-500/10",
+    iconBg: "bg-violet-500",
+    name: "text-violet-700 dark:text-violet-300",
+    count: "text-violet-600 dark:text-violet-300",
+    frac: "text-violet-600/80 dark:text-violet-300/80",
+    pill: "bg-violet-500",
+    ribbon: "bg-violet-600",
   },
   TUGAS: {
-    text: "text-orange-700 dark:text-orange-300",
-    bar: "bg-orange-500",
-    track: "bg-orange-200/70 dark:bg-orange-500/20",
+    tile: "border-orange-200 bg-orange-50 dark:border-orange-500/25 dark:bg-orange-500/10",
+    iconBg: "bg-orange-500",
+    name: "text-orange-700 dark:text-orange-300",
+    count: "text-orange-600 dark:text-orange-300",
+    frac: "text-orange-600/80 dark:text-orange-300/80",
+    pill: "bg-orange-500",
+    ribbon: "bg-orange-600",
+  },
+  TAJWID: {
+    tile: "border-rose-200 bg-rose-50 dark:border-rose-500/25 dark:bg-rose-500/10",
+    iconBg: "bg-rose-500",
+    name: "text-rose-700 dark:text-rose-300",
+    count: "text-rose-600 dark:text-rose-300",
+    frac: "text-rose-600/80 dark:text-rose-300/80",
+    pill: "bg-rose-500",
+    ribbon: "bg-rose-600",
   },
   KEHADIRAN: {
-    text: "text-sky-700 dark:text-sky-300",
-    bar: "bg-sky-500",
-    track: "bg-sky-200/70 dark:bg-sky-500/20",
-  },
-  UMUM: {
-    text: "text-foreground",
-    bar: "bg-foreground/70",
-    track: "bg-muted",
+    tile: "border-sky-200 bg-sky-50 dark:border-sky-500/25 dark:bg-sky-500/10",
+    iconBg: "bg-sky-500",
+    name: "text-sky-700 dark:text-sky-300",
+    count: "text-sky-600 dark:text-sky-300",
+    frac: "text-sky-600/80 dark:text-sky-300/80",
+    pill: "bg-sky-500",
+    ribbon: "bg-sky-600",
   },
 };
 
-/** Satuan per tipe meter. */
-const METER_UNITS: Record<string, string> = {
-  TAHFIDZ: "surat",
-  HADITS: "hadits",
-  DOA: "doa",
-  TAJWID: "materi",
-  TUGAS: "tugas",
-  KEHADIRAN: "pertemuan",
-  CUSTOM: "item",
-};
+/** Pita predikat dari persentase capaian. */
+function ribbonLabel(pct: number | null): string {
+  if (pct === null) return "Belum Dinilai";
+  if (pct >= 90) return "Sangat Baik";
+  if (pct >= 75) return "Baik";
+  if (pct >= 60) return "Cukup";
+  return "Semangat!";
+}
+
+/** Ubin capaian ala mockup: ikon bundar, nama, angka besar, pecahan, pil persen, pita. */
+function AchievementTile({
+  tileKey,
+  count,
+  frac,
+  pct,
+  title,
+}: {
+  tileKey: string;
+  count: number;
+  frac: string | null;
+  pct: number | null;
+  title: string;
+}) {
+  const s = TILE_STYLE[tileKey] ?? TILE_STYLE.KEHADIRAN;
+  const Icon = MODULE_ICONS[tileKey] ?? BookOpenCheck;
+  return (
+    <div
+      className={cn(
+        "shadow-card relative flex flex-col items-center gap-1 overflow-hidden rounded-2xl border px-2 pt-3.5 pb-3 text-center",
+        s.tile
+      )}
+      title={title}
+    >
+      <span aria-hidden className="bg-dots pointer-events-none absolute -top-1 right-0 h-12 w-16 text-white/60 dark:text-white/10" />
+      <span className={cn("shadow-card flex size-11 items-center justify-center rounded-full text-white", s.iconBg)}>
+        <Icon className="size-5.5" />
+      </span>
+      <p className={cn("mt-1 text-sm font-bold", s.name)}>{TILE_LABEL[tileKey] ?? tileKey}</p>
+      <p className={cn("tabular text-2xl leading-none font-extrabold", count === 0 && "opacity-60", s.count)}>{count}</p>
+      <p className={cn("tabular text-xs font-semibold", s.frac)}>{frac ?? "—"}</p>
+      <span
+        className={cn(
+          "mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.7rem] font-bold text-white",
+          count === 0 ? "bg-slate-400 dark:bg-slate-500" : s.pill
+        )}
+      >
+        <Star className="size-3 fill-current" aria-hidden />
+        {pct === null ? "0%" : `${pct}%`}
+      </span>
+      <span
+        className={cn(
+          "mt-1.5 inline-block px-3.5 py-0.5 text-[0.68rem] font-bold text-white [clip-path:polygon(0_0,100%_0,calc(100%-8px)_50%,100%_100%,0_100%,8px_50%)]",
+          count === 0 ? "bg-slate-400 dark:bg-slate-500" : s.ribbon
+        )}
+      >
+        {ribbonLabel(pct)}
+      </span>
+    </div>
+  );
+}
 
 /**
- * V40 — bangun meter persentase untuk satu anak.
- *
- * Aturan per modul:
- *   • TAHFIDZ : surat dikuasai / target guru (fallback: semua surat aktif).
- *   • TUGAS   : tugas dikerjakan / tugas diberikan (5/10 → 50%).
- *   • HADITS, DOA, TAJWID: materi lulus / target guru; tanpa target guru →
- *     / jumlah materi aktif modul itu di lembaga (RPC santri_meter_totals).
- * SETORAN & TARTIL sengaja tidak punya meter.
+ * Medali peringkat ala mockup: medali bundar + pita biru di belakang.
+ */
+function RankMedal({ rank }: { rank: number | null }) {
+  const face =
+    rank === null
+      ? "from-slate-200 to-slate-300 ring-slate-300 dark:from-slate-600 dark:to-slate-700 dark:ring-slate-500/40"
+      : rank === 1
+        ? "from-amber-300 to-amber-500 ring-amber-400"
+        : rank === 2
+          ? "from-slate-200 to-slate-400 ring-slate-300"
+          : rank === 3
+            ? "from-orange-300 to-orange-500 ring-orange-400"
+            : "from-sky-300 to-sky-500 ring-sky-400";
+  return (
+    <div className="relative mx-auto size-24 lg:size-28">
+      {/* Pita medali */}
+      <span aria-hidden className="absolute top-[58%] left-1/2 h-11 w-6 -translate-x-[135%] rotate-[20deg] rounded-b-md bg-sky-600" />
+      <span aria-hidden className="absolute top-[58%] left-1/2 h-11 w-6 -translate-x-[-35%] rotate-[-20deg] rounded-b-md bg-sky-500" />
+      <div
+        className={cn(
+          "shadow-card-lg relative z-10 flex size-full items-center justify-center rounded-full bg-gradient-to-br ring-4",
+          face
+        )}
+      >
+        <span className="tabular text-4xl font-black text-white drop-shadow-sm lg:text-5xl">
+          {rank === null ? "–" : rank}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * V40 — bangun meter persentase untuk satu anak (dipakai ubin capaian).
  */
 function buildMeters(
   c: PrestasiCard,
@@ -139,8 +227,6 @@ function buildMeters(
   const milik = targets.filter((t) => t.studentId === c.studentId && t.targetValue > 0);
   const meters: PersenMeter[] = [];
 
-  // TAHFIDZ: surat dikuasai vs target hafalan guru.
-  // Contoh: target 10 surat, sudah 9 → 90%. Tanpa target → vs semua surat aktif.
   const tTahfidz = milik.find((t) => t.category === "TAHFIDZ");
   const targetTahfidz = tTahfidz ? tTahfidz.targetValue : c.surahTotal || 0;
   if (targetTahfidz > 0) {
@@ -149,13 +235,11 @@ function buildMeters(
       label: "Target Hafalan",
       done: Math.min(tTahfidz ? tTahfidz.capaian : c.surahSelesai, targetTahfidz),
       total: targetTahfidz,
-      unit: METER_UNITS.TAHFIDZ,
+      unit: "surat",
       hint: tTahfidz ? `Target ustadz · ${targetScopeLabel(tTahfidz.scope)}` : "Semua surat aktif di tenant",
     });
   }
 
-  // TUGAS: jumlah tugas yang sudah dikerjakan/dinilai vs total tugas diberikan.
-  // Contoh: 10 tugas diberikan, 5 dikerjakan → 50%.
   const tugasStat = c.moduleStats?.TUGAS;
   const tugasDiberikan = (totals?.tugasTotal || 0) || tugasStat?.count || 0;
   if (tugasDiberikan > 0) {
@@ -164,26 +248,11 @@ function buildMeters(
       label: "Pengerjaan Tugas",
       done: Math.min(tugasStat?.count ?? 0, tugasDiberikan),
       total: tugasDiberikan,
-      unit: METER_UNITS.TUGAS,
+      unit: "tugas",
       hint: "Tugas halaqah yang sudah dikerjakan",
     });
   }
 
-  // KEHADIRAN: hadir / total pertemuan tercatat — selalu tampil bila ada
-  // data presensi (mis. 26 hadir dari 30 pertemuan → 87%).
-  if (c.presensi.total > 0) {
-    meters.push({
-      key: "KEHADIRAN",
-      label: "Kehadiran",
-      done: c.presensi.hadir,
-      total: c.presensi.total,
-      unit: METER_UNITS.KEHADIRAN,
-      hint: `${c.presensi.izin} izin · ${c.presensi.sakit} sakit · ${c.presensi.alpa} alpa`,
-    });
-  }
-
-  // HADITS / DOA / TAJWID: materi lulus / target guru; tanpa target guru →
-  // / jumlah materi aktif modul itu di lembaga. SELALU tampil.
   const modulMateri: Array<{ key: string; label: string; total: number }> = [
     { key: "HADITS", label: "Target Hadits", total: totals?.haditsTotal ?? 0 },
     { key: "DOA", label: "Target Doa", total: totals?.doaTotal ?? 0 },
@@ -201,118 +270,253 @@ function buildMeters(
       label: modul.label,
       done,
       total,
-      unit: METER_UNITS[modul.key],
+      unit: modul.key === "TAJWID" ? "materi" : modul.key === "HADITS" ? "hadits" : "doa",
       hint: t ? `Target ustadz · ${targetScopeLabel(t.scope)}` : "Materi aktif di lembaga",
-    });
-  }
-
-  // Target bebas (CUSTOM) dari guru — tampil bila ada.
-  const tCustom = milik.find((x) => x.category === "CUSTOM");
-  if (tCustom && tCustom.targetValue > 0) {
-    meters.push({
-      key: "CUSTOM",
-      label: "Target Lain",
-      done: Math.min(tCustom.capaian, tCustom.targetValue),
-      total: tCustom.targetValue,
-      unit: METER_UNITS.CUSTOM,
-      hint: `Target ustadz · ${targetScopeLabel(tCustom.scope)}`,
     });
   }
 
   return meters;
 }
 
-/**
- * V42 — cincin peringkat sementara di halaqah (dari rata-rata nilai semua
- * modul). Tampilan V45: cincin lebih besar dengan gradasi warna medali,
- * angka besar tebal berwarna, dan latar dalam berbinar lembut.
- */
-const RANK_STYLES = {
-  emas: {
-    ring: "#f59e0b",
-    text: "text-amber-500 dark:text-amber-400",
-    inner: "from-amber-50 to-white dark:from-amber-500/15 dark:to-slate-900",
-    glow: "0 0 0 3px rgba(245,158,11,0.18), 0 6px 18px rgba(245,158,11,0.28)",
-  },
-  perak: {
-    ring: "#94a3b8",
-    text: "text-slate-500 dark:text-slate-300",
-    inner: "from-slate-100 to-white dark:from-slate-500/15 dark:to-slate-900",
-    glow: "0 0 0 3px rgba(148,163,184,0.20), 0 6px 18px rgba(148,163,184,0.28)",
-  },
-  perunggu: {
-    ring: "#b45309",
-    text: "text-amber-700 dark:text-amber-500",
-    inner: "from-orange-100 to-white dark:from-orange-500/15 dark:to-slate-900",
-    glow: "0 0 0 3px rgba(180,83,9,0.16), 0 6px 18px rgba(180,83,9,0.26)",
-  },
-  hijau: {
-    ring: "#059669",
-    text: "text-emerald-600 dark:text-emerald-400",
-    inner: "from-emerald-50 to-white dark:from-emerald-500/15 dark:to-slate-900",
-    glow: "0 0 0 3px rgba(5,150,105,0.16), 0 6px 18px rgba(5,150,105,0.24)",
-  },
-  kosong: {
-    ring: "#cbd5e1",
-    text: "text-muted-foreground",
-    inner: "from-slate-50 to-white dark:from-slate-500/10 dark:to-slate-900",
-    glow: "none",
-  },
-} as const;
-
-function RankRing({
-  rank,
-  totalRanked,
-  avgScore,
-  halaqahName,
+/** Satu frame Kartu Prestasi (mockup) untuk satu anak. */
+function PrestasiFrame({
+  c,
+  meters,
+  rankInfo,
+  avatarUrl,
+  isPlaceholder,
 }: {
-  rank: number | null;
-  totalRanked: number;
-  avgScore: number | null;
-  halaqahName: string | null;
+  c: PrestasiCard;
+  meters: PersenMeter[];
+  rankInfo: { rank: number | null; totalRanked: number; avgScore: number | null; halaqahName: string | null } | undefined;
+  avatarUrl: string | null;
+  isPlaceholder: boolean;
 }) {
-  const s =
-    rank === null
-      ? RANK_STYLES.kosong
-      : rank === 1
-        ? RANK_STYLES.emas
-        : rank === 2
-          ? RANK_STYLES.perak
-          : rank === 3
-            ? RANK_STYLES.perunggu
-            : RANK_STYLES.hijau;
-  const pct =
-    rank === null ? 0 : totalRanked > 1 ? Math.round(((totalRanked - rank) / (totalRanked - 1)) * 100) : 100;
-  const title =
-    rank === null
-      ? "Peringkat sementara · belum ada nilai"
-      : `Peringkat sementara di ${halaqahName ?? "halaqah"}: #${rank} dari ${totalRanked} santri · rata-rata nilai ${avgScore ?? "–"}`;
+  const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
+  const nisTampil = cleanNis(c.nis, c.businessCode);
+  const lencana = badgesFor(c).slice(0, 3);
+  const meterMap = new Map(meters.map((m) => [m.key, m]));
+
+  const tileOf = (key: string, stat: { count: number }) => {
+    const m = meterMap.get(key);
+    return {
+      key,
+      count: stat.count,
+      frac: m ? `${m.done}/${m.total}` : null,
+      pct: m ? persen(m.done, m.total) : null,
+      title: stat.count === 0
+        ? `${moduleLabel(key as ModuleKey)} · belum ada penilaian`
+        : `${moduleLabel(key as ModuleKey)} · ${m ? `${m.done}/${m.total} ${m.unit ?? ""}` : ""} · ${m?.hint ?? ""}`,
+    };
+  };
+
+  // 4 ubin mockup selalu tampil; Tajwid & Kehadiran muncul saat ada datanya.
+  const tiles = [
+    tileOf("TAHFIDZ", c.moduleStats?.TAHFIDZ ?? EMPTY_MODULE_STAT),
+    tileOf("HADITS", c.moduleStats?.HADITS ?? EMPTY_MODULE_STAT),
+    tileOf("DOA", c.moduleStats?.DOA ?? EMPTY_MODULE_STAT),
+    tileOf("TUGAS", c.moduleStats?.TUGAS ?? EMPTY_MODULE_STAT),
+    ...(c.moduleStats?.TAJWID && c.moduleStats.TAJWID.count > 0 ? [tileOf("TAJWID", c.moduleStats.TAJWID)] : []),
+    ...(c.presensi.total > 0
+      ? [
+          {
+            key: "KEHADIRAN",
+            count: c.presensi.hadir,
+            frac: `${c.presensi.hadir}/${c.presensi.total}`,
+            pct: persen(c.presensi.hadir, c.presensi.total),
+            title: `Kehadiran · ${c.presensi.izin} izin · ${c.presensi.sakit} sakit · ${c.presensi.alpa} alpa`,
+          },
+        ]
+      : []),
+  ];
+
+  const rank = rankInfo?.rank ?? null;
+  const totalRanked = rankInfo?.totalRanked ?? 0;
+
   return (
-    <div
-      className="relative flex size-16 shrink-0 items-center justify-center rounded-full lg:size-24"
-      style={{
-        background: `conic-gradient(${s.ring} ${pct * 3.6}deg, ${s.ring}22 ${pct * 3.6}deg)`,
-        boxShadow: s.glow,
-      }}
-      title={title}
-    >
-      <div
-        className={cn(
-          "flex size-12 flex-col items-center justify-center rounded-full bg-gradient-to-br lg:size-20",
-          s.inner,
-        )}
-      >
-        {rank === null ? (
-          <span className={cn("text-lg font-black lg:text-2xl", s.text)}>–</span>
-        ) : (
-          <>
-            <span className={cn("tabular text-[1.35rem] leading-none font-black tracking-tight lg:text-4xl", s.text)}>
-              #{rank}
+    <div className="shadow-card-lg bg-card relative flex flex-col overflow-hidden rounded-3xl border">
+      {/* ================= HERO: langit + masjid ================= */}
+      <div className="relative overflow-hidden bg-gradient-to-b from-sky-300 via-sky-200 to-sky-100 px-5 pt-5 pb-8 sm:px-7 dark:from-sky-950 dark:via-sky-900/70 dark:to-sky-900/40">
+        {/* Awan */}
+        <span aria-hidden className="absolute top-3 left-10 h-8 w-28 rounded-full bg-white/60 blur-md" />
+        <span aria-hidden className="absolute top-9 left-1/3 h-6 w-20 rounded-full bg-white/50 blur-md" />
+        <span aria-hidden className="absolute -top-2 right-1/4 h-9 w-32 rounded-full bg-white/55 blur-md" />
+        {/* Masjid kanan */}
+        <span aria-hidden className="absolute right-4 bottom-0 text-sky-600/80 sm:right-8 dark:text-sky-300/40">
+          <MosqueGlyph className="size-24 lg:size-32" />
+        </span>
+
+        <div className="relative flex flex-wrap items-start gap-4">
+          <span className="shadow-card flex size-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-sky-600 text-white ring-2 ring-white/70">
+            <Trophy className="size-7" />
+            <span aria-hidden className="mt-0.5 block h-1 w-1 rounded-full bg-white/90" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-2xl font-extrabold tracking-tight text-sky-950 sm:text-3xl dark:text-white">
+              Kartu Prestasi
+            </h2>
+            <p className="mt-0.5 text-sm font-medium text-sky-900/75 dark:text-sky-100/75">
+              Langkah kecil hari ini, untuk masa depan yang mulia.
+            </p>
+          </div>
+          <p className="hidden max-w-56 shrink-0 text-right text-sm leading-snug font-medium text-sky-900/80 italic lg:block dark:text-sky-100/80">
+            “Jadilah santri yang berprestasi, berakhlak mulia, dan bermanfaat untuk sesama.”
+            <span aria-hidden className="mx-auto mt-1 block h-1 w-14 rounded-full bg-amber-300" />
+          </p>
+        </div>
+      </div>
+
+      {/* ================= STRIP IDENTITAS + KAMU HEBAT ================= */}
+      <div className="bg-card relative -mt-4 px-4 sm:px-6">
+        <div className="shadow-card flex flex-wrap items-center gap-4 rounded-2xl border px-4 py-4 sm:px-5">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt={c.studentName}
+              className="size-16 shrink-0 rounded-full object-cover ring-2 ring-sky-200 lg:size-20 dark:ring-sky-500/30"
+            />
+          ) : (
+            <span className="bg-role-soft text-role-strong flex size-16 shrink-0 items-center justify-center rounded-full text-xl font-bold ring-2 ring-sky-200 lg:size-20 dark:ring-sky-500/30">
+              {initial}
             </span>
-            <span className="text-muted-foreground mt-1 text-[0.55rem] font-semibold tracking-wide lg:text-[0.68rem]">
-              dari {totalRanked}
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold">
+              <UserRound className="text-role size-3.5" />
+              Nama Santri
+            </p>
+            <p className="text-role-strong truncate text-xl font-extrabold tracking-tight sm:text-2xl">
+              {c.studentName}
+            </p>
+            <p className="text-muted-foreground mt-0.5 truncate text-sm">
+              {c.halaqahName ?? "Belum tergabung halaqah"}
+              {nisTampil ? <span className="ml-2 font-mono text-xs">{nisTampil}</span> : null}
+            </p>
+          </div>
+          <div className="relative min-w-52 flex-1 rounded-2xl bg-sky-100/80 px-4 py-3 sm:max-w-xs dark:bg-sky-500/10">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-white shadow-sm">
+                <Medal className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-sky-950 dark:text-sky-100">Kamu hebat!</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-sky-900/70 dark:text-sky-100/70">
+                  Teruslah belajar, karena setiap usaha adalah ibadah.
+                </p>
+                <span aria-hidden className="mt-1 block h-1 w-12 rounded-full bg-amber-400" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ================= PENCAPAIAN SAYA + PERINGKAT ================= */}
+      <div className="mt-4 grid gap-4 px-4 pb-2 sm:px-6 lg:grid-cols-[1fr_300px]">
+        {/* Pencapaian Saya */}
+        <div className="shadow-card rounded-2xl border px-4 py-4 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="bg-role text-role-ink shadow-card flex size-9 items-center justify-center rounded-xl">
+                <Trophy className="size-4.5" />
+              </span>
+              <h3 className="text-role-strong text-lg font-extrabold tracking-tight">Pencapaian Saya</h3>
+            </div>
+            <span className="text-muted-foreground text-xs">
+              {c.lastAssessedAt ? `Terakhir dinilai ${tanggalId(c.lastAssessedAt)}` : "Belum ada penilaian"}
             </span>
-          </>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            {tiles.map((t) => (
+              <AchievementTile key={t.key} tileKey={t.key} count={t.count} frac={t.frac} pct={t.pct} title={t.title} />
+            ))}
+          </div>
+
+          {/* Lencana pencapaian */}
+          {lencana.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {lencana.map((b) => (
+                <span
+                  key={b.label}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold",
+                    b.tone
+                  )}
+                >
+                  <span aria-hidden>{b.emoji}</span>
+                  {b.label}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Catatan apresiasi guru */}
+          {c.catatanApresiasi && (
+            <p className="mt-3 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs leading-relaxed text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+              “{c.catatanApresiasi}”
+            </p>
+          )}
+        </div>
+
+        {/* Peringkat */}
+        <div className="shadow-card flex flex-col rounded-2xl border px-4 py-4 sm:px-5">
+          <div className="flex items-center gap-2.5">
+            <span className="bg-role text-role-ink shadow-card flex size-9 items-center justify-center rounded-xl">
+              <Trophy className="size-4.5" />
+            </span>
+            <h3 className="text-role-strong text-lg font-extrabold tracking-tight">Peringkat</h3>
+          </div>
+
+          <div className="mt-4 flex flex-1 flex-col items-center justify-center text-center">
+            <RankMedal rank={rank} />
+            <p className="text-role-strong mt-3 text-lg font-extrabold tracking-tight">
+              {rank === null ? "Belum ada peringkat" : `Peringkat ${rank}`}
+            </p>
+            <p className="text-muted-foreground text-sm">
+              {rank === null
+                ? "Menunggu nilai dari ustadz"
+                : totalRanked > 0
+                  ? `dari ${totalRanked} santri`
+                  : "di halaqah"}
+            </p>
+          </div>
+
+          <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-sky-100/70 px-3.5 py-3 dark:bg-sky-500/10">
+            <TrendingUp className="mt-0.5 size-4 shrink-0 text-sky-600 dark:text-sky-300" />
+            <p className="text-xs leading-relaxed font-medium text-sky-900/80 dark:text-sky-100/80">
+              {rank === null
+                ? "Raih nilai terbaik dari ustadz untuk mendapatkan peringkat."
+                : rank === 1
+                  ? "Juara 1! Pertahankan prestasimu, hebat!"
+                  : "Pertahankan prestasi, raih peringkat lebih baik lagi!"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ================= FOOTER: kutipan + gelombang ================= */}
+      <div className="mt-4 px-4 sm:px-6">
+        <p className="flex flex-wrap items-center justify-center gap-2 text-center text-sm font-medium text-sky-900/80 italic dark:text-sky-100/80">
+          <BookOpen className="text-role size-4.5" aria-hidden />
+          “Ilmu adalah cahaya, amal adalah buahnya, dan akhlak adalah keindahannya.”
+        </p>
+      </div>
+      <div className="relative mt-4 h-14 overflow-hidden bg-gradient-to-r from-sky-500 via-sky-400 to-sky-300 dark:from-sky-900 dark:via-sky-900/80 dark:to-sky-900/50">
+        <span aria-hidden className="absolute right-6 -bottom-3 text-white/25">
+          <MosqueGlyph className="size-16" />
+        </span>
+        <span aria-hidden className="absolute right-28 -bottom-4 text-white/15">
+          <MosqueGlyph className="size-12" />
+        </span>
+        {!isPlaceholder && (
+          <Link
+            href={`/santri/pantauan?student=${c.studentId}`}
+            className="relative inline-flex h-full items-center gap-1 pl-5 text-sm font-semibold text-white hover:underline sm:pl-8"
+          >
+            Pantauan lengkap
+            <ArrowUpRight className="size-4" />
+          </Link>
         )}
       </div>
     </div>
@@ -320,72 +524,10 @@ function RankRing({
 }
 
 /**
- * Ubin ringkas: ikon + angka besar + label. Dipakai modul & kehadiran.
- */
-function Tile({
-  icon: Icon,
-  label,
-  count,
-  accent,
-  title,
-  kosong,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  count: number;
-  accent: string;
-  title: string;
-  kosong: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex flex-col items-center gap-1.5 rounded-xl px-2 py-3.5 text-center lg:gap-2 lg:px-3 lg:py-5",
-        kosong ? "bg-slate-50 dark:bg-slate-500/5" : "bg-slate-50 dark:bg-slate-500/10"
-      )}
-      title={title}
-    >
-      <Icon className={cn("size-6 lg:size-8", kosong ? "text-slate-400 dark:text-slate-500" : accent)} />
-      <span className={cn("tabular text-xl leading-none font-bold lg:text-3xl", kosong && "text-muted-foreground")}>
-        {count}
-      </span>
-      <span className="text-muted-foreground truncate text-[0.7rem] leading-tight font-medium lg:text-sm">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-/**
- * V40 — bar persentase capaian: persen kanan, angka kiri (done/total + satuan),
- * bar warna modul di bawahnya. Sembunyikan bila total target = 0.
- */
-function MeterBar({ m }: { m: PersenMeter }) {
-  if (m.total <= 0) return null;
-  const pct = persen(m.done, m.total);
-  const tone = TONE_METER[m.key] ?? TONE_METER.UMUM;
-  return (
-    <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-500/10 lg:px-4 lg:py-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-muted-foreground truncate text-[0.68rem] font-medium lg:text-xs">{m.label}</p>
-        <p className={cn("tabular text-sm font-bold lg:text-base", tone.text)}>{pct}%</p>
-      </div>
-      <div className="mt-0.5 flex items-center justify-between gap-2">
-        <p className="tabular text-muted-foreground text-[0.62rem] lg:text-[0.7rem]">{meterDoneLabel(m)}</p>
-        <p className="text-muted-foreground/70 hidden truncate text-[0.62rem] sm:block lg:text-[0.7rem]">{m.hint}</p>
-      </div>
-      <div className={cn("mt-1 h-1.5 overflow-hidden rounded-full lg:mt-1.5 lg:h-2", tone.track)}>
-        <div className={cn("h-full rounded-full transition-all", tone.bar)} style={{ width: `${Math.min(pct, 100)}%` }} />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Kartu Prestasi (versi baru) — seperti raport mini: identitas anak, cincin
- * rata-rata nilai, ubin modul + kehadiran, meter persentase, lencana, dan
- * catatan apresiasi guru. Kartu selalu dirender meski belum ada penilaian
- * (angka 0) supaya anak tahu apa yang akan terisi nanti.
+ * Kartu Prestasi (mockup terbaru) — frame besar: hero langit + masjid,
+ * strip identitas + pesan motivasi, Pencapaian Saya (ubin modul berwarna
+ * dengan pil persen & pita predikat), kartu Peringkat medali, dan footer
+ * kutipan. Kartu selalu dirender meski belum ada penilaian (angka 0).
  */
 export default async function SantriPrestasiPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/prestasi");
@@ -429,152 +571,21 @@ export default async function SantriPrestasiPage() {
         ];
 
   return (
-    <div>
-      <PageHeader
-        title="Kartu Prestasi"
-        description="Raport mini ananda — rata-rata nilai, capaian hafalan, kehadiran, dan apresiasi dari ustadz/ustadzah."
-        icon={<Award className="size-6" />}
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 lg:gap-5">
-        {cards.map((c) => {
-          const p = predikat(c.avgScore);
-          const lencana = badgesFor(c).slice(0, 3);
-          const meters = buildMeters(c, targets, meterTotals.get(c.studentId));
-          const rankInfo = ranks.get(c.studentId);
-          const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
-          const avatarUrl = avatarUrls.get(c.studentId) ?? null;
-          // V41 — subtitle: HALAQAH - NIS/NISN lembaga (bukan nomor ID web).
-          const nisTampil = cleanNis(c.nis, c.businessCode);
-          const idLembaga = [nisTampil, (c.nisn ?? "").trim() || null]
-            .filter(Boolean)
-            .join("/");
-          const subtitle = `${(c.halaqahName ?? "Belum tergabung halaqah").toUpperCase()}${idLembaga ? ` - ${idLembaga}` : ""}`;
-
-          return (
-            <div
-              key={c.studentId}
-              className="bg-card shadow-card relative flex flex-col overflow-hidden rounded-2xl border"
-            >
-              <span aria-hidden className="bg-role absolute inset-x-0 top-0 h-1" />
-
-              <div className="flex items-start gap-3 px-4 pt-4 lg:gap-4 lg:px-6 lg:pt-6">
-                {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatarUrl}
-                    alt={c.studentName}
-                    className="size-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200 lg:size-14 dark:ring-white/10"
-                  />
-                ) : (
-                  <span className="bg-role-soft text-role-strong flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold lg:size-14 lg:text-lg">
-                    {initial}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[0.95rem] font-bold tracking-tight text-foreground lg:text-xl">
-                    {c.studentName}
-                  </p>
-                  <p className="text-muted-foreground truncate text-xs lg:text-sm">{subtitle}</p>
-                </div>
-                <RankRing
-                  rank={rankInfo?.rank ?? null}
-                  totalRanked={rankInfo?.totalRanked ?? 0}
-                  avgScore={rankInfo?.avgScore ?? null}
-                  halaqahName={rankInfo?.halaqahName ?? c.halaqahName}
-                />
-              </div>
-
-              <div className="px-4 pt-2 lg:px-6 lg:pt-3">
-                <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[0.68rem] font-bold lg:px-3 lg:py-1 lg:text-sm", p.tone)}>
-                  {p.label}
-                </span>
-              </div>
-
-              {/* Ubin modul + kehadiran — 6 kartu (setoran & tartil dihapus) */}
-              <div className="mt-3 grid grid-cols-3 gap-1.5 px-4 lg:mt-4 lg:grid-cols-6 lg:gap-2.5 lg:px-6">
-                {TILE_ORDER.map((key) => {
-                  const stat = c.moduleStats?.[key] ?? EMPTY_MODULE_STAT;
-                  const kosong = stat.count === 0;
-                  return (
-                    <Tile
-                      key={key}
-                      icon={MODULE_ICONS[key]}
-                      label={moduleLabel(key).split(" ")[0]}
-                      count={stat.count}
-                      accent={MODULE_ACCENT[key]}
-                      kosong={kosong}
-                      title={
-                        kosong
-                          ? `${moduleLabel(key)} · belum ada penilaian`
-                          : `${moduleLabel(key)} · ${stat.lastTitle ?? ""} · ${tanggalId(stat.lastDate)}`
-                      }
-                    />
-                  );
-                })}
-                <Tile
-                  icon={CalendarCheck}
-                  label="Kehadiran"
-                  count={c.presensi.hadir}
-                  accent={MODULE_ACCENT.KEHADIRAN}
-                  kosong={c.presensi.total === 0}
-                  title={
-                    c.presensi.total === 0
-                      ? "Kehadiran · belum ada data presensi"
-                      : `Kehadiran · ${c.presensi.hadir} hadir, ${c.presensi.izin} izin, ${c.presensi.sakit} sakit, ${c.presensi.alpa} alpa`
-                  }
-                />
-              </div>
-
-              {/* V40 — persentase capaian: hafalan & tugas (+ target modul lain) */}
-              {meters.length > 0 && (
-                <div className="mt-3 grid gap-1.5 px-4 lg:mt-4 lg:grid-cols-2 lg:gap-2 lg:px-6">
-                  {meters.map((m) => (
-                    <MeterBar key={`${m.key}-${m.label}`} m={m} />
-                  ))}
-                </div>
-              )}
-
-              {/* Lencana pencapaian */}
-              {lencana.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5 px-4 lg:mt-4 lg:gap-2 lg:px-6">
-                  {lencana.map((b) => (
-                    <span
-                      key={b.label}
-                      className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold lg:gap-1.5 lg:px-3 lg:py-1 lg:text-xs", b.tone)}
-                    >
-                      <span aria-hidden>{b.emoji}</span>
-                      {b.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Catatan apresiasi guru */}
-              {c.catatanApresiasi && (
-                <p className="mx-4 mt-3 line-clamp-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs leading-relaxed text-amber-900 dark:bg-yellow-500/10 dark:text-yellow-200 lg:mx-6 lg:mt-4 lg:px-4 lg:py-2.5 lg:text-sm">
-                  “{c.catatanApresiasi}”
-                </p>
-              )}
-
-              <div className="mt-3 flex items-center justify-between gap-2 border-t px-4 py-2.5 lg:mt-4 lg:px-6 lg:py-3.5">
-                <span className="text-muted-foreground text-[0.7rem] lg:text-sm">
-                  {c.lastAssessedAt ? `Terakhir dinilai ${tanggalId(c.lastAssessedAt)}` : "Belum ada penilaian"}
-                </span>
-                {c.studentId !== "placeholder" && (
-                  <Link
-                    href={`/santri/pantauan?student=${c.studentId}`}
-                    className="text-role-strong inline-flex items-center gap-0.5 text-xs font-semibold hover:underline lg:text-sm"
-                  >
-                    Pantauan lengkap
-                    <ArrowUpRight className="size-3 lg:size-4" />
-                  </Link>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+    <div className="space-y-5">
+      {cards.map((c) => {
+        const meters = buildMeters(c, targets, meterTotals.get(c.studentId));
+        const rankInfo = ranks.get(c.studentId);
+        return (
+          <PrestasiFrame
+            key={c.studentId}
+            c={c}
+            meters={meters}
+            rankInfo={rankInfo}
+            avatarUrl={avatarUrls.get(c.studentId) ?? null}
+            isPlaceholder={c.studentId === "placeholder"}
+          />
+        );
+      })}
     </div>
   );
 }
