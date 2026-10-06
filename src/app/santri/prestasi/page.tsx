@@ -25,7 +25,6 @@ import { cn } from "@/lib/utils";
 import {
   EMPTY_MODULE_STAT,
   badgesFor,
-  meterDoneLabel,
   moduleLabel,
   persen,
   targetScopeLabel,
