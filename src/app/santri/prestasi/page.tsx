@@ -469,7 +469,7 @@ function PrestasiFrame({
           </div>
 
           {/* Gelembung kutipan — mode mobile (mockup) */}
-          <div className="relative hidden min-w-44 max-w-[46%] shrink-0 items-center rounded-3xl bg-sky-400/80 px-4 py-3 sm:flex lg:hidden dark:bg-sky-500/25">
+          <div className="relative flex w-full min-w-44 items-center justify-center rounded-3xl bg-sky-400/80 px-4 py-3 sm:w-auto sm:max-w-[46%] sm:justify-normal lg:hidden dark:bg-sky-500/25">
             <span aria-hidden className="absolute -top-1 left-3 text-lg leading-none font-black text-white/90">“</span>
             <span aria-hidden className="absolute right-3 -bottom-2 text-lg leading-none font-black text-white/90">”</span>
             <p className="text-center text-[0.72rem] leading-snug font-semibold text-white italic">
