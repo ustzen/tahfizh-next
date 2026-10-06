@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, FileUp, HandCoins, HandHeart, History, PencilLine, QrCode, ReceiptText, Search, UserRound, X } from "lucide-react";
+import { Banknote, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, Clock3, Coins, FileUp, HandHeart, History, PencilLine, QrCode, ReceiptText, Search, UserRound, Users, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -65,36 +65,8 @@ function arrearsTone(count: number) {
     : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300";
 }
 
-/** Ubin ringkasan status tagihan — bentuk & palet mengikuti ubin Presensi. */
-const PAYMENT_STATS = [
-  { key: "paid", label: "Lunas", icon: "✓", tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
-  { key: "pending", label: "Menunggu", icon: "◷", tone: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
-  { key: "waiting", label: "Diproses", icon: "↻", tone: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
-  { key: "unpaid", label: "Belum Bayar", icon: "✚", tone: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
-] as const;
-
 /** Tagihan yang masih harus dibayar (belum diterbitkan pun tetap bisa dilunasi). */
 const isOpenStatus = (s: string) => s === "UNPAID" || s === "NONE";
-
-/** Teks ringkas status satu bulan (agregat antar anak), mis. "2 Lunas · 1 Belum Bayar". */
-function monthStatusText(statuses: string[]) {
-  const counts = new Map<string, number>();
-  for (const s of statuses) counts.set(s, (counts.get(s) ?? 0) + 1);
-  return [...counts.entries()]
-    .map(([s, n]) => `${n > 1 ? `${n} ` : ""}${INVOICE_STATUS_LABEL[s] ?? (s === "NONE" ? "Belum Bayar" : s)}`)
-    .join(" · ");
-}
-
-/** Nada badge status bulan — yang paling perlu diperhatikan yang menang. */
-function monthTone(statuses: string[]) {
-  if (statuses.some(isOpenStatus))
-    return "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
-  if (statuses.some((s) => s === "PENDING"))
-    return "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300";
-  if (statuses.some((s) => s === "WAITING_CONFIRM"))
-    return "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300";
-  return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
-}
 
 /** Gaya chip identitas pembayar: aktif = solid warna role, nonaktif = outline lembut. */
 function payerChipCls(active: boolean) {
@@ -113,6 +85,14 @@ const CHILD_TONES = [
   "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
   "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
 ];
+
+/** Filter chip kartu "Bayarkan Infak Santri Lain" (mockup terbaru). */
+const OTHER_FILTERS = [
+  { key: "all", label: "Semua", n: 0 },
+  { key: "1", label: "1 Bulan", n: 1 },
+  { key: "3", label: "3 Bulan", n: 3 },
+  { key: "5", label: "5 Bulan", n: 5 },
+] as const;
 
 export function WaliPaymentPanel({
   kids,
@@ -158,6 +138,8 @@ export function WaliPaymentPanel({
   const [othersQuery, setOthersQuery] = useState("");
   const [othersShown, setOthersShown] = useState(10);
   const [othersOpen, setOthersOpen] = useState<Record<string, boolean>>({});
+  // Filter chip "Bayarkan Infak Santri Lain": Semua / 1 / 3 / 5 bulan terlama.
+  const [othersFilter, setOthersFilter] = useState<"all" | "1" | "3" | "5">("all");
   // "Dibayarkan atas nama" — dipakai bila ingin infak untuk santri lain tanpa
   // menampilkan nama asli (mis. "Hamba Allah").
   // Mode identitas: "self" = nama asli wali (dikirim apa adanya), "anon" = Hamba Allah,
@@ -230,11 +212,18 @@ export function WaliPaymentPanel({
     if (mode === "custom" && payerMode === "custom") setPayerCustom("");
   }
 
-  /** Pilih N santri lain dengan tunggakan paling lama (seluruh bulannya). */
-  function pickOldestOthers(n: number) {
+  /**
+   * Chip filter "Bayarkan Infak Santri Lain" (mockup): Semua = kosongkan
+   * pilihan; 1/3/5 = pilih santri dengan tunggakan terlama (seluruh bulannya).
+   */
+  function applyOthersFilter(n: number) {
     setError(null);
+    setOthersFilter(n === 0 ? "all" : (String(n) as "1" | "3" | "5"));
     setSelected((prev) => {
       const next = { ...prev };
+      for (const o of others) {
+        for (const inv of o.invoices) delete next[keyOf(o.studentId, inv.y, inv.m)];
+      }
       for (const o of others.slice(0, n)) {
         for (const inv of o.invoices.filter(isSelectable)) next[keyOf(o.studentId, inv.y, inv.m)] = inv.amount;
       }
@@ -293,164 +282,43 @@ export function WaliPaymentPanel({
   }, [others, othersQuery]);
   const visibleOthers = filteredOthers.slice(0, othersShown);
 
-  /* ---- Ringkasan tagihan (ala kartu Presensi) ---------------------------- */
-  // Gabungan riwayat 12 bulan + tunggakan lama (di luar riwayat) per anak,
-  // tanpa duplikat — satu sumber untuk ubin, tabel bulanan, dan chip.
-  type MonthCell = { studentId: string; studentName: string; y: number; m: number; amount: number; status: string };
-  const monthCells: MonthCell[] = [];
-  const seenMonth = new Set<string>();
-  for (const h of history) {
-    for (const it of h.items) {
-      const k = `${h.studentId}:${it.y}:${it.m}`;
-      if (seenMonth.has(k)) continue;
-      seenMonth.add(k);
-      monthCells.push({ studentId: h.studentId, studentName: h.name, y: it.y, m: it.m, amount: it.amount, status: it.status });
+  /* ---- Ringkasan status untuk badge "Tagihan Saya" ----------------------- */
+  // Gabungan riwayat 12 bulan + tagihan terbuka (tanpa duplikat angka presisi
+  // diperlukan — cukup hitungan status).
+  const summary = (() => {
+    const seen = new Set<string>();
+    const statuses: string[] = [];
+    for (const h of history) {
+      for (const it of h.items) {
+        const k = `${h.studentId}:${it.y}:${it.m}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        statuses.push(it.status);
+      }
     }
-  }
-  for (const c of kids) {
-    for (const inv of c.invoices) {
-      const k = `${c.studentId}:${inv.y}:${inv.m}`;
-      if (seenMonth.has(k)) continue;
-      seenMonth.add(k);
-      monthCells.push({ studentId: c.studentId, studentName: c.name, y: inv.y, m: inv.m, amount: inv.amount, status: inv.status });
+    for (const c of kids) {
+      for (const inv of c.invoices) {
+        const k = `${c.studentId}:${inv.y}:${inv.m}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        statuses.push(inv.status);
+      }
     }
-  }
-  const summary = {
-    total: monthCells.length,
-    paid: monthCells.filter((c) => c.status === "PAID").length,
-    pending: monthCells.filter((c) => c.status === "PENDING").length,
-    waiting: monthCells.filter((c) => c.status === "WAITING_CONFIRM").length,
-    unpaid: monthCells.filter((c) => isOpenStatus(c.status)).length,
-  };
-  // Tabel status per bulan — agregat antar anak, terbaru dulu.
-  const monthlyRows = [...monthCells
-    .reduce((map, c) => {
-      const key = `${c.y}-${c.m}`;
-      const row = map.get(key) ?? { y: c.y, m: c.m, amount: 0, statuses: [] as string[] };
-      row.amount += c.amount;
-      row.statuses.push(c.status);
-      map.set(key, row);
-      return map;
-    }, new Map<string, { y: number; m: number; amount: number; statuses: string[] }>())
-    .values()]
-    .sort((a, b) => monthIndex(b.y, b.m) - monthIndex(a.y, a.m));
-  // Chip bulan yang perlu dibayar — terlama dulu, maks 5.
-  const openCells = monthCells
-    .filter((c) => isOpenStatus(c.status) && c.amount > 0)
-    .sort((a, b) => monthIndex(a.y, a.m) - monthIndex(b.y, b.m))
-    .slice(0, 5);
+    return { total: statuses.length, unpaid: statuses.filter(isOpenStatus).length };
+  })();
 
   return (
     <div className="space-y-6">
       <Card className="shadow-card overflow-hidden rounded-2xl">
-        {/* Ringkasan ala kartu Presensi: judul + lencana status, ubin status
-            4 warna, tabel status per bulan, dan chip bulan perlu dibayar.
-            Pengaturan nominal & pemilihan tagihan tetap di bagian bawah. */}
-        <CardContent className="px-5 py-5 sm:px-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-role-strong text-lg font-bold tracking-tight sm:text-xl">
-                Infak Pengembangan {academicYear}
-              </p>
-              <p className="text-muted-foreground mt-0.5 text-xs">
-                {monthCells.length > 0
-                  ? `${monthCells.length} bulan tercatat`
-                  : "Belum ada tagihan tercatat"}{" "}
-                · mulai {rupiah(defaultAmount)}/bulan/santri
-              </p>
-            </div>
-            {selectedCount > 0 ? (
-              <span className="bg-role text-role-ink shadow-card inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-bold">
-                <HandCoins className="size-4" />
-                {selectedCount} dipilih · {rupiah(total)}
-              </span>
-            ) : monthCells.length > 0 ? (
-              <span
-                className={cn(
-                  "shadow-card inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-bold text-white",
-                  summary.unpaid === 0
-                    ? "bg-emerald-600"
-                    : summary.unpaid < 3
-                      ? "bg-amber-500"
-                      : "bg-rose-600"
-                )}
-              >
-                {summary.unpaid === 0 ? <CheckCircle2 className="size-4" /> : <CalendarDays className="size-4" />}
-                {summary.unpaid === 0 ? "Semua lunas" : `Perlu dibayar ${summary.unpaid} bulan`}
-              </span>
-            ) : null}
-          </div>
-
-          {waiverKids.length > 0 && (
-            <div className="mt-3">
-              <WaiverRequestLink kids={waiverKids} requests={waiverRequests} />
-            </div>
-          )}
-
-          {/* Ubin status tagihan */}
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {PAYMENT_STATS.map((s) => (
-              <div key={s.key} className={cn("rounded-2xl px-3 py-3", s.tone)}>
-                <div className="flex items-center justify-between">
-                  <p className="text-[0.7rem] font-bold uppercase tracking-wider">{s.label}</p>
-                  <span aria-hidden className="text-sm opacity-70">{s.icon}</span>
-                </div>
-                <p className="tabular mt-0.5 text-2xl font-bold">{summary[s.key]}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Status per bulan — terbaru dulu */}
-          {monthlyRows.length > 0 && (
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[24rem] text-sm">
-                <thead>
-                  <tr className="text-muted-foreground text-left text-[0.7rem] uppercase tracking-wider">
-                    <th className="py-1.5 font-bold">Bulan</th>
-                    <th className="py-1.5 text-center font-bold">Nominal</th>
-                    <th className="py-1.5 text-right font-bold">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {monthlyRows.map((row) => (
-                    <tr key={`${row.y}-${row.m}`}>
-                      <td className="py-2 font-medium">{monthYearLabel(row.y, row.m)}</td>
-                      <td className="tabular py-2 text-center">{rupiah(row.amount)}</td>
-                      <td className="py-2 text-right">
-                        <span className={cn("inline-block rounded-full px-2 py-0.5 text-xs font-medium", monthTone(row.statuses))}>
-                          {monthStatusText(row.statuses)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Bulan yang masih perlu dibayar (terlama dulu) */}
-          {openCells.length > 0 && (
-            <div className="mt-5">
-              <p className="text-muted-foreground mb-2 text-[0.7rem] font-bold uppercase tracking-widest">
-                Perlu dibayar
-              </p>
-              <ul className="flex flex-wrap gap-1.5">
-                {openCells.map((c) => (
-                  <li
-                    key={`${c.studentId}-${c.y}-${c.m}`}
-                    title={c.studentName}
-                    className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
-                  >
-                    {monthYearLabel(c.y, c.m)} · {rupiah(c.amount)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </CardContent>
         <CardContent className="space-y-6 pt-6">
           {error && (
             <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">{error}</p>
+          )}
+
+          {waiverKids.length > 0 && (
+            <div>
+              <WaiverRequestLink kids={waiverKids} requests={waiverRequests} />
+            </div>
           )}
 
           {pendingTx && (
@@ -466,10 +334,10 @@ export function WaliPaymentPanel({
               aria-hidden
               className="bg-dots text-role/15 pointer-events-none absolute -top-4 -right-4 h-28 w-44 [mask-image:linear-gradient(to_left,black,transparent)]"
             />
-            {/* Header strip: chip ikon + judul + pengatur nominal sebaris */}
-            <div className="bg-role-soft/60 border-role/15 relative flex flex-wrap items-center gap-x-3 gap-y-3 border-b px-5 py-4 sm:px-6">
+            {/* Header strip: chip ikon + judul + badge Aktif (mockup). */}
+            <div className="bg-role-soft/60 border-role/15 relative flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-5 py-4 sm:px-6">
               <span className="bg-role text-role-ink shadow-card flex size-10 shrink-0 items-center justify-center rounded-xl">
-                <HandCoins className="size-5" />
+                <Coins className="size-5" />
               </span>
               <div className="min-w-0">
                 <h4 className="text-role-strong text-base font-bold tracking-tight sm:text-lg">Tagihan Saya</h4>
@@ -478,54 +346,78 @@ export function WaliPaymentPanel({
                   bulan / santri
                 </p>
               </div>
-              <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              <span
+                aria-hidden
+                className="bg-dots text-role/15 pointer-events-none absolute -top-4 -right-4 h-24 w-36 [mask-image:linear-gradient(to_left,black,transparent)]"
+              />
+              <span
+                className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                title={
+                  pendingTx
+                    ? "Ada transaksi yang sedang berjalan"
+                    : summary.unpaid === 0
+                      ? "Semua tagihan sampai bulan ini sudah lunas"
+                      : `${summary.unpaid} bulan masih perlu dibayar`
+                }
+              >
+                {pendingTx ? (
+                  <Clock3 className="size-3.5" />
+                ) : (
+                  <CheckCircle2 className="size-3.5" />
+                )}
+                {pendingTx ? "Diproses" : summary.unpaid === 0 ? "Lunas" : "Aktif"}
+              </span>
+            </div>
+
+            {/* Pengatur nominal infak per bulan (baris ringkas di bawah header) */}
+            <div className="flex flex-wrap items-center gap-1.5 px-5 pt-4 sm:px-6">
+              <span className="text-muted-foreground text-xs">Nominal:</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className={cn(
+                  "h-8 rounded-full px-3.5 text-xs",
+                  customAmount === null
+                    ? "border-transparent bg-role text-role-ink hover:bg-role/90 hover:text-role-ink"
+                    : "border-role/30 bg-white text-role-strong hover:bg-role-soft hover:text-role-strong dark:bg-transparent"
+                )}
+                onClick={() => {
+                  setCustomAmount(null);
+                  setCustomText("");
+                }}
+              >
+                Sesuai tagihan
+              </Button>
+              {QUICK_AMOUNTS.filter((a) => a > defaultAmount).map((a) => (
                 <Button
+                  key={a}
                   type="button"
                   size="sm"
                   variant="outline"
                   className={cn(
                     "h-8 rounded-full px-3.5 text-xs",
-                    customAmount === null
+                    customAmount === a
                       ? "border-transparent bg-role text-role-ink hover:bg-role/90 hover:text-role-ink"
                       : "border-role/30 bg-white text-role-strong hover:bg-role-soft hover:text-role-strong dark:bg-transparent"
                   )}
                   onClick={() => {
-                    setCustomAmount(null);
-                    setCustomText("");
+                    setCustomAmount(a);
+                    setCustomText(a.toLocaleString("id-ID"));
                   }}
                 >
-                  Sesuai tagihan
+                  {rupiah(a)}
                 </Button>
-                {QUICK_AMOUNTS.filter((a) => a > defaultAmount).map((a) => (
-                  <Button
-                    key={a}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className={cn(
-                      "h-8 rounded-full px-3.5 text-xs",
-                      customAmount === a
-                        ? "border-transparent bg-role text-role-ink hover:bg-role/90 hover:text-role-ink"
-                        : "border-role/30 bg-white text-role-strong hover:bg-role-soft hover:text-role-strong dark:bg-transparent"
-                    )}
-                    onClick={() => {
-                      setCustomAmount(a);
-                      setCustomText(a.toLocaleString("id-ID"));
-                    }}
-                  >
-                    {rupiah(a)}
-                  </Button>
-                ))}
-                <Input
-                  id="infak-per-month"
-                  inputMode="numeric"
-                  value={customText}
-                  onChange={(e) => setCustom(e.target.value)}
-                  placeholder="Nominal lain…"
-                  className="border-role/30 h-8 w-28 rounded-full bg-white dark:bg-transparent"
-                  aria-label="Nominal infak per bulan lainnya"
-                />
-              </div>
+              ))}
+              <Input
+                id="infak-per-month"
+                inputMode="numeric"
+                value={customText}
+                onChange={(e) => setCustom(e.target.value)}
+                placeholder="Nominal lain…"
+                className="border-role/30 h-8 w-28 rounded-full bg-white dark:bg-transparent"
+                aria-label="Nominal infak per bulan lainnya"
+              />
             </div>
 
             {/* Daftar tagihan per anak */}
@@ -703,52 +595,59 @@ export function WaliPaymentPanel({
             </div>
           </section>
 
-          {/* ---------------- Santri lain (menunggak) ---------------- */}
+          {/* ------- Bayarkan Infak Santri Lain (mockup terbaru) ------- */}
           {others.length > 0 && (
-            <section className="space-y-3 rounded-xl bg-slate-50 p-4 dark:bg-slate-500/5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <HandHeart className="size-4 text-role" />
-                  <h4 className="text-sm font-semibold text-foreground">Bayarkan untuk santri lain</h4>
-                  <Badge variant="outline" className="text-[0.65rem]">{others.length} menunggak</Badge>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-muted-foreground text-xs">Bantu terlama:</span>
-                  {[1, 3, 5].map((n) => (
-                    <Button
-                      key={n}
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 bg-white px-2.5 text-xs dark:bg-transparent"
-                      disabled={locked || others.length < n}
-                      onClick={() => pickOldestOthers(n)}
-                    >
-                      {n} santri
-                    </Button>
-                  ))}
+            <section className="shadow-card rounded-2xl border border-slate-200 p-4 sm:p-5 dark:border-slate-500/20">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="bg-role text-role-ink shadow-card flex size-10 shrink-0 items-center justify-center rounded-xl">
+                  <Users className="size-5" />
+                </span>
+                <h4 className="text-role-strong min-w-0 flex-1 text-base font-bold tracking-tight sm:text-lg">
+                  Bayarkan Infak Santri Lain
+                </h4>
+                <div className="relative w-full sm:w-64">
+                  <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                  <Input
+                    value={othersQuery}
+                    onChange={(e) => {
+                      setOthersQuery(e.target.value);
+                      setOthersShown(10);
+                    }}
+                    placeholder="Cari nama atau kode santri…"
+                    className="border-slate-200 bg-slate-50/80 pl-9 dark:border-slate-500/20 dark:bg-transparent"
+                    aria-label="Cari santri"
+                  />
                 </div>
               </div>
 
-              <div className="relative">
-                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                <Input
-                  value={othersQuery}
-                  onChange={(e) => {
-                    setOthersQuery(e.target.value);
-                    setOthersShown(10);
-                  }}
-                  placeholder="Cari nama atau kode santri…"
-                  className="bg-white pl-9 dark:bg-transparent"
-                  aria-label="Cari santri"
-                />
+              {/* Chip filter: Semua / 1 / 3 / 5 bulan terlama */}
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {OTHER_FILTERS.map((f) => (
+                  <Button
+                    key={f.key}
+                    type="button"
+                    size="sm"
+                    className={cn(
+                      "h-9 rounded-full px-4 text-xs",
+                      othersFilter === f.key
+                        ? "bg-role text-role-ink shadow-sm hover:bg-role/90 hover:text-role-ink"
+                        : "border-transparent bg-role-soft text-role-strong hover:bg-role/20"
+                    )}
+                    disabled={locked || (f.n > 0 && others.length < f.n)}
+                    onClick={() => applyOthersFilter(f.n)}
+                    aria-pressed={othersFilter === f.key}
+                  >
+                    {f.label}
+                  </Button>
+                ))}
+                <Badge variant="outline" className="ml-auto text-[0.65rem]">{others.length} santri menunggak</Badge>
               </div>
 
               {filteredOthers.length === 0 ? (
                 <p className="text-muted-foreground py-3 text-center text-sm">Tidak ada santri yang cocok.</p>
               ) : (
                 <ul className="space-y-2">
-                  {visibleOthers.map((o) => {
+                  {visibleOthers.map((o, i) => {
                     const selectable = o.invoices.filter(isSelectable);
                     const chosen = selectable.filter((i) => keyOf(o.studentId, i.y, i.m) in selected).length;
                     const all = selectable.length > 0 && chosen === selectable.length;
@@ -762,6 +661,15 @@ export function WaliPaymentPanel({
                         )}
                       >
                         <div className="flex items-center gap-3 p-3">
+                          <span
+                            className={cn(
+                              "flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+                              CHILD_TONES[i % CHILD_TONES.length]
+                            )}
+                            aria-hidden
+                          >
+                            {o.name.charAt(0).toUpperCase()}
+                          </span>
                           <Checkbox
                             checked={all}
                             disabled={locked || selectable.length === 0}
@@ -1147,23 +1055,36 @@ function MonthRow({
         disabled && "cursor-not-allowed opacity-60"
       )}
     >
-      <span className="min-w-0">
-        <span className="flex flex-wrap items-center gap-2 text-[0.95rem] font-semibold text-foreground">
-          {monthYearLabel(inv.y, inv.m)}
-          {open && overdue && (
-            <span className="rounded-full bg-red-50 px-2 py-0.5 text-[0.7rem] font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
-              Menunggak
-            </span>
+      <span className="flex min-w-0 items-center gap-3">
+        <span
+          className={cn(
+            "flex size-10 shrink-0 items-center justify-center rounded-xl",
+            checked ? "bg-role text-role-ink" : "bg-role-soft text-role-strong"
           )}
+          aria-hidden
+        >
+          <CalendarDays className="size-5" />
         </span>
-        <span className="text-muted-foreground mt-0.5 block text-xs">
-          {INVOICE_STATUS_LABEL[inv.status] ?? (inv.status === "NONE" ? "Belum Bayar" : inv.status)}
-          {open && ` · min ${rupiah(inv.amount)}`}
-          {open && !overdue && ` · jatuh tempo ${String(DUE_DAY).padStart(2, "0")}/${String(inv.m).padStart(2, "0")}/${inv.y}`}
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-center gap-2 text-[0.95rem] font-semibold text-foreground">
+            {monthYearLabel(inv.y, inv.m)}
+            {open && overdue && (
+              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[0.7rem] font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                Menunggak
+              </span>
+            )}
+          </span>
+          <span className="text-muted-foreground mt-0.5 block text-xs">
+            {INVOICE_STATUS_LABEL[inv.status] ?? (inv.status === "NONE" ? "Belum Bayar" : inv.status)}
+            {open && ` · min ${rupiah(inv.amount)}`}
+            {open && !overdue && ` · jatuh tempo ${String(DUE_DAY).padStart(2, "0")}/${String(inv.m).padStart(2, "0")}/${inv.y}`}
+          </span>
         </span>
       </span>
       <span className="ml-3 flex shrink-0 items-center gap-3">
-        <span className="text-base font-bold text-foreground">{rupiah(inv.amount)}</span>
+        <span className="bg-role-soft text-role-strong tabular rounded-full px-3 py-1.5 text-sm font-bold">
+          {rupiah(inv.amount)}
+        </span>
         <span
           className={cn(
             "flex size-6 items-center justify-center rounded-full border-2 transition-colors",
