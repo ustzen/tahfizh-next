@@ -65,6 +65,37 @@ function arrearsTone(count: number) {
     : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300";
 }
 
+/** Ubin ringkasan status tagihan — bentuk & palet mengikuti ubin Presensi. */
+const PAYMENT_STATS = [
+  { key: "paid", label: "Lunas", icon: "✓", tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
+  { key: "pending", label: "Menunggu", icon: "◷", tone: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300" },
+  { key: "waiting", label: "Diproses", icon: "↻", tone: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
+  { key: "unpaid", label: "Belum Bayar", icon: "✚", tone: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
+] as const;
+
+/** Tagihan yang masih harus dibayar (belum diterbitkan pun tetap bisa dilunasi). */
+const isOpenStatus = (s: string) => s === "UNPAID" || s === "NONE";
+
+/** Teks ringkas status satu bulan (agregat antar anak), mis. "2 Lunas · 1 Belum Bayar". */
+function monthStatusText(statuses: string[]) {
+  const counts = new Map<string, number>();
+  for (const s of statuses) counts.set(s, (counts.get(s) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([s, n]) => `${n > 1 ? `${n} ` : ""}${INVOICE_STATUS_LABEL[s] ?? (s === "NONE" ? "Belum Bayar" : s)}`)
+    .join(" · ");
+}
+
+/** Nada badge status bulan — yang paling perlu diperhatikan yang menang. */
+function monthTone(statuses: string[]) {
+  if (statuses.some(isOpenStatus))
+    return "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
+  if (statuses.some((s) => s === "PENDING"))
+    return "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300";
+  if (statuses.some((s) => s === "WAITING_CONFIRM"))
+    return "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300";
+  return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
+}
+
 /** Gaya chip identitas pembayar: aktif = solid warna role, nonaktif = outline lembut. */
 function payerChipCls(active: boolean) {
   return cn(
@@ -262,40 +293,161 @@ export function WaliPaymentPanel({
   }, [others, othersQuery]);
   const visibleOthers = filteredOthers.slice(0, othersShown);
 
+  /* ---- Ringkasan tagihan (ala kartu Presensi) ---------------------------- */
+  // Gabungan riwayat 12 bulan + tunggakan lama (di luar riwayat) per anak,
+  // tanpa duplikat — satu sumber untuk ubin, tabel bulanan, dan chip.
+  type MonthCell = { studentId: string; studentName: string; y: number; m: number; amount: number; status: string };
+  const monthCells: MonthCell[] = [];
+  const seenMonth = new Set<string>();
+  for (const h of history) {
+    for (const it of h.items) {
+      const k = `${h.studentId}:${it.y}:${it.m}`;
+      if (seenMonth.has(k)) continue;
+      seenMonth.add(k);
+      monthCells.push({ studentId: h.studentId, studentName: h.name, y: it.y, m: it.m, amount: it.amount, status: it.status });
+    }
+  }
+  for (const c of kids) {
+    for (const inv of c.invoices) {
+      const k = `${c.studentId}:${inv.y}:${inv.m}`;
+      if (seenMonth.has(k)) continue;
+      seenMonth.add(k);
+      monthCells.push({ studentId: c.studentId, studentName: c.name, y: inv.y, m: inv.m, amount: inv.amount, status: inv.status });
+    }
+  }
+  const summary = {
+    total: monthCells.length,
+    paid: monthCells.filter((c) => c.status === "PAID").length,
+    pending: monthCells.filter((c) => c.status === "PENDING").length,
+    waiting: monthCells.filter((c) => c.status === "WAITING_CONFIRM").length,
+    unpaid: monthCells.filter((c) => isOpenStatus(c.status)).length,
+  };
+  // Tabel status per bulan — agregat antar anak, terbaru dulu.
+  const monthlyRows = [...monthCells
+    .reduce((map, c) => {
+      const key = `${c.y}-${c.m}`;
+      const row = map.get(key) ?? { y: c.y, m: c.m, amount: 0, statuses: [] as string[] };
+      row.amount += c.amount;
+      row.statuses.push(c.status);
+      map.set(key, row);
+      return map;
+    }, new Map<string, { y: number; m: number; amount: number; statuses: string[] }>())
+    .values()]
+    .sort((a, b) => monthIndex(b.y, b.m) - monthIndex(a.y, a.m));
+  // Chip bulan yang perlu dibayar — terlama dulu, maks 5.
+  const openCells = monthCells
+    .filter((c) => isOpenStatus(c.status) && c.amount > 0)
+    .sort((a, b) => monthIndex(a.y, a.m) - monthIndex(b.y, b.m))
+    .slice(0, 5);
+
   return (
     <div className="space-y-6">
       <Card className="shadow-card overflow-hidden rounded-2xl">
-        {/* Gaya PageHeader: strip warna role di pinggir kiri + chip ikon. */}
-        <div className="bg-role-soft border-role/15 relative overflow-hidden border-l-4 px-5 py-5 sm:px-7">
-          <span
-            aria-hidden
-            className="bg-dots text-role/20 pointer-events-none absolute -top-4 -right-4 h-32 w-52 [mask-image:linear-gradient(to_left,black,transparent)]"
-          />
-          <div className="relative flex flex-wrap items-center gap-3.5">
-            <span className="bg-role text-role-ink shadow-card flex size-11 shrink-0 items-center justify-center rounded-xl">
-              <HandCoins className="size-6" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-role-strong text-lg font-bold tracking-tight sm:text-xl">
+        {/* Ringkasan ala kartu Presensi: judul + lencana status, ubin status
+            4 warna, tabel status per bulan, dan chip bulan perlu dibayar.
+            Pengaturan nominal & pemilihan tagihan tetap di bagian bawah. */}
+        <CardContent className="px-5 py-5 sm:px-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-role-strong text-lg font-bold tracking-tight sm:text-xl">
                 Infak Pengembangan {academicYear}
-              </h3>
-              <p className="text-muted-foreground mt-0.5 text-sm">
-                Dana pengembangan platform · mulai {rupiah(defaultAmount)}/bulan/santri
+              </p>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {monthCells.length > 0
+                  ? `${monthCells.length} bulan tercatat`
+                  : "Belum ada tagihan tercatat"}{" "}
+                · mulai {rupiah(defaultAmount)}/bulan/santri
               </p>
             </div>
-            {selectedCount > 0 && (
-              <div className="bg-role text-role-ink rounded-xl px-3.5 py-1.5 text-right">
-                <p className="text-[0.65rem] font-medium opacity-80">{selectedCount} dipilih</p>
-                <p className="text-base font-extrabold tracking-tight">{rupiah(total)}</p>
-              </div>
-            )}
+            {selectedCount > 0 ? (
+              <span className="bg-role text-role-ink shadow-card inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-bold">
+                <HandCoins className="size-4" />
+                {selectedCount} dipilih · {rupiah(total)}
+              </span>
+            ) : monthCells.length > 0 ? (
+              <span
+                className={cn(
+                  "shadow-card inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-bold text-white",
+                  summary.unpaid === 0
+                    ? "bg-emerald-600"
+                    : summary.unpaid < 3
+                      ? "bg-amber-500"
+                      : "bg-rose-600"
+                )}
+              >
+                {summary.unpaid === 0 ? <CheckCircle2 className="size-4" /> : <CalendarDays className="size-4" />}
+                {summary.unpaid === 0 ? "Semua lunas" : `Perlu dibayar ${summary.unpaid} bulan`}
+              </span>
+            ) : null}
           </div>
+
           {waiverKids.length > 0 && (
-            <div className="relative mt-2.5">
+            <div className="mt-3">
               <WaiverRequestLink kids={waiverKids} requests={waiverRequests} />
             </div>
           )}
-        </div>
+
+          {/* Ubin status tagihan */}
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {PAYMENT_STATS.map((s) => (
+              <div key={s.key} className={cn("rounded-2xl px-3 py-3", s.tone)}>
+                <div className="flex items-center justify-between">
+                  <p className="text-[0.7rem] font-bold uppercase tracking-wider">{s.label}</p>
+                  <span aria-hidden className="text-sm opacity-70">{s.icon}</span>
+                </div>
+                <p className="tabular mt-0.5 text-2xl font-bold">{summary[s.key]}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Status per bulan — terbaru dulu */}
+          {monthlyRows.length > 0 && (
+            <div className="mt-5 overflow-x-auto">
+              <table className="w-full min-w-[24rem] text-sm">
+                <thead>
+                  <tr className="text-muted-foreground text-left text-[0.7rem] uppercase tracking-wider">
+                    <th className="py-1.5 font-bold">Bulan</th>
+                    <th className="py-1.5 text-center font-bold">Nominal</th>
+                    <th className="py-1.5 text-right font-bold">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {monthlyRows.map((row) => (
+                    <tr key={`${row.y}-${row.m}`}>
+                      <td className="py-2 font-medium">{monthYearLabel(row.y, row.m)}</td>
+                      <td className="tabular py-2 text-center">{rupiah(row.amount)}</td>
+                      <td className="py-2 text-right">
+                        <span className={cn("inline-block rounded-full px-2 py-0.5 text-xs font-medium", monthTone(row.statuses))}>
+                          {monthStatusText(row.statuses)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Bulan yang masih perlu dibayar (terlama dulu) */}
+          {openCells.length > 0 && (
+            <div className="mt-5">
+              <p className="text-muted-foreground mb-2 text-[0.7rem] font-bold uppercase tracking-widest">
+                Perlu dibayar
+              </p>
+              <ul className="flex flex-wrap gap-1.5">
+                {openCells.map((c) => (
+                  <li
+                    key={`${c.studentId}-${c.y}-${c.m}`}
+                    title={c.studentName}
+                    className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+                  >
+                    {monthYearLabel(c.y, c.m)} · {rupiah(c.amount)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
         <CardContent className="space-y-6 pt-6">
           {error && (
             <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">{error}</p>

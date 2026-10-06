@@ -1,6 +1,6 @@
-import { Info, Lock } from "lucide-react";
+import { Info, Lock, HandCoins } from "lucide-react";
 
-import { CardBox } from "@/components/dashboard/section";
+import { CardBox, PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import {
   getPaymentGate,
@@ -42,6 +42,11 @@ export default async function SantriInfakPage() {
   if (locked) {
     return (
       <div className="space-y-6">
+        <PageHeader
+          title="Infak Pengembangan"
+          description="Akses menu dibatasi sampai infak bulan ini terkonfirmasi — batas pembayaran maksimal tanggal 15."
+          icon={<HandCoins className="size-6" />}
+        />
         <CardBox className="border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
@@ -82,6 +87,12 @@ export default async function SantriInfakPage() {
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title="Infak Pengembangan"
+        description={`Dukungan pengembangan platform tahun ajaran ${invoices?.academicYear ?? "-"} — dibayar per bulan per santri, mulai ${rupiah(invoices?.defaultAmount ?? 1000)}.`}
+        icon={<HandCoins className="size-6" />}
+      />
+
       {/* V18 — panel infak SELALU tampil (jadi header halaman sekaligus panel
           pembayaran). Bila RPC tagihan sedang tidak dapat
           dibaca, panel tetap dirender dengan nilai dasar agar santri tetap bisa
