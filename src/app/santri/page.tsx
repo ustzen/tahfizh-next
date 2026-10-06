@@ -61,13 +61,12 @@ export default async function SantriDashboardPage() {
   const visibleQuickMenu = resolveQuickMenu(SANTRI_QUICK_MENU, savedQuickMenu, SANTRI_QUICK_MENU_DEFAULT_KEYS);
   const defaultQuickMenu = resolveQuickMenu(SANTRI_QUICK_MENU, null, SANTRI_QUICK_MENU_DEFAULT_KEYS);
 
-  const namaPanggilan = profile.fullName.split(" ")[0];
   const prestasi = prestasiCards[0] ?? null;
   const meterTotals = meterTotalsMap.get(prestasi?.studentId ?? "") ?? undefined;
 
   return (
     <SantriDashboard
-      namaPanggilan={namaPanggilan}
+      namaSantri={profile.fullName}
       avatarUrl={display?.avatarUrl ?? null}
       tanggalHariIni={hariIniJakarta()}
       prestasi={prestasi}

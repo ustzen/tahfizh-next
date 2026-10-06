@@ -83,29 +83,33 @@ export function DashboardHeader({
   return (
     <>
       <header className="bg-background/85 sticky top-0 z-40 border-b backdrop-blur">
-      {/* Mobile bar — tiga zona sejajar, tidak bertumpuk */}
-      <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-4 lg:hidden">
+      {/* Mobile bar — logo + tagline kiri, lonceng & profil kanan (gaya mockup) */}
+      <div className="flex h-16 items-center justify-between gap-2 px-3 sm:px-4 lg:hidden">
         <button
           onClick={() => setOpen(true)}
           aria-label="Buka menu"
           aria-expanded={open}
-          className="flex size-11 shrink-0 items-center justify-center rounded-xl text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-500/10"
+          className="border-slate-100 flex size-11 shrink-0 items-center justify-center rounded-full border bg-white shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-500/20 dark:bg-slate-800 dark:hover:bg-slate-700"
         >
-          <Menu className="size-5.5" />
+          <Menu className="text-role-strong size-5.5" />
         </button>
 
-        <div className="flex min-w-0 flex-1 flex-col items-center leading-tight">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <Logo showText={false} />
-          <span className="truncate text-[0.68rem] font-semibold text-slate-500 dark:text-slate-400">
-            {tenantName ?? "TAHFIZH"}
-          </span>
+          <div className="min-w-0 leading-tight">
+            <p className="text-role-strong truncate text-lg font-extrabold tracking-tight">TAHFIZH</p>
+            <p className="text-muted-foreground truncate text-[0.62rem] font-semibold">
+              Sahabat Menghafal Al-Qur&apos;an
+            </p>
+          </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-2">
+          <NotificationBell items={notifications} unread={unreadCount} />
           <Link
             href={`${ROLE_HOME[role]}/pengaturan/profil`}
             aria-label="Profil saya"
-            className="flex size-11 items-center justify-center rounded-xl transition-colors hover:bg-muted dark:hover:bg-slate-500/10"
+            className="border-slate-100 flex size-11 items-center justify-center rounded-full border bg-white shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-500/20 dark:bg-slate-800 dark:hover:bg-slate-700"
           >
             {avatar}
           </Link>

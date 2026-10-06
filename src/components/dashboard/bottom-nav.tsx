@@ -47,7 +47,7 @@ export function BottomNav({
   return (
     <nav
       aria-label="Menu bawah"
-      className="bg-background/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur lg:hidden"
+      className="border-slate-100 fixed inset-x-3 bottom-3 z-40 rounded-2xl border bg-white/95 shadow-lg backdrop-blur lg:hidden dark:border-slate-500/20 dark:bg-slate-900/95"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <div
@@ -67,10 +67,10 @@ export function BottomNav({
               prefetch
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[0.66rem] font-medium transition-colors",
+                "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[0.66rem] font-semibold transition-colors",
                 active
-                  ? "text-primary"
-                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                  ? "bg-role-soft text-role-strong"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-500/10 dark:hover:text-slate-200"
               )}
             >
               <MenuIcon
