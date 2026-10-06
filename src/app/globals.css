@@ -122,75 +122,37 @@
 }
 
 /* ==================================================================
-   Identitas warna per role — dipakai banner halaman, kepala tabel,
-   dan aksen. Diaktifkan via <div data-role="admin"> di DashboardShell.
+   Identitas warna — SERAGAM untuk SEMUA role & semua halaman.
+   Diaktifkan via <div data-role="..."> di DashboardShell, tapi nilainya
+   kini sama untuk admin/developer/koordinator/ustadz/santri, sehingga
+   tampilan identik dengan tema login TAHFIZH (biru solid + aksen kuning).
      --role         warna utama (solid)
      --role-strong  varian lebih pekat (teks di atas soft, hover)
      --role-soft    latar lembut untuk chip/kepala tabel
      --role-ink     teks di atas warna utama
    ================================================================== */
 :root,
-[data-role="admin"] {
+[data-role="admin"],
+[data-role="developer"],
+[data-role="koordinator"],
+[data-role="ustadz"],
+[data-role="santri"] {
   --role: oklch(0.546 0.245 262.88);
   --role-strong: oklch(0.45 0.21 264);
   --role-soft: oklch(0.955 0.03 258);
   --role-ink: oklch(0.985 0.003 247.86);
 }
-[data-role="developer"] {
-  --role: oklch(0.55 0.24 295);
-  --role-strong: oklch(0.44 0.21 295);
-  --role-soft: oklch(0.955 0.035 300);
-  --role-ink: oklch(0.985 0.003 247.86);
-}
-[data-role="koordinator"] {
-  --role: oklch(0.6 0.12 195);
-  --role-strong: oklch(0.47 0.1 195);
-  --role-soft: oklch(0.95 0.035 195);
-  --role-ink: oklch(0.985 0.003 247.86);
-}
-[data-role="ustadz"] {
-  --role: oklch(0.6 0.15 160);
-  --role-strong: oklch(0.46 0.12 160);
-  --role-soft: oklch(0.952 0.04 160);
-  --role-ink: oklch(0.985 0.003 247.86);
-}
-[data-role="santri"] {
-  --role: oklch(0.72 0.17 65);
-  --role-strong: oklch(0.5 0.12 60);
-  --role-soft: oklch(0.965 0.05 85);
-  --role-ink: oklch(0.25 0.06 60);
-}
 
 .dark,
-.dark [data-role="admin"] {
+.dark [data-role="admin"],
+.dark [data-role="developer"],
+.dark [data-role="koordinator"],
+.dark [data-role="ustadz"],
+.dark [data-role="santri"] {
   --role: oklch(0.65 0.2 260);
   --role-strong: oklch(0.82 0.11 258);
   --role-soft: oklch(0.3 0.06 262);
   --role-ink: oklch(0.985 0.003 247.86);
-}
-.dark [data-role="developer"] {
-  --role: oklch(0.66 0.2 295);
-  --role-strong: oklch(0.83 0.1 298);
-  --role-soft: oklch(0.3 0.07 295);
-  --role-ink: oklch(0.985 0.003 247.86);
-}
-.dark [data-role="koordinator"] {
-  --role: oklch(0.68 0.11 195);
-  --role-strong: oklch(0.84 0.09 195);
-  --role-soft: oklch(0.29 0.05 195);
-  --role-ink: oklch(0.15 0.03 195);
-}
-.dark [data-role="ustadz"] {
-  --role: oklch(0.68 0.15 160);
-  --role-strong: oklch(0.84 0.11 160);
-  --role-soft: oklch(0.29 0.055 160);
-  --role-ink: oklch(0.15 0.03 160);
-}
-.dark [data-role="santri"] {
-  --role: oklch(0.78 0.15 75);
-  --role-strong: oklch(0.88 0.11 85);
-  --role-soft: oklch(0.32 0.06 75);
-  --role-ink: oklch(0.2 0.05 60);
 }
 
 @layer base {

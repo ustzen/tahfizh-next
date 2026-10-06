@@ -32,12 +32,14 @@ export const CHAT_ROLE_LABEL: Record<AppRole, string> = {
   WALI_SANTRI: "Santri",
 };
 
+// SERAGAM: semua role memakai satu tema yang sama (biru TAHFIZH),
+// konsisten dengan --role di globals.css agar tampilan lintas role identik.
 export const CHAT_ROLE_TONE: Record<AppRole, string> = {
-  DEVELOPER: "bg-slate-200 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300",
+  DEVELOPER: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
   ADMIN: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  KOORDINATOR: "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300",
-  USTADZ: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-  WALI_SANTRI: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300",
+  KOORDINATOR: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+  USTADZ: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+  WALI_SANTRI: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
 };
 
 export function chatRoleLabel(role: string) {

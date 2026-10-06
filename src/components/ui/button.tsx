@@ -10,7 +10,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
-        // Tombol berwarna identitas role (Admin=biru, Ustadz=hijau, dst.).
+        // Tombol berwarna identitas role — kini SERAGAM (biru TAHFIZH) untuk semua role.
         role: "bg-role text-role-ink shadow-xs hover:brightness-95",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20",
