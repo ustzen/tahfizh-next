@@ -178,49 +178,60 @@ export function PresensiRekapCard({ rekap }: { rekap: PresensiRekap }) {
       {/* Tabel per bulan */}
       {months.length > 0 && (
         <div className="mt-5 overflow-hidden rounded-2xl border border-sky-100">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[30rem] text-sm">
-              <thead className="bg-sky-50/80 text-sky-800">
-                <tr className="text-left text-[0.72rem] font-bold tracking-wider uppercase">
-                  <th className="px-4 py-3">Bulan</th>
-                  <th className="px-2 py-3 text-center">Hadir</th>
-                  <th className="px-2 py-3 text-center">Izin</th>
-                  <th className="px-2 py-3 text-center">Sakit</th>
-                  <th className="px-2 py-3 text-center">Alpha</th>
-                  <th className="px-4 py-3 text-right">Persentase</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-sky-50">
-                {months.map((m) => {
-                  const p = persen(m.hadir, m.total);
-                  return (
-                    <tr key={m.ym}>
-                      <td className="px-4 py-2.5">
-                        <span className="flex items-center gap-2 font-medium text-slate-700">
-                          <CalendarDays className="size-4 text-sky-400" />
-                          {bulanId(m.ym)}
-                        </span>
-                      </td>
-                      <td className="tabular px-2 py-2.5 text-center">{m.hadir}</td>
-                      <td className="tabular px-2 py-2.5 text-center">{m.izin}</td>
-                      <td className="tabular px-2 py-2.5 text-center">{m.sakit}</td>
-                      <td className="tabular px-2 py-2.5 text-center">{m.alpa}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <span
-                          className={cn(
-                            "tabular inline-block rounded-lg px-2.5 py-1 text-xs font-bold",
-                            pctTone(p)
-                          )}
-                        >
-                          {p}%
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {/* table-fixed + padding rapat → muat di layar HP, kolom Persentase
+              langsung terlihat tanpa perlu geser ke kanan. */}
+          <table className="w-full table-fixed text-sm">
+            <thead className="bg-sky-50/80 text-sky-800">
+              <tr className="text-left text-[0.62rem] font-bold tracking-wide uppercase sm:text-[0.72rem]">
+                <th className="px-2 py-2.5 sm:px-4 sm:py-3">Bulan</th>
+                <th className="w-10 px-0.5 py-2.5 text-center sm:w-16 sm:px-2 sm:py-3">Hadir</th>
+                <th className="w-9 px-0.5 py-2.5 text-center sm:w-14 sm:px-2 sm:py-3">Izin</th>
+                <th className="w-10 px-0.5 py-2.5 text-center sm:w-14 sm:px-2 sm:py-3">Sakit</th>
+                <th className="w-10 px-0.5 py-2.5 text-center sm:w-14 sm:px-2 sm:py-3">Alpha</th>
+                <th className="w-12 px-1 py-2.5 text-right sm:w-24 sm:px-4 sm:py-3">
+                  <span className="sm:hidden">Persen</span>
+                  <span className="hidden sm:inline">Persentase</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-sky-50">
+              {months.map((m) => {
+                const p = persen(m.hadir, m.total);
+                return (
+                  <tr key={m.ym}>
+                    <td className="px-2 py-2 sm:px-4 sm:py-2.5">
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-slate-700 sm:gap-2 sm:text-sm">
+                        <CalendarDays className="hidden size-4 shrink-0 text-sky-400 sm:block" />
+                        {bulanId(m.ym)}
+                      </span>
+                    </td>
+                    <td className="tabular px-0.5 py-2 text-center text-xs sm:px-2 sm:py-2.5 sm:text-sm">
+                      {m.hadir}
+                    </td>
+                    <td className="tabular px-0.5 py-2 text-center text-xs sm:px-2 sm:py-2.5 sm:text-sm">
+                      {m.izin}
+                    </td>
+                    <td className="tabular px-0.5 py-2 text-center text-xs sm:px-2 sm:py-2.5 sm:text-sm">
+                      {m.sakit}
+                    </td>
+                    <td className="tabular px-0.5 py-2 text-center text-xs sm:px-2 sm:py-2.5 sm:text-sm">
+                      {m.alpa}
+                    </td>
+                    <td className="px-1 py-2 text-right sm:px-4 sm:py-2.5">
+                      <span
+                        className={cn(
+                          "tabular inline-block rounded-md px-1.5 py-0.5 text-[0.68rem] font-bold sm:rounded-lg sm:px-2.5 sm:py-1 sm:text-xs",
+                          pctTone(p)
+                        )}
+                      >
+                        {p}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
