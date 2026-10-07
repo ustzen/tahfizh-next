@@ -33,6 +33,8 @@ type HeaderProps = {
   bottomNavDefaultKeys: string[];
   /** V39 — override ikon menu platform untuk sidebar drawer & editor Menu Bawah. */
   iconOverrides?: MenuIconOverride[];
+  /** V-hide: sembunyikan label kategori menu (dipakai dasbor santri). */
+  hideGroupLabels?: boolean;
 };
 
 export function DashboardHeader({
@@ -49,6 +51,7 @@ export function DashboardHeader({
   bottomNavSelected,
   bottomNavDefaultKeys,
   iconOverrides = [],
+  hideGroupLabels = false,
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -190,6 +193,7 @@ export function DashboardHeader({
                 groups={navGroups}
                 onNavigate={() => setOpen(false)}
                 iconOverrides={iconOverrides}
+                hideGroupLabels={hideGroupLabels}
               />
             </div>
 

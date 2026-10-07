@@ -71,12 +71,15 @@ function NavLinks({
   onNavigate,
   prefetchEnabled,
   iconOverrides,
+  hideGroupLabels,
 }: {
   groups: NavGroup[];
   pathname: string;
   onNavigate?: () => void;
   prefetchEnabled: boolean;
   iconOverrides: MenuIconOverride[];
+  /** V-hide: dasbor santri tidak memakai label kategori (Master Data, dll). */
+  hideGroupLabels?: boolean;
 }) {
   return (
     <>
@@ -84,7 +87,7 @@ function NavLinks({
         const style = GROUP_STYLES[group.key] ?? GROUP_STYLES.utama;
         return (
           <div key={group.key} className="mb-3 last:mb-0">
-            {style.label && (
+            {style.label && !hideGroupLabels && (
               <p className="text-muted-foreground mb-1 flex items-center gap-1.5 px-3 text-[0.66rem] font-bold uppercase tracking-widest">
                 {style.label}
               </p>
@@ -144,12 +147,15 @@ export function SidebarNav({
   onNavigate,
   prefetch = true,
   iconOverrides = [],
+  hideGroupLabels = false,
 }: {
   groups: NavGroup[];
   onNavigate?: () => void;
   prefetch?: boolean;
   /** Override ikon menu platform (V39) — dikosongkan bila tidak disediakan. */
   iconOverrides?: MenuIconOverride[];
+  /** V-hide: sembunyikan label kategori menu (dipakai dasbor santri). */
+  hideGroupLabels?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -172,6 +178,7 @@ export function SidebarNav({
         onNavigate={onNavigate}
         prefetchEnabled={prefetch}
         iconOverrides={iconOverrides}
+        hideGroupLabels={hideGroupLabels}
       />
     </div>
   );

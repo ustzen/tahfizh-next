@@ -70,6 +70,10 @@ export async function DashboardShell({
   // Nama role untuk atribut CSS — WALI_SANTRI tampil sebagai "santri" (V12).
   const roleKey = role === "WALI_SANTRI" ? "santri" : role.toLowerCase();
 
+  // Dasbor santri tidak memakai label kategori menu (Master Data, Pembelajaran,
+  // dst) — menu tampil polos tanpa judul kelompok.
+  const hideGroupLabels = role === "WALI_SANTRI";
+
   return (
     <div className="flex min-h-screen" data-role={roleKey}>
       {/* Desktop sidebar — dark-mode aware */}
@@ -81,7 +85,11 @@ export async function DashboardShell({
           {roleLabel}
         </p>
         <div className="flex-1 overflow-y-auto">
-          <SidebarNav groups={navGroups} iconOverrides={iconOverrides} />
+          <SidebarNav
+            groups={navGroups}
+            iconOverrides={iconOverrides}
+            hideGroupLabels={hideGroupLabels}
+          />
         </div>
         <div className="bg-role-soft mt-3 flex items-center gap-3 rounded-2xl p-3">
           {avatarUrl ? (
@@ -130,6 +138,7 @@ export async function DashboardShell({
           bottomNavSelected={bottomNavItems}
           bottomNavDefaultKeys={BOTTOM_NAV_DEFAULT_KEYS[role]}
           iconOverrides={iconOverrides}
+          hideGroupLabels={hideGroupLabels}
         />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 pb-24 sm:px-6 sm:py-6 lg:px-8 lg:pb-6">
           {/* V12.11 — wajib ganti password untuk SEMUA role (password sementara
