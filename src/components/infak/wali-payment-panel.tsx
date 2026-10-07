@@ -138,6 +138,9 @@ export function WaliPaymentPanel({
   const [othersQuery, setOthersQuery] = useState("");
   const [othersShown, setOthersShown] = useState(10);
   const [othersOpen, setOthersOpen] = useState<Record<string, boolean>>({});
+  // Kartu "Bayarkan Infak Santri Lain" tersembunyi dulu; daftar nama muncul
+  // setelah kepala kartu diklik (collapse/expand).
+  const [othersPanelOpen, setOthersPanelOpen] = useState(false);
   // Filter chip "Bayarkan Infak Santri Lain": Semua / 1 / 3 / 5 bulan terlama.
   const [othersFilter, setOthersFilter] = useState<"all" | "1" | "3" | "5">("all");
   // "Dibayarkan atas nama" — dipakai bila ingin infak untuk santri lain tanpa
@@ -172,6 +175,8 @@ export function WaliPaymentPanel({
   const ownIds = useMemo(() => new Set(kids.map((k) => k.studentId)), [kids]);
   const hasOwnSelected = selectedKeys.some((k) => ownIds.has(k.split(":")[0]));
   const hasOtherSelected = selectedKeys.some((k) => !ownIds.has(k.split(":")[0]));
+  /** Jumlah tagihan santri LAIN yang sedang dipilih (dipakai di kepala kartu). */
+  const othersSelectedCount = selectedKeys.filter((k) => !ownIds.has(k.split(":")[0])).length;
   // Nama lain hanya dikunci bila TIDAK ada santri lain dalam pilihan.
   const payerLocked = hasOwnSelected && !hasOtherSelected;
   const effectivePayerMode = payerLocked ? "self" : payerMode;
@@ -614,51 +619,73 @@ export function WaliPaymentPanel({
 
           {/* ------- Bayarkan Infak Santri Lain (mockup terbaru) ------- */}
           {others.length > 0 && (
-            <section className="shadow-card rounded-2xl border border-slate-200 p-4 sm:p-5 dark:border-slate-500/20">
-              <div className="flex flex-wrap items-center gap-3">
+            <section className="shadow-card overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-500/20">
+              {/* Kepala kartu bisa diklik: daftar nama santri tampil setelah di-expand. */}
+              <button
+                type="button"
+                onClick={() => setOthersPanelOpen((v) => !v)}
+                aria-expanded={othersPanelOpen}
+                className="hover:bg-role-soft/40 flex w-full items-center gap-3 p-4 text-left transition-colors sm:p-5"
+              >
                 <span className="bg-role text-role-ink shadow-card flex size-10 shrink-0 items-center justify-center rounded-xl">
                   <Users className="size-5" />
                 </span>
-                <h4 className="text-role-strong min-w-0 flex-1 text-base font-bold tracking-tight sm:text-lg">
-                  Bayarkan Infak Santri Lain
-                </h4>
-                <div className="relative w-full sm:w-64">
-                  <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                  <Input
-                    value={othersQuery}
-                    onChange={(e) => {
-                      setOthersQuery(e.target.value);
-                      setOthersShown(10);
-                    }}
-                    placeholder="Cari nama atau kode santri…"
-                    className="border-slate-200 bg-slate-50/80 pl-9 dark:border-slate-500/20 dark:bg-transparent"
-                    aria-label="Cari santri"
-                  />
-                </div>
-              </div>
+                <span className="min-w-0 flex-1">
+                  <span className="text-role-strong block text-base font-bold tracking-tight sm:text-lg">
+                    Bayarkan Infak Santri Lain
+                  </span>
+                  <span className="text-muted-foreground mt-0.5 block text-xs">
+                    {othersSelectedCount > 0
+                      ? `${othersSelectedCount} tagihan santri lain dipilih — klik untuk ubah`
+                      : `Klik untuk melihat ${others.length} santri yang masih menunggak.`}
+                  </span>
+                </span>
+                <Badge variant="outline" className="hidden text-[0.65rem] sm:inline-flex">
+                  {others.length} santri menunggak
+                </Badge>
+                <ChevronDown
+                  className={cn("text-muted-foreground size-5 shrink-0 transition-transform", othersPanelOpen && "rotate-180")}
+                  aria-hidden
+                />
+              </button>
 
-              {/* Chip filter: Semua / 1 / 3 / 5 bulan terlama */}
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {OTHER_FILTERS.map((f) => (
-                  <Button
-                    key={f.key}
-                    type="button"
-                    size="sm"
-                    className={cn(
-                      "h-9 rounded-full px-4 text-xs",
-                      othersFilter === f.key
-                        ? "bg-role text-role-ink shadow-sm hover:bg-role/90 hover:text-role-ink"
-                        : "border-transparent bg-role-soft text-role-strong hover:bg-role/20"
-                    )}
-                    disabled={locked || (f.n > 0 && others.length < f.n)}
-                    onClick={() => applyOthersFilter(f.n)}
-                    aria-pressed={othersFilter === f.key}
-                  >
-                    {f.label}
-                  </Button>
-                ))}
-                <Badge variant="outline" className="ml-auto text-[0.65rem]">{others.length} santri menunggak</Badge>
-              </div>
+              {othersPanelOpen && (
+                <div className="border-t border-slate-100 p-4 sm:p-5 dark:border-slate-500/10">
+                  <div className="relative w-full sm:w-64">
+                    <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                    <Input
+                      value={othersQuery}
+                      onChange={(e) => {
+                        setOthersQuery(e.target.value);
+                        setOthersShown(10);
+                      }}
+                      placeholder="Cari nama atau kode santri…"
+                      className="border-slate-200 bg-slate-50/80 pl-9 dark:border-slate-500/20 dark:bg-transparent"
+                      aria-label="Cari santri"
+                    />
+                  </div>
+
+                  {/* Chip filter: Semua / 1 / 3 / 5 bulan terlama */}
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    {OTHER_FILTERS.map((f) => (
+                      <Button
+                        key={f.key}
+                        type="button"
+                        size="sm"
+                        className={cn(
+                          "h-9 rounded-full px-4 text-xs",
+                          othersFilter === f.key
+                            ? "bg-role text-role-ink shadow-sm hover:bg-role/90 hover:text-role-ink"
+                            : "border-transparent bg-role-soft text-role-strong hover:bg-role/20"
+                        )}
+                        disabled={locked || (f.n > 0 && others.length < f.n)}
+                        onClick={() => applyOthersFilter(f.n)}
+                        aria-pressed={othersFilter === f.key}
+                      >
+                        {f.label}
+                      </Button>
+                    ))}
+                  </div>
 
               {filteredOthers.length === 0 ? (
                 <p className="text-muted-foreground py-3 text-center text-sm">Tidak ada santri yang cocok.</p>
@@ -739,11 +766,13 @@ export function WaliPaymentPanel({
                 </ul>
               )}
 
-              {filteredOthers.length > visibleOthers.length && (
-                <div className="text-center">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setOthersShown((n) => n + 10)}>
-                    Tampilkan lebih banyak ({filteredOthers.length - visibleOthers.length} lagi)
-                  </Button>
+                  {filteredOthers.length > visibleOthers.length && (
+                    <div className="text-center">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setOthersShown((n) => n + 10)}>
+                        Tampilkan lebih banyak ({filteredOthers.length - visibleOthers.length} lagi)
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </section>
