@@ -140,6 +140,8 @@ export type TargetProgress = {
   scope: string;
   /** Daftar nama yang diketik guru (satu per baris); null pada data lama. */
   items: string | null;
+  /** V61 — status centang per item target: item yang dicapai santri → done. */
+  itemStatus?: { name: string; done: boolean }[] | null;
   description: string | null;
   teacherName: string | null;
 };
