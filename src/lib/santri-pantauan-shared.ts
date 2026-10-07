@@ -126,6 +126,8 @@ export type PresensiRekap = {
     alpa: number;
   }[];
   recent: { date: string; status: string; note: string | null; halaqahName: string | null }[];
+  /** V64 — seluruh catatan presensi dalam periode (terbaru dulu) untuk pemilih bulan. */
+  records?: { date: string; status: string; note: string | null; halaqahName: string | null }[];
 };
 
 export type TargetProgress = {

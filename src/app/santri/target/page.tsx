@@ -10,7 +10,7 @@ import {
   Target as TargetIcon,
 } from "lucide-react";
 
-import { TargetMosqueArt } from "@/components/santri/target-hero-art";
+import { MosqueScene } from "@/components/santri/mosque-scene";
 import { requireRole } from "@/lib/auth";
 import { getTargetProgress } from "@/lib/santri-pantauan";
 import type { TargetProgress } from "@/lib/santri-pantauan-shared";
@@ -225,7 +225,7 @@ export default async function SantriTargetPage() {
     <div className="space-y-5">
       {/* Hero banner */}
       <div className="shadow-card relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-100 via-sky-50 to-white">
-        <TargetMosqueArt className="pointer-events-none absolute inset-y-0 right-0 h-full w-44 sm:w-72" />
+        <MosqueScene className="pointer-events-none absolute inset-y-0 right-0 h-full w-44 sm:w-72" />
         <div className="relative max-w-[60%] p-5 sm:max-w-sm sm:p-6">
           <Link
             href="/santri"

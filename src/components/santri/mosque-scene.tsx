@@ -1,9 +1,9 @@
 /**
- * Dekorasi hero halaman Target Pembelajaran (santri) — pemandangan masjid
- * biru di langit cerah, mengikuti mockup. SVG inline (tanpa dependensi) agar
- * aman di server component dan tetap tajam di segala ukuran.
+ * Dekorasi hero dasbor santri — pemandangan masjid biru di langit cerah,
+ * mengikuti mockup (dipakai halaman Target & Presensi). SVG inline (tanpa
+ * dependensi) agar aman di server component dan tetap tajam di segala ukuran.
  */
-export function TargetMosqueArt({ className }: { className?: string }) {
+export function MosqueScene({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 320 200"
