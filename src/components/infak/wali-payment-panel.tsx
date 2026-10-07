@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, Clock3, Coins, FileUp, HandHeart, History, PencilLine, QrCode, ReceiptText, Search, UserRound, Users, X } from "lucide-react";
+import { Banknote, CalendarDays, CalendarPlus, CheckCircle2, ChevronDown, CircleUserRound, Clock3, Coins, FileUp, HandHeart, History, Lock, PencilLine, QrCode, ReceiptText, Search, UserRound, Users, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -146,7 +146,6 @@ export function WaliPaymentPanel({
   // "custom" = bebas diketik. Default "self" sehingga nama tercatat otomatis.
   const [payerMode, setPayerMode] = useState<"self" | "anon" | "custom">("self");
   const [payerCustom, setPayerCustom] = useState("");
-  const payerAlias = payerMode === "self" ? payerName : payerMode === "anon" ? ANONYMOUS_PAYER_NAME : payerCustom.trim();
   // V48.3 — kartu metode bayar hanya muncul setelah pengguna klik lanjut.
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   // Tab kartu Riwayat gabungan.
@@ -164,6 +163,19 @@ export function WaliPaymentPanel({
     () => Object.values(selected).reduce((a, b) => a + Math.max(b, customAmount ?? 0), 0),
     [selected, customAmount]
   );
+
+  // Santri milik akun ini (kartu "Tagihan Saya"). Bila pilihan memuat tagihan
+  // santri sendiri → infak WAJIB atas nama diri sendiri; nama lain (Hamba Allah
+  // / ketik sendiri) hanya boleh untuk membayarkan infak santri LAIN.
+  const ownIds = useMemo(() => new Set(kids.map((k) => k.studentId)), [kids]);
+  const hasOwnSelected = selectedKeys.some((k) => ownIds.has(k.split(":")[0]));
+  const effectivePayerMode = hasOwnSelected ? "self" : payerMode;
+  const payerAlias =
+    effectivePayerMode === "self"
+      ? ""
+      : effectivePayerMode === "anon"
+        ? ANONYMOUS_PAYER_NAME
+        : payerCustom.trim();
 
   /* ---- seleksi ---------------------------------------------------------- */
   function setMany(studentId: string, invs: WaliInvoiceItem[], on: boolean, replaceAmong?: WaliInvoiceItem[]) {
@@ -755,9 +767,9 @@ export function WaliPaymentPanel({
                     type="button"
                     size="sm"
                     variant="outline"
-                    className={payerChipCls(payerMode === "self")}
+                    className={payerChipCls(effectivePayerMode === "self")}
                     onClick={() => togglePayerMode("self")}
-                    aria-pressed={payerMode === "self"}
+                    aria-pressed={effectivePayerMode === "self"}
                   >
                     <CircleUserRound className="size-3.5" />
                     {payerName || "Nama saya"}
@@ -766,9 +778,9 @@ export function WaliPaymentPanel({
                     type="button"
                     size="sm"
                     variant="outline"
-                    className={payerChipCls(payerMode === "anon")}
+                    className={cn(payerChipCls(payerMode === "anon"), hasOwnSelected && "hidden")}
                     onClick={() => togglePayerMode("anon")}
-                    aria-pressed={payerMode === "anon"}
+                    aria-pressed={effectivePayerMode === "anon"}
                   >
                     <HandHeart className="size-3.5" />
                     {ANONYMOUS_PAYER_NAME}
@@ -777,14 +789,14 @@ export function WaliPaymentPanel({
                     type="button"
                     size="sm"
                     variant="outline"
-                    className={payerChipCls(payerMode === "custom")}
+                    className={cn(payerChipCls(payerMode === "custom"), hasOwnSelected && "hidden")}
                     onClick={() => togglePayerMode("custom")}
-                    aria-pressed={payerMode === "custom"}
+                    aria-pressed={effectivePayerMode === "custom"}
                   >
                     <PencilLine className="size-3.5" />
                     Ketik sendiri
                   </Button>
-                  {payerMode === "custom" && (
+                  {payerMode === "custom" && !hasOwnSelected && (
                     <Input
                       value={payerCustom}
                       onChange={(e) => setPayerCustom(e.target.value)}
@@ -796,8 +808,21 @@ export function WaliPaymentPanel({
                     />
                   )}
                 </div>
-                <p className="text-muted-foreground mt-2 text-[0.7rem] leading-relaxed">
-                  Nama ini yang tercatat sebagai pembayar infak — pilih Hamba Allah bila ingin anonim.
+                <p className="text-muted-foreground mt-2 flex items-start gap-1.5 text-[0.7rem] leading-relaxed">
+                  {hasOwnSelected ? (
+                    <>
+                      <Lock className="mt-0.5 size-3 shrink-0" aria-hidden />
+                      <span>
+                        Infak untuk diri sendiri otomatis atas nama Anda. Untuk memakai nama lain
+                        (mis. {ANONYMOUS_PAYER_NAME}), bayarkan infak santri lain saja.
+                      </span>
+                    </>
+                  ) : (
+                    <span>
+                      Nama ini yang tercatat sebagai pembayar infak — pilih {ANONYMOUS_PAYER_NAME}{" "}
+                      bila ingin anonim.
+                    </span>
+                  )}
                 </p>
               </div>
 
