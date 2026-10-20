@@ -160,6 +160,45 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
 
   return (
     <div className="space-y-8">
+      {/* ---------------- Panduan alur (V13.2) ---------------- */}
+      <section className="rounded-2xl border border-role/20 bg-gradient-to-br from-role-soft/60 via-role-soft/30 to-transparent p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <LayoutTemplate className="h-4 w-4 text-role" />
+          <p className="text-sm font-bold text-foreground">
+            {isDeveloper ? "Cara mengelola contoh raport" : "3 langkah menetapkan raport lembaga"}
+          </p>
+        </div>
+        {isDeveloper ? (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Buat template global, lalu tandai salah satu dengan “Jadikan Contoh Utama” agar ditawarkan lebih dulu kepada lembaga baru.
+          </p>
+        ) : (
+          <ol className="mt-2.5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+            <li className="flex items-start gap-2 rounded-xl bg-white/60 px-3 py-2 dark:bg-slate-900/40">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-role text-[10px] font-bold text-role-ink">1</span>
+              <span>
+                <span className="font-semibold text-foreground">Pakai contoh</span> — pilih contoh raport bawaan di bawah, tekan “Pakai Contoh Ini”.
+              </span>
+            </li>
+            <li className="flex items-start gap-2 rounded-xl bg-white/60 px-3 py-2 dark:bg-slate-900/40">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-role text-[10px] font-bold text-role-ink">2</span>
+              <span>
+                <span className="font-semibold text-foreground">Ubah sesuka lembaga</span> — atur tata letak di Report Builder hingga cocok.
+              </span>
+            </li>
+            <li className="flex items-start gap-2 rounded-xl bg-white/60 px-3 py-2 dark:bg-slate-900/40">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-role text-[10px] font-bold text-role-ink">3</span>
+              <span>
+                <span className="font-semibold text-foreground">
+                  {isDeveloper ? "Jadikan utama" : "Jadikan raport utama"}
+                </span>
+                — tetapkan sebagai bentuk raport resmi lembaga Anda.
+              </span>
+            </li>
+          </ol>
+        )}
+      </section>
+
       {message ? (
         <p
           className={cn(
@@ -194,11 +233,15 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
         </div>
 
         {primary && primary.layout ? (
-          <div className="overflow-hidden rounded-2xl border border-role/20 bg-role-soft/40 shadow-card">
-            <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start">
+          <div className="overflow-hidden rounded-2xl border border-role/20 bg-card shadow-card">
+            <div className={cn(
+              "h-1 w-full bg-gradient-to-r from-role via-role/60 to-transparent",
+              pending && "opacity-60"
+            )} />
+            <div className="flex flex-col gap-5 bg-role-soft/30 p-5 sm:flex-row sm:items-start dark:bg-slate-900/30">
               <Link
                 href={`${basePath}/contoh/${primary.id}`}
-                className="mx-auto shrink-0 transition hover:opacity-90 sm:mx-0"
+                className="mx-auto shrink-0 transition hover:-translate-y-0.5 sm:mx-0"
               >
                 <ReportThumbnail
                   layout={primary.layout}
@@ -257,15 +300,17 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-role/30 bg-role-soft/30 p-6 text-center">
-            <LayoutTemplate className="mx-auto h-8 w-8 text-role" />
-            <p className="mt-2 text-sm font-semibold text-foreground">
+          <div className="rounded-2xl border border-dashed border-role/30 bg-role-soft/30 p-8 text-center">
+            <LayoutTemplate className="mx-auto h-10 w-10 text-role" />
+            <p className="mt-2.5 text-sm font-bold text-foreground">
               Belum ada raport utama {isDeveloper ? "bawaan" : "lembaga"}.
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
               {isDeveloper
                 ? "Tandai salah satu template global di bawah sebagai contoh utama."
-                : "Pilih salah satu contoh di bawah, lalu tekan “Jadikan Raport Utama”."}
+                : owned.length > 0
+                  ? "Template Anda sudah siap — tekan tombol dengan ikon bintang untuk menjadikannya raport utama."
+                  : "Pilih salah satu contoh di bawah, lalu tekan “Pakai Contoh Ini” diikuti “Jadikan Raport Utama”."}
             </p>
           </div>
         )}
@@ -292,9 +337,13 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
         </div>
 
         {owned.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-muted-foreground">
-            Belum ada template. Ambil salah satu contoh bawaan di bawah untuk memulai.
-          </p>
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white/50 p-8 text-center dark:bg-slate-900/40">
+            <Sparkles className="mx-auto h-7 w-7 text-role" />
+            <p className="mt-2 text-sm font-semibold text-foreground">Belum ada template lembaga</p>
+            <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
+              Ambil salah satu contoh bawaan di bawah dengan “Pakai Contoh Ini” untuk memulai, atau buat template kosong.
+            </p>
+          </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {owned.map((t) => (
@@ -542,7 +591,7 @@ function TemplateCard({
     >
       <Link
         href={`${basePath}/contoh/${item.id}`}
-        className="flex justify-center bg-slate-100 p-4 transition hover:bg-slate-200/70 dark:bg-slate-800/40"
+        className="group flex justify-center overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100 p-4 transition hover:from-indigo-50 hover:to-indigo-50/40 dark:from-slate-800/40 dark:to-slate-800/60"
       >
         {item.layout ? (
           <ReportThumbnail
@@ -552,6 +601,7 @@ function TemplateCard({
             paper={item.paper}
             orientation={item.orientation}
             width={196}
+            className="shadow-md transition group-hover:shadow-lg"
           />
         ) : (
           <div className="flex h-[277px] w-[196px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-xs text-slate-400">
