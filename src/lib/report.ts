@@ -87,20 +87,52 @@ export async function getDevTemplates(): Promise<DevTemplateRow[]> {
   }));
 }
 
+export type TemplateDetail = {
+  id: string;
+  name: string;
+  paper: string;
+  orientation: string;
+  layout: ReportLayout | null;
+  tenantId: string | null;
+};
+
 export async function getTemplateDetail(
   templateId: string
-): Promise<{ id: string; name: string; paper: string; orientation: string; layout: ReportLayout | null; tenantId: string | null } | null> {
+): Promise<TemplateDetail | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("report_template_detail", { p_template_id: templateId });
-  if (error || !data || data.length === 0) return null;
-  const r = (data as Record<string, unknown>[])[0];
+  if (!error && data && data.length > 0) {
+    const r = (data as Record<string, unknown>[])[0];
+    return {
+      id: r.id as string,
+      name: r.name as string,
+      paper: r.paper as string,
+      orientation: r.orientation as string,
+      layout: (r.layout as ReportLayout) ?? null,
+      tenantId: (r.tenant_id as string | null) ?? null,
+    };
+  }
+
+  /**
+   * V71 fallback: versi RPC lama di database hanya mengizinkan DEVELOPER
+   * (template global) dan ADMIN (salinan lembaga), sehingga guru/koordinator
+   * mendapat null → halaman builder 404. Galeri (report_template_gallery /
+   * report_dev_gallery) sudah memverifikasi role + tenant di sisi DB, dan
+   * selalu memuat layout, jadi dipakai sebagai sumber kebenaran cadangan.
+   */
+  const profile = await getSessionProfile();
+  if (!profile) return null;
+  const t = await getGalleryTemplate(templateId);
+  if (!t) return null;
+  // DEVELOPER boleh membuka global; staf lembaga hanya salinan lembaganya.
+  if (profile.role !== "DEVELOPER" && t.scope !== "TENANT") return null;
   return {
-    id: r.id as string,
-    name: r.name as string,
-    paper: r.paper as string,
-    orientation: r.orientation as string,
-    layout: (r.layout as ReportLayout) ?? null,
-    tenantId: (r.tenant_id as string | null) ?? null,
+    id: t.id,
+    name: t.name,
+    paper: t.paper,
+    orientation: t.orientation,
+    layout: t.layout,
+    tenantId: profile.role === "DEVELOPER" ? null : (profile.tenantId ?? null),
   };
 }
 
