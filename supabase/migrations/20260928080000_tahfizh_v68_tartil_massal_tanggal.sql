@@ -18,6 +18,28 @@
 -- Idempoten: drop/create ulang (aman rerun).
 -- ============================================================================
 
+-- ---------------------------------------------------------------------------
+-- 0. PREFLIGHT — file ini HANYA bisa dijalankan setelah migrasi V1..V67
+--    bertahan di database yang sama (CREATE FUNCTION menyelesaikan tipe yang
+--    dideklarasikan saat pembuatan; tanpa tabel dasar → 42704 yang membingungkan).
+-- ---------------------------------------------------------------------------
+do $preflight$
+begin
+  if to_regclass('public.profiles') is null
+     or to_regclass('public.teachers') is null
+     or to_regclass('public.students') is null
+     or to_regclass('public.tartil_assessments') is null then
+    raise exception using message = format(
+      'SKEMA_BELUM_LENGKAP: tabel dasar migrasi awal tidak ditemukan (profiles=%s, teachers=%s, students=%s, tartil_assessments=%s). Jalankan seluruh migrasi supabase/migrations/ berurutan sesuai nama file (V1..V67) dulu — paling mudah \"supabase db push\" dari project root — sebelum migrasi V68.',
+      coalesce((select relname from pg_class where oid = to_regclass('public.profiles')), 'TIDAK ADA'),
+      coalesce((select relname from pg_class where oid = to_regclass('public.teachers')), 'TIDAK ADA'),
+      coalesce((select relname from pg_class where oid = to_regclass('public.students')), 'TIDAK ADA'),
+      coalesce((select relname from pg_class where oid = to_regclass('public.tartil_assessments')), 'TIDAK ADA')
+    );
+  end if;
+end
+$preflight$;
+
 -- -----------------------------------------------------------------------------
 -- 1. tartil_save_assessment — body sama dengan V12, hanya baris assessed_at
 --    yang kini fallback-aware: coalesce(GUC, now()).
