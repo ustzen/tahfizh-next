@@ -11,8 +11,10 @@ import {
 } from "@/lib/tartil";
 import { getTerminology } from "@/lib/terminology";
 import { TartilJurnalForm } from "./tartil-jurnal";
+import { TartilBulkForm } from "./tartil-bulk";
 import { PageHeader } from "@/components/dashboard/section";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { StatusBadge } from "@/components/status-badge";
@@ -42,18 +44,41 @@ export default async function UstadzTartilPage() {
       {config && teacher && (
         <Card className="shadow-card rounded-2xl">
           <CardContent className="pt-6">
-            <TartilJurnalForm
-              students={summaries.map((s) => ({
-                studentId: s.studentId,
-                fullName: s.fullName,
-                nis: s.nis,
-              }))}
-              materials={config.materials.map((m) => ({ id: m.id, name: m.name }))}
-              methods={methods.map((m) => ({ id: m.id, name: m.name, jilidCount: m.jilidCount }))}
-              grades={config.grades.map((g) => ({ label: g.label, minValue: g.minValue, maxValue: g.maxValue }))}
-              mode={config.mode}
-              templates={config.templates.map((t: NoteTemplate) => ({ id: t.id, slot: t.slot, content: t.content }))}
-            />
+            {/* V67 — dua cara input: satu santri (per jurnal) atau banyak
+                santri sekaligus untuk lembaga baru yang datanya di kertas. */}
+            <Tabs defaultValue="satu">
+              <TabsList className="mb-5">
+                <TabsTrigger value="satu">Per Santri</TabsTrigger>
+                <TabsTrigger value="banyak">Banyak Santri (Massal)</TabsTrigger>
+              </TabsList>
+              <TabsContent value="satu" className="mt-0">
+                <TartilJurnalForm
+                  students={summaries.map((s) => ({
+                    studentId: s.studentId,
+                    fullName: s.fullName,
+                    nis: s.nis,
+                  }))}
+                  materials={config.materials.map((m) => ({ id: m.id, name: m.name }))}
+                  methods={methods.map((m) => ({ id: m.id, name: m.name, jilidCount: m.jilidCount }))}
+                  grades={config.grades.map((g) => ({ label: g.label, minValue: g.minValue, maxValue: g.maxValue }))}
+                  mode={config.mode}
+                  templates={config.templates.map((t: NoteTemplate) => ({ id: t.id, slot: t.slot, content: t.content }))}
+                />
+              </TabsContent>
+              <TabsContent value="banyak" className="mt-0">
+                <TartilBulkForm
+                  students={summaries.map((s) => ({
+                    studentId: s.studentId,
+                    fullName: s.fullName,
+                    nis: s.nis,
+                  }))}
+                  materials={config.materials.map((m) => ({ id: m.id, name: m.name }))}
+                  methods={methods.map((m) => ({ id: m.id, name: m.name, jilidCount: m.jilidCount }))}
+                  grades={config.grades.map((g) => ({ label: g.label, minValue: g.minValue, maxValue: g.maxValue }))}
+                  mode={config.mode}
+                />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       )}

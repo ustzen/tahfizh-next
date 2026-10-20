@@ -18,10 +18,12 @@ const TARTIL_ERROR_MAP: { match: RegExp; message: string }[] = [
   { match: /SANTRI_BUKAN_BINAAN|SANTRI_TIDAK_DITEMUKAN/, message: "Santri bukan binaan Anda atau sudah tidak terdaftar." },
   { match: /MATERI_TIDAK_AKTIF/, message: "Materi ini sudah tidak digunakan oleh lembaga." },
   { match: /NILAI_ANGKA_TIDAK_VALID/, message: "Nilai harus angka 1-100." },
+  { match: /NILAI_TIDAK_VALID/, message: "Nilai belum diisi dengan benar — isi nilai untuk santri yang dinilai." },
   { match: /GRADE_TIDAK_VALID/, message: "Grade tidak valid untuk lembaga ini." },
   { match: /STATUS_TIDAK_VALID/, message: "Status penilaian tidak valid." },
   { match: /CATATAN_TERLALU_PANJANG/, message: "Catatan maksimal 500 karakter." },
   { match: /CATATAN_TIDAK_VALID/, message: "Isi catatan tidak valid." },
+  { match: /BATCH_KOSONG|BATCH_TERLALU_BESAR/, message: "Daftar penilaian tidak valid." },
 ];
 
 function friendlyError(message: string): string {
@@ -134,6 +136,72 @@ export async function saveTartilAssessmentAction(input: {
 
   invalidateTartilAssessments([input.studentId]);
   return { success: "Penilaian Tartil berhasil disimpan." };
+}
+
+/**
+ * V67 — INPUT NILAI MASSAL: guru memasukkan penilaian Tartil untuk BANYAK
+ * santri sekaligus (mis. lembaga baru yang datanya masih di kertas). Satu
+ * panggilan → satu transaksi: gagal di satu item = tidak ada yang tersimpan.
+ * Semua aturan (binaan, materi aktif, mode/grade lembaga) ditegakkan ulang oleh
+ * RPC per item — client tidak pernah dipercaya.
+ */
+export type TartilBulkItem = {
+  studentId: string;
+  materialId: string;
+  pagesLabel: string;
+  status: string;
+  scoreValue: number | null;
+  scoreLabel: string;
+};
+
+export async function saveTartilAssessmentsBulkAction(
+  items: TartilBulkItem[]
+): Promise<ActionResult> {
+  const profile = await getSessionProfile();
+  if (!profile || profile.role !== "USTADZ" || !profile.tenantId) {
+    return { error: "Session Anda telah berakhir. Silakan login kembali." };
+  }
+  if (!Array.isArray(items) || items.length === 0 || items.length > 200) {
+    return { error: "Daftar penilaian tidak valid." };
+  }
+
+  const payload = items.map((it) => {
+    const pages = (it.pagesLabel ?? "").trim();
+    return {
+      student_id: it.studentId,
+      material_id: it.materialId,
+      pages_label: pages || null,
+      status: it.status,
+      score_value: it.scoreValue,
+      score_label: it.scoreLabel || null,
+      free_note: null,
+    };
+  });
+
+  for (const p of payload) {
+    if (!UUID_RE.test(p.student_id) || !UUID_RE.test(p.material_id)) {
+      return { error: "Data penilaian tidak valid." };
+    }
+    if (!["BELUM", "DIPELAJARI", "DINILAI"].includes(p.status)) {
+      return { error: "Status penilaian tidak valid." };
+    }
+    if ((p.pages_label ?? "").length > 60) {
+      return { error: "Halaman/bagian maksimal 60 karakter." };
+    }
+    if (p.status === "DINILAI" && p.score_value !== null) {
+      if (!Number.isInteger(p.score_value) || p.score_value < 1 || p.score_value > 100) {
+        return { error: "Nilai harus angka 1-100." };
+      }
+    }
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("tartil_save_assessments_bulk", { p_items: payload });
+  if (error) return { error: friendlyError(error.message) };
+
+  invalidateTartilAssessments([...new Set(items.map((i) => i.studentId))]);
+  revalidatePath("/ustadz/tartil");
+  return { success: `${items.length} penilaian berhasil disimpan sekaligus.` };
 }
 
 /**
