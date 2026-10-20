@@ -120,3 +120,68 @@ export function parseTargetItems(raw: string): string[] {
 export function targetItemsTooLong(raw: string): boolean {
   return parseTargetItems(raw).join("\n").length > 5000;
 }
+
+/**
+ * V70 — TARGET PER SANTRI
+ * Lapisan lain di atas target halaqah: baris yang tersimpan menimpa target
+ * halaqah untuk santri yang memilikinya (kategori jenis yang sama).
+ */
+export type TargetStudentOption = {
+  id: string;
+  name: string;
+  halaqahName: string;
+};
+
+export type SantriTargetRow = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  halaqahName: string | null;
+  category: TargetCategory;
+  scope: TargetScope;
+  /** Nama tampilan dari katalog (atau teks ketikan guru pada data lama). */
+  items: string[];
+  itemIds: string[];
+  targetValue: number;
+  description: string | null;
+  updatedAt: string;
+};
+
+/** Kelompok target per santri: banyak santri dengan ISI target yang persis sama. */
+export type SantriTargetGroup = {
+  key: string;
+  category: TargetCategory;
+  scope: TargetScope;
+  items: string[];
+  itemIds: string[];
+  description: string | null;
+  targetValue: number;
+  studentIds: string[];
+  studentNames: string[];
+};
+
+/** Kelompokkan baris per-santri dengan isi target yang identik → satu kartu, N santri. */
+export function groupSantriTargets(rows: SantriTargetRow[]): SantriTargetGroup[] {
+  const groups = new Map<string, SantriTargetGroup>();
+  for (const r of rows) {
+    const key = `${r.category}|${r.scope}|${r.itemIds.join(",")}|${r.description ?? ""}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        key,
+        category: r.category,
+        scope: r.scope,
+        items: r.items,
+        itemIds: r.itemIds,
+        description: r.description,
+        targetValue: r.targetValue,
+        studentIds: [],
+        studentNames: [],
+      };
+      groups.set(key, g);
+    }
+    g.studentIds.push(r.studentId);
+    g.studentNames.push(r.studentName);
+  }
+  return [...groups.values()];
+}

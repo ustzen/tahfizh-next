@@ -366,8 +366,8 @@ export function TargetClient({
 
       <p className="text-muted-foreground flex items-center gap-2 px-1 text-xs">
         <TargetIcon className="size-3.5" />
-        Target berlaku untuk seluruh {santriLabel.toLowerCase()} di halaqah — bukan per {santriLabel.toLowerCase()}.
-        Satu halaqah punya satu target untuk tiap jenis, berlaku untuk 1 tahun ajaran, semester ganjil, atau semester genap.
+        Target halaqah berlaku untuk seluruh {santriLabel.toLowerCase()} di halaqah. Untuk {santriLabel.toLowerCase()} yang butuh target berbeda,
+        gunakan bagian "{santriLabel} Tertentu" di bawah — target per {santriLabel.toLowerCase()} menimpa target halaqahnya.
       </p>
 
       {/* Dialog atur / ubah target */}

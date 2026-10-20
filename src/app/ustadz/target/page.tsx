@@ -2,10 +2,12 @@ import { Target as TargetIcon } from "lucide-react";
 
 import { requireRole } from "@/lib/auth";
 import { getTargetCatalog, getTargetOverview } from "@/lib/target-halaqah";
+import { getSantriTargetOverview } from "@/lib/target-santri";
 import type { TargetCatalogItem, TargetCategory } from "@/lib/target-shared";
 import { getTerminology } from "@/lib/terminology";
 import { PageHeader } from "@/components/dashboard/section";
 import { TargetClient } from "./target-client";
+import { TargetSantriSection } from "./target-santri";
 
 export const metadata = { title: "Target" };
 
@@ -18,7 +20,10 @@ export const metadata = { title: "Target" };
 export default async function TargetPage() {
   const profile = await requireRole(["USTADZ"], "/ustadz/target");
   const terms = await getTerminology(profile.tenantId);
-  const overview = await getTargetOverview();
+  const [overview, santriOverview] = await Promise.all([
+    getTargetOverview(),
+    getSantriTargetOverview(),
+  ]);
 
   // V54/55 — katalog acuan per jenis untuk picker & kelola (semua item,
   // termasuk nonaktif, supaya guru bisa menampilkan lagi).
@@ -37,7 +42,7 @@ export default async function TargetPage() {
     <div>
       <PageHeader
         title="Target"
-        description={`Atur target untuk setiap halaqah — bukan per ${terms.santri.toLowerCase()}. Ada 3 target: Tahfidz Al-Qur'an, Hadits, dan Doa.`}
+        description={`Atur target PER HALAQAH atau PER ${terms.santri.toUpperCase()} (bisa banyak ${terms.santri.toLowerCase()} sekaligus). Target per ${terms.santri.toLowerCase()} menimpa target halaqahnya.`}
         action={
           <span className="bg-gradient-brand inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-card">
             <TargetIcon className="size-4" />
@@ -48,6 +53,14 @@ export default async function TargetPage() {
       <TargetClient
         halaqah={overview.halaqah}
         targets={overview.targets}
+        catalog={catalog}
+        santriLabel={terms.santri}
+      />
+      {/* V70 — target khusus untuk santri tertentu (bisa banyak sekaligus). */}
+      <TargetSantriSection
+        binaan={santriOverview.binaan}
+        targets={santriOverview.targets}
+        groups={santriOverview.groups}
         catalog={catalog}
         santriLabel={terms.santri}
       />
