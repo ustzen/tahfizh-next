@@ -68,6 +68,7 @@ export default async function UstadzTartilPage() {
                   grades={config.grades.map((g) => ({ label: g.label, minValue: g.minValue, maxValue: g.maxValue }))}
                   mode={config.mode}
                   templates={config.templates.map((t: NoteTemplate) => ({ id: t.id, slot: t.slot, content: t.content }))}
+                  today={hariIniWib()}
                 />
               </TabsContent>
               <TabsContent value="banyak" className="mt-0">

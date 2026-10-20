@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   BookMarked,
   BookOpen,
+  CalendarDays,
   GraduationCap,
   Loader2,
   MessageSquareText,
@@ -73,6 +74,7 @@ export function TartilJurnalForm({
   grades,
   mode: initialMode,
   templates,
+  today,
 }: {
   students: StudentOption[];
   materials: MaterialOption[];
@@ -82,12 +84,16 @@ export function TartilJurnalForm({
   /** Mode bawaan dari Pengaturan → Tartil (admin); guru tetap bisa ganti sendiri di form ini. */
   mode: TahfidzMode;
   templates: TemplateOption[];
+  /** Hari ini (WIB, YYYY-MM-DD) — default & batas input tanggal penilaian (V69, sama dgn massal). */
+  today: string;
 }) {
   const [studentId, setStudentId] = useState("");
   const [methodId, setMethodId] = useState(methods[0]?.id ?? "");
   const [materialId, setMaterialId] = useState("");
   const [fromPage, setFromPage] = useState("1");
   const [toPage, setToPage] = useState("1");
+  /** V69 — tanggal penilaian (sesuai kertas untuk data lama), sama seperti input massal. */
+  const [assessedDate, setAssessedDate] = useState(today);
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   // V33 — mode nilai TIDAK terkunci ke pengaturan admin: guru dapat memilih
   // Centang/Huruf/Angka langsung di form ini (default = pengaturan admin).
@@ -189,6 +195,7 @@ export function TartilJurnalForm({
         scoreLabel: mode === "HURUF" ? scoreLabel : "",
         freeNote: "",
         notes: noteInputs,
+        assessedAt: assessedDate === today ? null : assessedDate,
       });
       if (res.success) {
         toast.success(res.success);
@@ -230,9 +237,27 @@ export function TartilJurnalForm({
         </Select>
       </div>
 
-      {/* 2-3. JILID + DARI/SAMPAI HALAMAN */}
-      <div className="grid gap-4 sm:grid-cols-4">
+      {/* 2-3. TANGGAL + JILID + DARI/SAMPAI HALAMAN */}
+      <div className="grid gap-4 sm:grid-cols-5">
         <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="tj-tanggal" className="text-rose-600 dark:text-rose-300">
+            <span className={LABEL_CLS}><CalendarDays className="size-4" /> Tanggal Penilaian</span>
+          </Label>
+          <Input
+            id="tj-tanggal"
+            type="date"
+            required
+            className="h-11"
+            value={assessedDate}
+            max={today}
+            onChange={(e) => setAssessedDate(e.target.value)}
+            aria-label="Tanggal penilaian (sesuai catatan)"
+          />
+          <p className="text-muted-foreground text-[0.7rem]">
+            Ubah untuk data lama yang baru ditransfer, atau penilaian yang lupa dicatat.
+          </p>
+        </div>
+        <div className="space-y-1.5 sm:col-span-3">
           <div className="flex items-center justify-between">
             <Label htmlFor="tj-jilid" className="text-orange-600 dark:text-orange-300">
               <span className={LABEL_CLS}><BookMarked className="size-4" /> Jilid</span>
@@ -256,7 +281,9 @@ export function TartilJurnalForm({
             </SelectContent>
           </Select>
         </div>
+      </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="tj-from" className="text-violet-600 dark:text-violet-300">
             <span className={LABEL_CLS}><BookOpen className="size-4" /> Dari Halaman</span>

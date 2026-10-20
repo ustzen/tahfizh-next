@@ -24,7 +24,7 @@ const TARTIL_ERROR_MAP: { match: RegExp; message: string }[] = [
   { match: /CATATAN_TERLALU_PANJANG/, message: "Catatan maksimal 500 karakter." },
   { match: /CATATAN_TIDAK_VALID/, message: "Isi catatan tidak valid." },
   { match: /BATCH_KOSONG|BATCH_TERLALU_BESAR/, message: "Daftar penilaian tidak valid." },
-  { match: /TANGGAL_MASSAL_TIDAK_VALID/, message: "Tanggal penilaian tidak boleh di masa depan." },
+  { match: /TANGGAL_TIDAK_VALID|TANGGAL_MASSAL_TIDAK_VALID/, message: "Tanggal penilaian tidak boleh di masa depan." },
 ];
 
 function friendlyError(message: string): string {
@@ -35,6 +35,24 @@ function friendlyError(message: string): string {
 }
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
+
+/**
+ * V68/V69 — tanggal override (YYYY-MM-DD → timestamptz). null/"" = pakai waktu
+ * sekarang. Validasi: format, bukan masa depan (batas: hari ini zona WIB).
+ */
+function assessedDateToTz(assessedAt?: string | null): string | { error: string } | null {
+  const dateInput = (assessedAt ?? "").trim();
+  if (dateInput === "") return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateInput) || Number.isNaN(Date.parse(`${dateInput}T00:00:00Z`))) {
+    return { error: "Tanggal penilaian tidak valid." };
+  }
+  const todayWib = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+  if (dateInput > todayWib) {
+    return { error: "Tanggal tidak boleh di masa depan." };
+  }
+  // Tengah hari 00:00 UTC tetap tampil sebagai tanggal yang dipilih di zona WIB.
+  return `${dateInput}T00:00:00+00:00`;
+}
 
 export type TartilNoteInput = { slot: NoteSlot; content: string };
 
@@ -84,6 +102,8 @@ export async function saveTartilAssessmentAction(input: {
   freeNote: string;
   notes: TartilNoteInput[];
   assessmentId?: string | null; // set = edit
+  /** V69 — tanggal penilaian (YYYY-MM-DD); kosong = hari ini/waktu sekarang. */
+  assessedAt?: string | null;
 }): Promise<ActionResult> {
   const profile = await getSessionProfile();
   if (!profile || profile.role !== "USTADZ" || !profile.tenantId) {
@@ -120,6 +140,9 @@ export async function saveTartilAssessmentAction(input: {
     return { error: "Data penilaian tidak valid." };
   }
 
+  const dateResult = assessedDateToTz(input.assessedAt);
+  if (typeof dateResult === "object" && dateResult !== null) return { error: dateResult.error };
+
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("tartil_save_assessment", {
     p_student_id: input.studentId,
@@ -131,6 +154,7 @@ export async function saveTartilAssessmentAction(input: {
     p_free_note: freeNote || null,
     p_notes: notesPayload,
     p_assessment_id: input.assessmentId ?? null,
+    p_assessed_at: dateResult,
   });
 
   if (error) return { error: friendlyError(error.message) };
@@ -172,20 +196,8 @@ export async function saveTartilAssessmentsBulkAction(
     return { error: "Daftar penilaian tidak valid." };
   }
 
-  // V68 — tanggal override (SSR: tanggal hari ini zona Asia/Jakarta).
-  let pAssessedAt: string | null = null;
-  const dateInput = (assessedAt ?? "").trim();
-  if (dateInput !== "") {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateInput) || Number.isNaN(Date.parse(`${dateInput}T00:00:00Z`))) {
-      return { error: "Tanggal penilaian tidak valid." };
-    }
-    const todayWib = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
-    if (dateInput > todayWib) {
-      return { error: "Tanggal tidak boleh di masa depan." };
-    }
-    // Siang 00:00 UTC tetap tampil sebagai tanggal yang dipilih di zona WIB (07:00).
-    pAssessedAt = `${dateInput}T00:00:00+00:00`;
-  }
+  const dateResult = assessedDateToTz(assessedAt);
+  if (typeof dateResult === "object" && dateResult !== null) return { error: dateResult.error };
 
   const payload = items.map((it) => {
     const pages = (it.pagesLabel ?? "").trim();
@@ -220,7 +232,7 @@ export async function saveTartilAssessmentsBulkAction(
   const supabase = await createClient();
   const { error } = await supabase.rpc("tartil_save_assessments_bulk", {
     p_items: payload,
-    p_assessed_at: pAssessedAt,
+    p_assessed_at: dateResult,
   });
   if (error) return { error: friendlyError(error.message) };
 
