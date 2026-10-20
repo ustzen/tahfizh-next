@@ -24,6 +24,7 @@ const TARTIL_ERROR_MAP: { match: RegExp; message: string }[] = [
   { match: /CATATAN_TERLALU_PANJANG/, message: "Catatan maksimal 500 karakter." },
   { match: /CATATAN_TIDAK_VALID/, message: "Isi catatan tidak valid." },
   { match: /BATCH_KOSONG|BATCH_TERLALU_BESAR/, message: "Daftar penilaian tidak valid." },
+  { match: /TANGGAL_MASSAL_TIDAK_VALID/, message: "Tanggal penilaian tidak boleh di masa depan." },
 ];
 
 function friendlyError(message: string): string {
@@ -145,6 +146,11 @@ export async function saveTartilAssessmentAction(input: {
  * Semua aturan (binaan, materi aktif, mode/grade lembaga) ditegakkan ulang oleh
  * RPC per item — client tidak pernah dipercaya.
  */
+/**
+ * V68 — input massal kini menerima `assessedAt` opsional (YYYY-MM-DD): saat
+ * guru memindahkan catatan kertas lama, tanggal penilaian mengikuti kertas —
+ * bukan hari input. Kosong → pakai waktu sekarang (perilaku lama).
+ */
 export type TartilBulkItem = {
   studentId: string;
   materialId: string;
@@ -155,7 +161,8 @@ export type TartilBulkItem = {
 };
 
 export async function saveTartilAssessmentsBulkAction(
-  items: TartilBulkItem[]
+  items: TartilBulkItem[],
+  assessedAt?: string | null
 ): Promise<ActionResult> {
   const profile = await getSessionProfile();
   if (!profile || profile.role !== "USTADZ" || !profile.tenantId) {
@@ -163,6 +170,21 @@ export async function saveTartilAssessmentsBulkAction(
   }
   if (!Array.isArray(items) || items.length === 0 || items.length > 200) {
     return { error: "Daftar penilaian tidak valid." };
+  }
+
+  // V68 — tanggal override (SSR: tanggal hari ini zona Asia/Jakarta).
+  let pAssessedAt: string | null = null;
+  const dateInput = (assessedAt ?? "").trim();
+  if (dateInput !== "") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateInput) || Number.isNaN(Date.parse(`${dateInput}T00:00:00Z`))) {
+      return { error: "Tanggal penilaian tidak valid." };
+    }
+    const todayWib = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+    if (dateInput > todayWib) {
+      return { error: "Tanggal tidak boleh di masa depan." };
+    }
+    // Siang 00:00 UTC tetap tampil sebagai tanggal yang dipilih di zona WIB (07:00).
+    pAssessedAt = `${dateInput}T00:00:00+00:00`;
   }
 
   const payload = items.map((it) => {
@@ -196,7 +218,10 @@ export async function saveTartilAssessmentsBulkAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("tartil_save_assessments_bulk", { p_items: payload });
+  const { error } = await supabase.rpc("tartil_save_assessments_bulk", {
+    p_items: payload,
+    p_assessed_at: pAssessedAt,
+  });
   if (error) return { error: friendlyError(error.message) };
 
   invalidateTartilAssessments([...new Set(items.map((i) => i.studentId))]);

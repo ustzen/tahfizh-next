@@ -23,6 +23,11 @@ import { genderLabel } from "@/lib/roles";
 
 export const metadata = { title: "Tartil" };
 
+/** Tanggal hari ini zona Asia/Jakarta dalam format YYYY-MM-DD (utk default & max input tanggal). */
+function hariIniWib(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+}
+
 export default async function UstadzTartilPage() {
   const profile = await requireRole(["USTADZ"], "/ustadz/tartil");
   const terms = await getTerminology(profile.tenantId);
@@ -76,6 +81,7 @@ export default async function UstadzTartilPage() {
                   methods={methods.map((m) => ({ id: m.id, name: m.name, jilidCount: m.jilidCount }))}
                   grades={config.grades.map((g) => ({ label: g.label, minValue: g.minValue, maxValue: g.maxValue }))}
                   mode={config.mode}
+                  today={hariIniWib()}
                 />
               </TabsContent>
             </Tabs>

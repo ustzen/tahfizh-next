@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   BookMarked,
   BookOpen,
+  CalendarDays,
   CheckSquare,
   ClipboardCheck,
   GraduationCap,
@@ -59,6 +60,7 @@ export function TartilBulkForm({
   methods,
   grades,
   mode: initialMode,
+  today,
 }: {
   students: StudentOption[];
   materials: MaterialOption[];
@@ -66,11 +68,15 @@ export function TartilBulkForm({
   grades: GradeOption[];
   /** Mode bawaan Pengaturan → Tartil (admin); guru bisa ganti langsung di sini. */
   mode: TahfidzMode;
+  /** Hari ini (WIB, YYYY-MM-DD) — default & batas input tanggal. */
+  today: string;
 }) {
   const [methodId, setMethodId] = useState(methods[0]?.id ?? "");
   const [materialId, setMaterialId] = useState("");
   const [fromPage, setFromPage] = useState("1");
   const [toPage, setToPage] = useState("1");
+  /** V68 — tanggal penilaian (sesuai kertas untuk data lama). */
+  const [assessedDate, setAssessedDate] = useState(today);
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   /** Entry per santri: "" = belum diisi (baris dilewati saat simpan). */
   const [entries, setEntries] = useState<Record<string, string>>({});
@@ -175,7 +181,7 @@ export function TartilBulkForm({
       });
 
     startTransition(async () => {
-      const res = await saveTartilAssessmentsBulkAction(items);
+      const res = await saveTartilAssessmentsBulkAction(items, assessedDate === today ? null : assessedDate);
       if (res.success) {
         toast.success(res.success);
         setEntries({});
@@ -193,8 +199,21 @@ export function TartilBulkForm({
 
   return (
     <form onSubmit={onSave} className="space-y-5">
-      {/* 1. JILID + RENTANG HALAMAN (sama untuk semua santri di batch ini) */}
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-6">
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="tb-tanggal" className="text-rose-600 dark:text-rose-300">
+            <span className={LABEL_CLS}><CalendarDays className="size-4" /> Tanggal Penilaian</span>
+          </Label>
+          <Input
+            id="tb-tanggal" type="date" required
+            className="h-11" value={assessedDate} max={today}
+            onChange={(e) => setAssessedDate(e.target.value)}
+            aria-label="Tanggal penilaian (sesuai catatan kertas)"
+          />
+          <p className="text-muted-foreground text-[0.7rem]">
+            Ubah untuk data kertas lama — semua nilai di batch ini memakai tanggal ini.
+          </p>
+        </div>
         <div className="space-y-1.5 sm:col-span-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="tb-jilid" className="text-orange-600 dark:text-orange-300">
