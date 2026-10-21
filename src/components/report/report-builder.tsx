@@ -367,8 +367,17 @@ export function ReportBuilder({
           <Button
             variant="outline"
             size="sm"
+            title="Buka pratinjau penuh (halaman contoh) di tab baru"
             onClick={() => {
-              if (typeof window !== "undefined") window.open(`${window.location.pathname}/preview`, "_blank");
+              // V72 — /…/builder/<id>/preview tidak pernah ada → 404.
+              // Pratinjau penuh yang benar adalah halaman "contoh" per role,
+              // yang merender layout tersimpan dengan renderer cetak yang sama.
+              if (typeof window === "undefined") return;
+              const contohPath = window.location.pathname.replace(
+                /\/builder\/[^/]+(?:\/.*)?$/,
+                `/contoh/${templateId}`
+              );
+              window.open(contohPath, "_blank");
             }}
           >
             Preview
