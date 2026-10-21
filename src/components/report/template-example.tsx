@@ -72,13 +72,16 @@ export function TemplateExample({
 
   return (
     <div className="space-y-4">
-      <div className="no-print flex flex-wrap items-center justify-between gap-2">
-        <Link href={basePath}>
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Kembali ke Raport
-          </Button>
-        </Link>
-        <div className="flex flex-wrap gap-2">
+      {/* V72 — bar aksi sebagai kartu dengan strip identitas role */}
+      <div className="no-print overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+        <div aria-hidden className="h-1 w-full bg-gradient-brand" />
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2">
+          <Link href={basePath}>
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="mr-1 h-4 w-4" /> Kembali ke Raport
+            </Button>
+          </Link>
+          <div className="flex flex-wrap gap-2 pr-1">
           <Button size="sm" variant="outline" onClick={() => window.print()}>
             <Printer className="mr-1 h-4 w-4" /> Cetak / PDF
           </Button>
@@ -117,6 +120,7 @@ export function TemplateExample({
               )}
             </>
           )}
+          </div>
         </div>
       </div>
 

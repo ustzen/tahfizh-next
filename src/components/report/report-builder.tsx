@@ -347,50 +347,54 @@ export function ReportBuilder({
 
   return (
     <div className="space-y-3">
-      {/* Toolbar (rule #52) */}
-      <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-white/80 p-2 shadow-card backdrop-blur">
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} aria-label="Urungkan">
-            <Undo2 className="h-4 w-4" /> Undo
-          </Button>
-          <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo} aria-label="Ulangi">
-            <Redo2 className="h-4 w-4" /> Redo
-          </Button>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="hidden sm:inline">{initialName}</span>
-          <span className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
-            Halaman {pageIndex + 1}/{layout.pages.length}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            title="Buka pratinjau penuh (halaman contoh) di tab baru"
-            onClick={() => {
-              // V72 — /…/builder/<id>/preview tidak pernah ada → 404.
-              // Pratinjau penuh yang benar adalah halaman "contoh" per role,
-              // yang merender layout tersimpan dengan renderer cetak yang sama.
-              if (typeof window === "undefined") return;
-              const contohPath = window.location.pathname.replace(
-                /\/builder\/[^/]+(?:\/.*)?$/,
-                `/contoh/${templateId}`
-              );
-              window.open(contohPath, "_blank");
-            }}
-          >
-            Preview
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="bg-primary text-white"
-          >
-            <Save className="mr-1 h-4 w-4" />
-            {saving ? "Menyimpan..." : "Simpan"}
-          </Button>
+      {/* Toolbar (rule #52) — V72 rombak visual: panel bersudut tajam, strip identitas */}
+      <div className="no-print overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+        <div aria-hidden className="h-1 w-full bg-gradient-brand" />
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2">
+          <div className="flex items-center gap-1 pl-1">
+            <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} aria-label="Urungkan">
+              <Undo2 className="mr-1 size-4" /> Undo
+            </Button>
+            <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo} aria-label="Ulangi">
+              <Redo2 className="mr-1 size-4" /> Redo
+            </Button>
+          </div>
+          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            <span className="hidden max-w-52 truncate font-semibold text-foreground/80 sm:inline">{initialName}</span>
+            <span className="flex items-center gap-1 rounded-full bg-role-soft px-2.5 py-0.5 text-[11px] font-semibold text-role-strong">
+              Halaman {pageIndex + 1}/{layout.pages.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 pr-1">
+            <Button
+              variant="outline"
+              size="sm"
+              title="Buka pratinjau penuh (halaman contoh) di tab baru"
+              onClick={() => {
+                // V72 — /…/builder/<id>/preview tidak pernah ada → 404.
+                // Pratinjau penuh yang benar adalah halaman "contoh" per role,
+                // yang merender layout tersimpan dengan renderer cetak yang sama.
+                if (typeof window === "undefined") return;
+                const contohPath = window.location.pathname.replace(
+                  /\/builder\/[^/]+(?:\/.*)?$/,
+                  `/contoh/${templateId}`
+                );
+                window.open(contohPath, "_blank");
+              }}
+            >
+              <Eye className="mr-1 size-4" />
+              Preview
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="bg-primary text-white"
+            >
+              <Save className="mr-1 size-4" />
+              {saving ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </div>
         </div>
       </div>
       {message ? (
@@ -408,7 +412,12 @@ export function ReportBuilder({
         {/* Component palette (rule #13/#14) */}
         <Card className="order-2 h-fit shadow-card lg:order-1">
           <CardContent className="space-y-3 p-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-blue-800">Komponen</p>
+            <div className="flex items-center gap-2">
+              <span className="bg-role-soft text-role-strong flex size-6 items-center justify-center rounded-lg">
+                <Plus className="size-3.5" />
+              </span>
+              <p className="text-xs font-bold uppercase tracking-wide text-role-strong">Komponen</p>
+            </div>
             {Object.entries(grouped).map(([group, types]) => (
               <div key={group} className="space-y-1">
                 <p className="text-[10px] font-semibold uppercase text-muted-foreground/80">{group}</p>
@@ -417,7 +426,7 @@ export function ReportBuilder({
                     key={t}
                     type="button"
                     onClick={() => addComponent(t)}
-                    className="flex w-full items-center justify-between rounded-lg border border-border/60 px-2.5 py-1.5 text-left text-xs font-medium text-foreground/85 transition hover:border-blue-300 hover:bg-blue-50"
+                    className="flex w-full items-center justify-between rounded-lg border-border border-x border-b border-dashed bg-card px-2.5 py-1.5 text-left text-xs font-medium text-foreground/85 transition hover:border-role/40 hover:bg-role-soft hover:text-role-strong"
                   >
                     {COMPONENT_META[t].label}
                     <Plus className="h-3 w-3 text-blue-500" />
@@ -432,7 +441,7 @@ export function ReportBuilder({
         <div className="order-1 flex flex-col items-center gap-3 lg:order-2">
           <div
             ref={canvasRef}
-            className="relative overflow-auto rounded-xl bg-muted p-4"
+            className="relative overflow-auto rounded-2xl border border-border/70 bg-muted p-4"
             style={{ maxHeight: "78vh" }}
           >
             <ReportCanvas
@@ -471,7 +480,7 @@ export function ReportBuilder({
           </div>
 
           {/* Page management (rule #58/#59) */}
-          <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-card px-3 py-2 text-xs shadow-card">
             <Button variant="outline" size="sm" onClick={() => movePage(-1)} disabled={pageIndex === 0}>
               ←
             </Button>
@@ -480,7 +489,7 @@ export function ReportBuilder({
                 key={i}
                 variant={i === pageIndex ? "default" : "outline"}
                 size="sm"
-                className={cn(i === pageIndex && "bg-blue-600 text-white")}
+                className={cn(i === pageIndex && "bg-role text-role-ink")}
                 onClick={() => {
                   setPageIndex(i);
                   setSelectedId(null);
@@ -515,7 +524,7 @@ export function ReportBuilder({
           <CardContent className="space-y-3 p-3">
             {selected ? (
               <>
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-800">
+                <p className="text-xs font-bold uppercase tracking-wide text-role-strong">
                   {COMPONENT_META[selected.type]?.label ?? selected.type}
                 </p>
 

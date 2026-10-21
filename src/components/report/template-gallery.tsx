@@ -7,6 +7,7 @@ import {
   Check,
   Copy,
   Eye,
+  Info,
   LayoutTemplate,
   Pencil,
   Plus,
@@ -48,11 +49,14 @@ import {
 } from "@/app/actions/report";
 
 /**
- * TAHFIZH V13 — Galeri Raport.
- * Halaman raport tidak lagi menampilkan daftar nama template: setiap template
- * langsung dirender sebagai CONTOH RAPORT memakai renderer cetak yang sama,
- * dengan data contoh. Dari sini pengguna memilih, menyunting, dan menetapkan
- * raport utama lembaga.
+ * TAHFIZH V72 — Galeri Raport (rombak total).
+ * Halaman raport langsung menampilkan CONTOH RAPORT-nya memakai renderer cetak
+ * yang sama (`ReportCanvas` lewat `ReportThumbnail`). Layout baru:
+ *   1. Sorotan "Raport Utama" — bingkai kaca besar + langkah 1-2-3 inline.
+ *   2. Grid kartu tinggi dengan hover lembut dan aksi ikon.
+ *   3. Katalog contoh bawaan untuk staf lembaga.
+ * Semua alur & aksi (pakai, ubah, utama, duplikat, info, aktif, hapus) tidak
+ * berubah — komponen ini murni penataan ulang visual.
  */
 
 export type GalleryItem = {
@@ -159,46 +163,7 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
   }
 
   return (
-    <div className="space-y-8">
-      {/* ---------------- Panduan alur (V13.2) ---------------- */}
-      <section className="rounded-2xl border border-role/20 bg-gradient-to-br from-role-soft/60 via-role-soft/30 to-transparent p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <LayoutTemplate className="h-4 w-4 text-role" />
-          <p className="text-sm font-bold text-foreground">
-            {isDeveloper ? "Cara mengelola contoh raport" : "3 langkah menetapkan raport lembaga"}
-          </p>
-        </div>
-        {isDeveloper ? (
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            Buat template global, lalu tandai salah satu dengan “Jadikan Contoh Utama” agar ditawarkan lebih dulu kepada lembaga baru.
-          </p>
-        ) : (
-          <ol className="mt-2.5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-            <li className="flex items-start gap-2 rounded-xl bg-white/60 px-3 py-2 dark:bg-slate-900/40">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-role text-[10px] font-bold text-role-ink">1</span>
-              <span>
-                <span className="font-semibold text-foreground">Pakai contoh</span> — pilih contoh raport bawaan di bawah, tekan “Pakai Contoh Ini”.
-              </span>
-            </li>
-            <li className="flex items-start gap-2 rounded-xl bg-white/60 px-3 py-2 dark:bg-slate-900/40">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-role text-[10px] font-bold text-role-ink">2</span>
-              <span>
-                <span className="font-semibold text-foreground">Ubah sesuka lembaga</span> — atur tata letak di Report Builder hingga cocok.
-              </span>
-            </li>
-            <li className="flex items-start gap-2 rounded-xl bg-white/60 px-3 py-2 dark:bg-slate-900/40">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-role text-[10px] font-bold text-role-ink">3</span>
-              <span>
-                <span className="font-semibold text-foreground">
-                  {isDeveloper ? "Jadikan utama" : "Jadikan raport utama"}
-                </span>
-                — tetapkan sebagai bentuk raport resmi lembaga Anda.
-              </span>
-            </li>
-          </ol>
-        )}
-      </section>
-
+    <div className="space-y-7">
       {message ? (
         <p
           className={cn(
@@ -212,14 +177,15 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
         </p>
       ) : null}
 
-      {/* ---------------- Raport utama ---------------- */}
-      <section className="space-y-3">
+      {/* ---------------- 1. Sorotan: Raport Utama ---------------- */}
+      <section aria-busy={pending} className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold text-foreground">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
+              <Star className="size-4.5 fill-amber-400 text-amber-400" />
               {isDeveloper ? "Contoh Utama Bawaan" : "Raport Utama Lembaga"}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {isDeveloper
                 ? "Template yang ditawarkan lebih dulu kepada lembaga baru."
                 : "Bentuk raport yang dipakai lembaga saat menerbitkan raport santri."}
@@ -227,57 +193,94 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
           </div>
           {isDeveloper ? (
             <Button size="sm" className="bg-primary text-white" onClick={openCreate} disabled={pending}>
-              <Plus className="mr-1 h-4 w-4" /> Template Baru
+              <Plus className="mr-1 size-4" /> Template Baru
             </Button>
           ) : null}
         </div>
 
         {primary && primary.layout ? (
-          <div className="overflow-hidden rounded-2xl border border-role/20 bg-card shadow-card">
-            <div className={cn(
-              "h-1 w-full bg-gradient-to-r from-role via-role/60 to-transparent",
-              pending && "opacity-60"
-            )} />
-            <div className="flex flex-col gap-5 bg-role-soft/30 p-5 sm:flex-row sm:items-start dark:bg-slate-900/30">
+          <div className="overflow-hidden rounded-2xl border border-role/25 shadow-card">
+            <div
+              className={cn(
+                "h-1 w-full bg-gradient-brand transition-opacity",
+                pending && "opacity-50"
+              )}
+            />
+            <div className="bg-role-soft/40 relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[260px_1fr] dark:bg-slate-900/30">
+              {/* Bingkai overview — thumbnail raport utama, diperbesar saat hover */}
               <Link
                 href={`${basePath}/contoh/${primary.id}`}
-                className="mx-auto shrink-0 transition hover:-translate-y-0.5 sm:mx-0"
+                className="group mx-auto w-fit lg:mx-0"
+                title="Lihat contoh penuh"
               >
-                <ReportThumbnail
-                  layout={primary.layout}
-                  ctx={SAMPLE_REPORT_CTX}
-                  data={SAMPLE_REPORT_DATA}
-                  paper={primary.paper}
-                  orientation={primary.orientation}
-                  width={230}
-                  className="shadow-card"
-                />
+                <div className="rounded-2xl bg-white p-2.5 shadow-card-lg ring-1 ring-slate-200 transition-transform duration-200 group-hover:-translate-y-1 dark:bg-white dark:ring-border/40">
+                  <ReportThumbnail
+                    layout={primary.layout}
+                    ctx={SAMPLE_REPORT_CTX}
+                    data={SAMPLE_REPORT_DATA}
+                    paper={primary.paper}
+                    orientation={primary.orientation}
+                    width={232}
+                  />
+                </div>
               </Link>
-              <div className="min-w-0 flex-1 space-y-3">
+
+              <div className="flex min-w-0 flex-col gap-3">
+                {/* Langkah alur — digabung ke panel sorotan (V72) */}
+                {!isDeveloper && mine.length > 0 && (
+                  <ol className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                    {[
+                      "Pilih / pakai contoh",
+                      "Ubah di Report Builder",
+                      isDeveloper ? "Jadikan utama" : "Jadikan raport utama",
+                    ].map((label, i) => (
+                      <li key={label} className="flex items-center gap-1.5">
+                        {i > 0 && <span aria-hidden className="text-border">→</span>}
+                        <span
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-full border border-role/20 bg-role-soft/70 px-2.5 py-1 font-medium text-role-strong"
+                          )}
+                        >
+                          <span className="bg-role text-role-ink flex size-4 items-center justify-center rounded-full text-[9px] font-bold">
+                            {i + 1}
+                          </span>
+                          {label}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="bg-role text-role-ink">
-                    <Star className="mr-1 h-3 w-3" /> Raport Utama
+                  <Badge className="bg-role text-role-ink gap-1">
+                    <Star className="size-3 fill-current" /> Raport Utama
                   </Badge>
                   <Badge variant="outline" className="text-muted-foreground">
                     {primary.paper} • {primary.orientation === "LANDSCAPE" ? "Landscape" : "Portrait"} • v
                     {primary.version}
                   </Badge>
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-foreground">{primary.name}</p>
-                  {primary.description ? (
-                    <p className="mt-1 text-sm text-muted-foreground">{primary.description}</p>
+                  {primary.usageCount > 0 ? (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      Dipakai {primary.usageCount} raport
+                    </Badge>
                   ) : null}
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xl font-bold text-foreground">{primary.name}</p>
+                  {primary.description ? (
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{primary.description}</p>
+                  ) : null}
+                </div>
+
+                <div className="mt-auto flex flex-wrap gap-2 pt-1">
                   <Link href={`${basePath}/contoh/${primary.id}`}>
-                    <Button size="sm" variant="outline">
-                      <Eye className="mr-1 h-4 w-4" /> Lihat Contoh Penuh
+                    <Button size="sm" variant="outline" className="shrink-0">
+                      <Eye className="mr-1 size-4" /> Lihat Contoh Penuh
                     </Button>
                   </Link>
                   <Link href={`${basePath}/builder/${primary.id}`}>
                     <Button size="sm" className="bg-primary text-white">
-                      <Pencil className="mr-1 h-4 w-4" /> Ubah Template
+                      <Pencil className="mr-1 size-4" /> Ubah Template
                     </Button>
                   </Link>
                   <Button
@@ -293,37 +296,43 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
                       )
                     }
                   >
-                    <Copy className="mr-1 h-4 w-4" /> Duplikat
+                    <Copy className="mr-1 size-4" /> Duplikat
                   </Button>
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-role/30 bg-role-soft/30 p-8 text-center">
-            <LayoutTemplate className="mx-auto h-10 w-10 text-role" />
-            <p className="mt-2.5 text-sm font-bold text-foreground">
+          <div className="relative overflow-hidden rounded-2xl border border-dashed border-role/30 bg-role-soft/30 p-8 text-center">
+            <span
+              aria-hidden
+              className="bg-dots text-role/25 pointer-events-none absolute -top-2 -right-2 h-24 w-40 [mask-image:linear-gradient(to_left,black,transparent)]"
+            />
+            <div className="bg-role-soft text-role-strong mx-auto flex size-12 items-center justify-center rounded-2xl shadow-card">
+              <LayoutTemplate className="size-6" />
+            </div>
+            <p className="mt-3 text-sm font-bold text-foreground">
               Belum ada raport utama {isDeveloper ? "bawaan" : "lembaga"}.
             </p>
             <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
               {isDeveloper
-                ? "Tandai salah satu template global di bawah sebagai contoh utama."
+                ? "Buat template baru, atau tandai salah satu template global di bawah sebagai contoh utama."
                 : owned.length > 0
-                  ? "Template Anda sudah siap — tekan tombol dengan ikon bintang untuk menjadikannya raport utama."
+                  ? "Template Anda sudah siap — tekan tombol bintang di kartu template untuk menjadikannya raport utama."
                   : "Pilih salah satu contoh di bawah, lalu tekan “Pakai Contoh Ini” diikuti “Jadikan Raport Utama”."}
             </p>
           </div>
         )}
       </section>
 
-      {/* ---------------- Template milik lembaga / global ---------------- */}
+      {/* ---------------- 2. Template milik lembaga / global ---------------- */}
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-foreground">
               {isDeveloper ? "Semua Template Global" : "Template Lembaga"}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {isDeveloper
                 ? "Setiap lembaga memakai salinannya sendiri — perubahan di sini tidak mengubah raport yang sudah terbit."
                 : "Salinan milik lembaga Anda. Bebas diubah tanpa memengaruhi lembaga lain."}
@@ -331,14 +340,14 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
           </div>
           {!isDeveloper ? (
             <Button size="sm" variant="outline" onClick={openCreate} disabled={pending}>
-              <Plus className="mr-1 h-4 w-4" /> Template Kosong
+              <Plus className="mr-1 size-4" /> Template Kosong
             </Button>
           ) : null}
         </div>
 
         {owned.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white/50 p-8 text-center dark:bg-slate-900/40">
-            <Sparkles className="mx-auto h-7 w-7 text-role" />
+          <div className="rounded-2xl border border-dashed border-border bg-card/60 p-8 text-center">
+            <Sparkles className="mx-auto size-7 text-role" />
             <p className="mt-2 text-sm font-semibold text-foreground">Belum ada template lembaga</p>
             <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
               Ambil salah satu contoh bawaan di bawah dengan “Pakai Contoh Ini” untuk memulai, atau buat template kosong.
@@ -356,39 +365,40 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
                 actions={
                   <>
                     <Link href={`${basePath}/builder/${t.id}`} className="grow">
-                      <Button size="sm" variant="outline" className="h-8 w-full text-xs">
-                        <Pencil className="mr-1 h-3.5 w-3.5" /> Ubah
+                      <Button size="sm" className="h-8 w-full bg-primary text-xs text-white">
+                        <Pencil className="mr-1 size-3.5" /> Ubah
                       </Button>
                     </Link>
                     {t.isPrimary ? (
                       <Button size="sm" variant="outline" className="h-8 text-xs" disabled>
-                        <Check className="mr-1 h-3.5 w-3.5" /> Utama
+                        <Check className="mr-1 size-3.5" /> Utama
                       </Button>
                     ) : (
                       <Button
                         size="sm"
-                        className="h-8 bg-primary text-xs text-white"
+                        variant="outline"
+                        className="h-8 shrink-0 text-xs text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-500/10"
+                        title={isDeveloper ? "Jadikan contoh utama" : "Jadikan raport utama"}
                         disabled={pending}
                         onClick={() => run(() => setReportTemplatePrimaryAction({ templateId: t.id }))}
                       >
-                        <Star className="mr-1 h-3.5 w-3.5" />
-                        {isDeveloper ? "Jadikan Contoh Utama" : "Jadikan Raport Utama"}
+                        <Star className="size-3.5" />
                       </Button>
                     )}
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs"
+                      className="h-8 shrink-0 text-xs"
                       title="Ubah nama & ukuran kertas"
                       disabled={pending}
                       onClick={() => openEdit(t)}
                     >
-                      Info
+                      <Info className="size-3.5" />
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs"
+                      className="h-8 shrink-0"
                       title="Duplikat"
                       disabled={pending}
                       onClick={() =>
@@ -400,25 +410,25 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
                         )
                       }
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="size-3.5" />
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs"
+                      className="h-8 shrink-0"
                       title={t.isActive ? "Nonaktifkan" : "Aktifkan"}
                       disabled={pending || t.isPrimary}
                       onClick={() =>
                         run(() => setReportTemplateActiveAction({ templateId: t.id, active: !t.isActive }))
                       }
                     >
-                      <Power className="h-3.5 w-3.5" />
+                      <Power className="size-3.5" />
                     </Button>
                     {canDelete ? (
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 text-xs text-red-600 dark:text-red-300"
+                        className="h-8 shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:bg-red-500/10"
                         title={
                           t.usageCount > 0
                             ? "Sudah dipakai raport — nonaktifkan saja."
@@ -427,7 +437,7 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
                         disabled={pending || t.usageCount > 0 || t.isPrimary}
                         onClick={() => run(() => deleteReportTemplateAction({ templateId: t.id }))}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="size-3.5" />
                       </Button>
                     ) : null}
                   </>
@@ -438,14 +448,14 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
         )}
       </section>
 
-      {/* ---------------- Katalog bawaan (khusus staf lembaga) ---------------- */}
+      {/* ---------------- 3. Katalog bawaan (khusus staf lembaga) ---------------- */}
       {!isDeveloper ? (
         <section className="space-y-3">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
-              <Sparkles className="h-4 w-4 text-role" /> Contoh Raport Bawaan
+              <Sparkles className="size-4 text-role" /> Contoh Raport Bawaan
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               Ini contoh tampilan raportnya. Tekan “Pakai Contoh Ini” untuk menyalinnya ke lembaga Anda,
               lalu ubah sesukanya di Report Builder.
             </p>
@@ -473,11 +483,11 @@ export function TemplateGallery({ templates, basePath, role }: Props) {
                           run(() => duplicateReportTemplateAction({ templateId: t.id, newName: t.name }))
                         }
                       >
-                        <Plus className="mr-1 h-3.5 w-3.5" /> Pakai Contoh Ini
+                        <Plus className="mr-1 size-3.5" /> Pakai Contoh Ini
                       </Button>
                       <Link href={`${basePath}/contoh/${t.id}`}>
-                        <Button size="sm" variant="outline" className="h-8 text-xs">
-                          <Eye className="mr-1 h-3.5 w-3.5" /> Contoh
+                        <Button size="sm" variant="outline" className="h-8 shrink-0 text-xs">
+                          <Eye className="mr-1 size-3.5" /> Contoh
                         </Button>
                       </Link>
                     </>
@@ -584,27 +594,28 @@ function TemplateCard({
     <div
       aria-busy={pending}
       className={cn(
-        "flex flex-col overflow-hidden rounded-2xl border bg-card shadow-card transition",
-        highlight ? "border-role/40 ring-1 ring-role/20" : "border-border",
-        pending && "opacity-70"
+        "group flex flex-col overflow-hidden rounded-2xl border bg-card shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-card-lg",
+        highlight ? "border-role/40 ring-1 ring-role/25" : "border-border",
+        pending && "pointer-events-none opacity-60"
       )}
     >
       <Link
         href={`${basePath}/contoh/${item.id}`}
-        className="group flex justify-center overflow-hidden bg-gradient-to-b from-slate-50 to-slate-100 p-4 transition hover:from-indigo-50 hover:to-indigo-50/40 dark:from-slate-800/40 dark:to-slate-800/60"
+        className="flex justify-center overflow-hidden border-b border-border/60 bg-gradient-to-b from-role-soft/50 to-slate-50 p-4 transition-colors group-hover:from-role-soft/70 dark:from-slate-900/50 dark:to-slate-900/30"
       >
         {item.layout ? (
-          <ReportThumbnail
-            layout={item.layout}
-            ctx={SAMPLE_REPORT_CTX}
-            data={SAMPLE_REPORT_DATA}
-            paper={item.paper}
-            orientation={item.orientation}
-            width={196}
-            className="shadow-md transition group-hover:shadow-lg"
-          />
+          <div className="rounded-lg bg-white p-1.5 ring-1 ring-slate-200 shadow-sm transition-transform duration-200 group-hover:-translate-y-0.5 dark:bg-white dark:ring-border/40">
+            <ReportThumbnail
+              layout={item.layout}
+              ctx={SAMPLE_REPORT_CTX}
+              data={SAMPLE_REPORT_DATA}
+              paper={item.paper}
+              orientation={item.orientation}
+              width={184}
+            />
+          </div>
         ) : (
-          <div className="flex h-[277px] w-[196px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-xs text-slate-400">
+          <div className="flex h-[277px] w-[184px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-xs text-slate-400">
             Layout masih kosong
           </div>
         )}
@@ -613,9 +624,11 @@ function TemplateCard({
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className="text-sm font-bold text-foreground">{item.name}</p>
+            <p className="truncate text-sm font-bold text-foreground">{item.name}</p>
             {item.isPrimary ? (
-              <Badge className="bg-role text-role-ink text-[10px]">Utama</Badge>
+              <Badge className="bg-role text-role-ink items-center gap-1 text-[10px]">
+                <Star className="size-2.5 fill-current" /> Utama
+              </Badge>
             ) : null}
             {!item.isActive ? (
               <Badge variant="outline" className="text-[10px] text-muted-foreground">

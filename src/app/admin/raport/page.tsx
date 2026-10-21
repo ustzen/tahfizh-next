@@ -1,21 +1,19 @@
 import Link from "next/link";
-import { FileCheck2, FilePlus2, FileText, Layers } from "lucide-react";
+import { ArrowRight, FileCheck2, FilePlus2, FileText, Layers } from "lucide-react";
 
-import { PageHeader, CardBox } from "@/components/dashboard/section";
+import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getAdminReportList, getReportTemplateGallery } from "@/lib/report";
 import { TemplateGallery } from "@/components/report/template-gallery";
+import { RaportStatStrip } from "@/components/report/raport-stat-strip";
 import { ReportListTable } from "@/components/report/report-list-table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Raport" };
 
 /**
- * TAHFIZH V13 — Admin Raport.
- * Halaman langsung menampilkan CONTOH RAPORT-nya: raport utama lembaga di
- * atas, lalu galeri template lembaga & contoh bawaan. Daftar raport santri
- * menyusul di bawah.
+ * TAHFIZH V72 — Admin Raport (rombak total).
+ * Sorotan "Raport Utama Lembaga", galeri template & contoh bawaan, lalu daftar
+ * raport santri yang baru dibuat. Data & aksi tidak berubah — hanya penataan.
  */
 export default async function AdminRaportPage() {
   await requireRole(["ADMIN"], "/admin/raport");
@@ -30,66 +28,62 @@ export default async function AdminRaportPage() {
   const primary = mine.find((t) => t.isPrimary) ?? null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <PageHeader
         title="Raport"
-        description="Pilih bentuk raport, ubah sesuai lembaga, lalu tetapkan sebagai raport utama."
+        description="Pilih bentuk raport, ubah sesuai lembaga Anda, lalu tetapkan sebagai raport utama."
         action={
           primary ? (
             <Link href={`/admin/raport/buat?template=${primary.id}`}>
-              <Button size="sm" className="bg-primary text-white">
-                <FilePlus2 className="mr-1 h-4 w-4" /> Buat Raport Santri
-              </Button>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-role px-4 py-2 text-sm font-semibold text-role-ink shadow-card transition hover:-translate-y-0.5 hover:shadow-card-lg">
+                <FilePlus2 className="size-4" /> Buat Raport Santri
+              </span>
             </Link>
           ) : undefined
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <CardBox className="flex items-center gap-3 p-4">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
-            <Layers className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-xs text-muted-foreground">Template lembaga</p>
-            <p className="text-lg font-bold text-foreground">{mine.length}</p>
-          </div>
-        </CardBox>
-        <CardBox className="flex items-center gap-3 p-4">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500 text-white">
-            <FileText className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-xs text-muted-foreground">Draft</p>
-            <p className="text-lg font-bold text-foreground">{draft}</p>
-          </div>
-        </CardBox>
-        <CardBox className="flex items-center gap-3 p-4">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-white">
-            <FileCheck2 className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-xs text-muted-foreground">Raport final</p>
-            <p className="text-lg font-bold text-foreground">{final}</p>
-          </div>
-        </CardBox>
-      </div>
+      <RaportStatStrip
+        items={[
+          {
+            label: "Template lembaga",
+            value: mine.length,
+            icon: <Layers />,
+            chip: "bg-role-soft text-role-strong",
+          },
+          {
+            label: "Draft menunggu final",
+            value: draft,
+            icon: <FileText />,
+            chip: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+          },
+          {
+            label: "Raport final",
+            value: final,
+            icon: <FileCheck2 />,
+            chip: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+          },
+        ]}
+      />
 
       <TemplateGallery templates={templates} basePath="/admin/raport" role="ADMIN" />
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-foreground">Raport Santri</h2>
-          <Badge variant="outline" className="border-role/25 bg-role-soft text-role-strong">
-            {reports.length} raport
-          </Badge>
+          <Link
+            href="/admin/raport/riwayat"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-role-strong hover:underline"
+          >
+            Riwayat lengkap ({reports.length}) <ArrowRight className="size-3" />
+          </Link>
         </div>
         <ReportListTable
           reports={reports.slice(0, 8)}
           canFinalize={false}
           emptyHint="Belum ada raport. Tetapkan raport utama dulu, lalu buat raport santri."
         />
-      </div>
+      </section>
     </div>
   );
 }

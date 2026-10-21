@@ -39,19 +39,23 @@ export function ReportPreview({
 }) {
   return (
     <div className="space-y-4">
-      <div className="no-print flex flex-wrap items-center justify-between gap-2">
-        <Link href={backHref}>
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-1 h-4 w-4" /> {backLabel}
+      {/* V72 — bar aksi sebagai kartu dengan strip identitas role */}
+      <div className="no-print overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+        <div aria-hidden className="h-1 w-full bg-gradient-brand" />
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2">
+          <Link href={backHref}>
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="mr-1 h-4 w-4" /> {backLabel}
+            </Button>
+          </Link>
+          <Button
+            size="sm"
+            className="mr-1 bg-primary text-white"
+            onClick={() => window.print()}
+          >
+            <Printer className="mr-1 h-4 w-4" /> Cetak / PDF
           </Button>
-        </Link>
-        <Button
-          size="sm"
-          className="bg-primary text-white"
-          onClick={() => window.print()}
-        >
-          <Printer className="mr-1 h-4 w-4" /> Cetak / PDF
-        </Button>
+        </div>
       </div>
 
       {banner}
