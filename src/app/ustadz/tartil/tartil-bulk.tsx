@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   BookMarked,
   BookOpen,
   CalendarDays,
+  CheckCircle2,
   CheckSquare,
   ClipboardCheck,
   GraduationCap,
@@ -18,7 +19,9 @@ import {
 
 import {
   generateTartilJilidsAction,
+  getTartilOnDateEntriesAction,
   saveTartilAssessmentsBulkAction,
+  type TartilOnDateEntry,
 } from "@/app/actions/tartil";
 import type { TahfidzMode } from "@/lib/tahfidz";
 import { Button } from "@/components/ui/button";
@@ -88,6 +91,33 @@ export function TartilBulkForm({
   const [bulkValue, setBulkValue] = useState("");
   const [pending, startTransition] = useTransition();
   const [genPending, startGen] = useTransition();
+
+  // V73 — penilaian guru pada tanggal terpilih: santri yang sudah dinilai
+  // ditandai langsung di daftar, jadi guru tahu siapa yang belum & sudah.
+  const [onDateEntries, setOnDateEntries] = useState<TartilOnDateEntry[]>([]);
+  useEffect(() => {
+    if (!assessedDate) {
+      setOnDateEntries([]);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const { entries } = await getTartilOnDateEntriesAction(assessedDate);
+      if (alive) setOnDateEntries(entries);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [assessedDate]);
+
+  /** Terakhir penilaian per santri pada tanggal ini (dedup per santri+materi). */
+  const alreadyByStudent = useMemo(() => {
+    const map = new Map<string, TartilOnDateEntry>();
+    for (const e of onDateEntries) {
+      map.set(e.studentId, e); // list diurut assessed_at desc oleh RPC
+    }
+    return map;
+  }, [onDateEntries]);
 
   const method = methods.find((m) => m.id === methodId) ?? null;
   const methodJilids = method
@@ -389,6 +419,25 @@ export function TartilBulkForm({
                 <p className="truncate text-sm font-medium text-foreground">{s.fullName}</p>
                 <p className="text-muted-foreground font-mono text-[0.7rem]">{s.nis ?? "—"}</p>
               </div>
+
+              {/* V73 — sudah dinilai pada tanggal terpilih? */}
+              {(() => {
+                const prev = alreadyByStudent.get(s.studentId);
+                if (!prev) return null;
+                const mat = materials.find((m) => m.id === prev.materialId);
+                const score = prev.status !== "DINILAI"
+                  ? prev.status === "DIPELAJARI" ? "Dipelajari" : "Belum"
+                  : prev.scoreLabel ?? (prev.scoreValue !== null ? String(prev.scoreValue) : "✓");
+                return (
+                  <span
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-bold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300"
+                    title={mat?.name}
+                  >
+                    <CheckCircle2 className="size-3" />
+                    {mat?.name ?? "Sudah"} · {score}
+                  </span>
+                );
+              })()}
 
               {mode === "CENTANG" ? (
                 <label className="flex cursor-pointer select-none items-center gap-2 text-xs font-semibold text-foreground/85">

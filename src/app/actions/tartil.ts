@@ -164,6 +164,51 @@ export async function saveTartilAssessmentAction(input: {
 }
 
 /**
+ * V73 — penilaian guru pada SATU HARI WIB (lewat RPC; teacher dari session).
+ * Tax dipakai form jurnal & massal: saat guru memilih santri/tanggal, entri
+ * yang sudah tersimpan langsung muncul — terlihat santri sudah dinilai hari itu.
+ */
+export type TartilOnDateEntry = {
+  studentId: string;
+  materialId: string;
+  pagesLabel: string | null;
+  status: "BELUM" | "DIPELAJARI" | "DINILAI";
+  scoreValue: number | null;
+  scoreLabel: string | null;
+  freeNote: string | null;
+  assessmentId: string;
+};
+
+export async function getTartilOnDateEntriesAction(
+  date: string
+): Promise<{ entries: TartilOnDateEntry[] }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { entries: [] };
+  const profile = await getSessionProfile();
+  if (!profile || profile.role !== "USTADZ") return { entries: [] };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("tartil_assessments_on_date", {
+    p_date: date,
+  });
+  if (error) {
+    console.error("tartil_assessments_on_date failed:", error.message);
+    return { entries: [] };
+  }
+  return {
+    entries: ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+      studentId: r.student_id as string,
+      materialId: r.material_id as string,
+      pagesLabel: (r.pages_label as string | null) ?? null,
+      status: r.status as TartilOnDateEntry["status"],
+      scoreValue: (r.score_value as number | null) ?? null,
+      scoreLabel: (r.score_label as string | null) ?? null,
+      freeNote: (r.free_note as string | null) ?? null,
+      assessmentId: r.assessment_id as string,
+    })),
+  };
+}
+
+/**
  * V67 — INPUT NILAI MASSAL: guru memasukkan penilaian Tartil untuk BANYAK
  * santri sekaligus (mis. lembaga baru yang datanya masih di kertas). Satu
  * panggilan → satu transaksi: gagal di satu item = tidak ada yang tersimpan.

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   BookMarked,
   BookOpen,
   CalendarDays,
   GraduationCap,
+  Info,
   Loader2,
   MessageSquareText,
   PenLine,
@@ -19,10 +20,12 @@ import {
 
 import {
   generateTartilJilidsAction,
+  getTartilOnDateEntriesAction,
   saveTartilAssessmentAction,
   saveTartilTemplateAction,
   deleteTartilTemplateAction,
   type TartilNoteInput,
+  type TartilOnDateEntry,
 } from "@/app/actions/tartil";
 import {
   NOTE_SLOTS,
@@ -107,6 +110,37 @@ export function TartilJurnalForm({
   const [editing, setEditing] = useState<{ slot: NoteSlot; id: string | null; content: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const [genPending, startGen] = useTransition();
+
+  // V73 — penilaian yang SUDAH ADA pada tanggal terpilih untuk santri ini.
+  // Muncul otomatis begitu santri + tanggal terisi: guru tahu santri sudah
+  // dinilai di tanggal itu sebelum menyimpan dobel.
+  const [existingOnDate, setExistingOnDate] = useState<TartilOnDateEntry[]>([]);
+  useEffect(() => {
+    if (!studentId || !assessedDate) {
+      setExistingOnDate([]);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const { entries } = await getTartilOnDateEntriesAction(assessedDate);
+      if (alive) setExistingOnDate(entries);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [studentId, assessedDate]);
+
+  const existingForStudent = useMemo(
+    () => existingOnDate.filter((e) => e.studentId === studentId),
+    [existingOnDate, studentId]
+  );
+
+  function scoreBurst(e: TartilOnDateEntry): string {
+    if (e.status !== "DINILAI") return e.status === "DIPELAJARI" ? "Dipelajari" : "Belum";
+    if (e.scoreLabel) return e.scoreLabel;
+    if (e.scoreValue !== null) return String(e.scoreValue);
+    return "✓";
+  }
 
   /** Template dikelompokkan per slot dengan urutan kategori sesuai desain. */
   const grouped = useMemo(() => {
@@ -282,6 +316,31 @@ export function TartilJurnalForm({
           </Select>
         </div>
       </div>
+
+      {/* V73 — penilaian yang sudah ada untuk santri + tanggal ini */}
+      {studentId !== "" && existingForStudent.length > 0 && (
+        <div className="space-y-1.5 rounded-xl border border-blue-200 bg-blue-50/70 p-3 dark:border-blue-500/30 dark:bg-blue-500/10">
+          <p className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-800 dark:text-blue-300">
+            <Info className="size-3.5" /> Sudah dinilai pada tanggal ini
+          </p>
+          <ul className="space-y-0.5 text-xs text-blue-800/90 dark:text-blue-300/90">
+            {existingForStudent.map((e) => {
+              const mat = materials.find((m) => m.id === e.materialId);
+              return (
+                <li key={e.assessmentId}>
+                  {mat?.name ?? "Materi"}
+                  {e.pagesLabel ? ` · Hal. ${e.pagesLabel}` : ""} — {""}
+                  <span className="font-bold">{scoreBurst(e)}</span>
+                  {e.freeNote ? ` — ${e.freeNote}` : ""}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-[0.7rem] text-blue-700/70 dark:text-blue-300/70">
+            Simpan lagi akan membuat entri riwayat baru — tidak menimpa yang sudah ada.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

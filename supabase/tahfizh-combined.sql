@@ -2422,7 +2422,9 @@ as $$
       coalesce(h.pages_label, '') as subtitle,
       h.score_label,
       h.score_value,
-      public.tahfidz_settings_mode(h.tenant_id)::text as score_mode,
+      case when h.score_label is not null then 'HURUF'
+           when h.score_value is not null then 'ANGKA'
+           else 'CENTANG' end::text as score_mode,
       h.status,
       t.full_name as teacher_name,
       h.notes_snapshot as notes_json,
@@ -3262,7 +3264,9 @@ as $$
       coalesce(h.pages_label, '') as subtitle,
       h.score_label,
       h.score_value,
-      public.tahfidz_settings_mode(h.tenant_id)::text as score_mode,
+      case when h.score_label is not null then 'HURUF'
+           when h.score_value is not null then 'ANGKA'
+           else 'CENTANG' end::text as score_mode,
       h.status,
       t.full_name as teacher_name,
       h.notes_snapshot as notes_json,
@@ -4324,7 +4328,9 @@ as $$
       coalesce(h.pages_label, '') as subtitle,
       h.score_label,
       h.score_value,
-      public.tahfidz_settings_mode(h.tenant_id)::text as score_mode,
+      case when h.score_label is not null then 'HURUF'
+           when h.score_value is not null then 'ANGKA'
+           else 'CENTANG' end::text as score_mode,
       h.status,
       t.full_name as teacher_name,
       h.notes_snapshot as notes_json,
@@ -6254,7 +6260,9 @@ as $$
       coalesce(h.pages_label, '') as subtitle,
       h.score_label,
       h.score_value,
-      public.tahfidz_settings_mode(h.tenant_id)::text as score_mode,
+      case when h.score_label is not null then 'HURUF'
+           when h.score_value is not null then 'ANGKA'
+           else 'CENTANG' end::text as score_mode,
       h.status,
       t.full_name as teacher_name,
       h.notes_snapshot as notes_json,
@@ -16230,7 +16238,8 @@ create or replace function public.tartil_save_assessment(
   p_score_label text default null,
   p_free_note   text default null,
   p_notes       jsonb default '{}'::jsonb,
-  p_assessment_id uuid default null
+  p_assessment_id uuid default null,
+  p_assessed_at   timestamptz default null
 )
 returns uuid
 language plpgsql
@@ -16241,7 +16250,7 @@ declare
   v_uid      uuid := auth.uid();
   v_profile  public.profiles;
   v_teacher  public.teachers;
-  v_mode     public.tahfidz_mode;
+  v_label    text;
   v_student  public.students;
   v_material public.tartil_materials;
   v_status   public.tahfidz_progress;
@@ -16286,40 +16295,51 @@ begin
     where id = p_material_id and tenant_id = v_profile.tenant_id and is_active;
   if v_material is null then raise exception 'MATERI_TIDAK_AKTIF'; end if;
 
-  -- V72 — FIX: mode nilai Tartil per lembaga (tartil_settings), SAMA dengan
-  -- sumber UI (Pengaturan → Tartil & form guru). Fallback 'CENTANG' = default
-  -- aplikasi. Sebelumnya keliru membaca tahfidz_settings → semua simpan gagal
-  -- saat mode Tartil ≠ mode Tahfidz.
-  select mode into v_mode from public.tartil_settings where tenant_id = v_profile.tenant_id;
-  v_mode := coalesce(v_mode, 'CENTANG');
+  -- V73 — Validasi MODE-AGNOSTIC: skor disimpan sesuai input guru (huruf →
+  -- label, angka → angka, kosong → centang ✓). Sebelumnya skor direstriksi ke
+  -- mode lembaga (tartil_settings) sehingga pilihan Huruf/Angka guru yang beda
+  -- dari setelan lembaga dihapus senyap — riwayat tampil seperti centang.
+  v_label := nullif(btrim(coalesce(p_score_label, '')), '');
 
   if p_status not in ('BELUM', 'DIPELAJARI', 'DINILAI') then
     raise exception 'STATUS_TIDAK_VALID';
   end if;
   v_status := p_status::public.tahfidz_progress;
 
-  -- Validasi nilai sesuai mode TARTIL lembaga (rule #46: satu sumber konfigurasi).
   if v_status = 'DINILAI' then
-    if v_mode = 'ANGKA' then
-      if p_score_value is null or p_score_value < 1 or p_score_value > 100 then
-        raise exception 'NILAI_TIDAK_VALID';
-      end if;
-    elsif v_mode = 'HURUF' then
-      if p_score_label is null or btrim(p_score_label) = '' then
-        raise exception 'NILAI_TIDAK_VALID';
-      end if;
+    -- Keduanya terisi sekaligus = tidak valid.
+    if v_label is not null and p_score_value is not null then
+      raise exception 'NILAI_TIDAK_VALID';
+    end if;
+    if v_label is not null then
+      -- Grade huruf harus ada di daftar grade aktif lembaga (sumber dengan UI).
       if not exists (
         select 1 from public.tahfidz_grade_settings g
         where g.tenant_id = v_profile.tenant_id and g.is_active
-          and upper(btrim(g.label)) = upper(btrim(p_score_label))
+          and upper(btrim(g.label)) = upper(v_label)
       ) then
         raise exception 'GRADE_TIDAK_VALID';
       end if;
+    elsif p_score_value is not null then
+      if p_score_value < 1 or p_score_value > 100 then
+        raise exception 'NILAI_TIDAK_VALID';
+      end if;
     end if;
+    -- Keduanya kosong = CENTANG (✓ Lancar) — valid, seperti perilaku V4.
   else
-    if p_score_value is not null or (p_score_label is not null and btrim(p_score_label) <> '') then
+    if p_score_value is not null or v_label is not null then
       raise exception 'NILAI_TIDAK_VALID';
     end if;
+  end if;
+
+  if p_assessed_at is not null and p_assessed_at > now() then
+    raise exception 'TANGGAL_TIDAK_VALID';
+  end if;
+
+  -- Override tanggal (V69) — hanya saat diberikan; bulk (V68) men-set GUC
+  -- lokal-transaksinya sendiri sebelum memanggil, nilai itu harus tetap hidup.
+  if p_assessed_at is not null then
+    perform set_config('app.tartil_assessed_at', p_assessed_at::text, true);
   end if;
 
   -- Edit? Pastikan baris milik tenant & guru yang sama.
@@ -16341,10 +16361,11 @@ begin
     tenant_id, student_id, material_id, teacher_id, assessed_by, assessed_at,
     pages_label, status, score_value, score_label, free_note
   ) values (
-    v_profile.tenant_id, p_student_id, p_material_id, v_teacher.id, v_uid, now(),
+    v_profile.tenant_id, p_student_id, p_material_id, v_teacher.id, v_uid,
+    coalesce(nullif(current_setting('app.tartil_assessed_at', true), '')::timestamptz, now()),
     nullif(btrim(coalesce(p_pages_label, '')), ''), v_status,
-    case when v_status = 'DINILAI' and v_mode = 'ANGKA' then p_score_value else null end,
-    case when v_status = 'DINILAI' and v_mode = 'HURUF' then upper(btrim(p_score_label)) else null end,
+    case when v_status = 'DINILAI' and v_label is null then p_score_value else null end,
+    case when v_status = 'DINILAI' and v_label is not null then upper(v_label) else null end,
     nullif(btrim(coalesce(p_free_note, '')), '')
   )
   returning id into v_id;
@@ -16372,8 +16393,68 @@ begin
 end;
 $$;
 
-revoke execute on function public.tartil_save_assessment(uuid, uuid, text, text, integer, text, text, jsonb, uuid) from public;
-grant execute on function public.tartil_save_assessment(uuid, uuid, text, text, integer, text, text, jsonb, uuid) to authenticated;
+revoke execute on function public.tartil_save_assessment(uuid, uuid, text, text, integer, text, text, jsonb, uuid, timestamptz) from public;
+grant execute on function public.tartil_save_assessment(uuid, uuid, text, text, integer, text, text, jsonb, uuid, timestamptz) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 4b. V73 — penilaian guru pada SATU HARI WIB (cek "sudah dinilai di tanggal
+--     itu" untuk form jurnal & massal).
+-- ---------------------------------------------------------------------------
+create or replace function public.tartil_assessments_on_date(
+  p_date date
+)
+returns table (
+  student_id    uuid,
+  material_id   uuid,
+  pages_label   text,
+  status        public.tahfidz_progress,
+  score_value   integer,
+  score_label   text,
+  free_note     text,
+  assessment_id uuid
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_tenant  uuid;
+  v_role    text;
+  v_teacher uuid;
+begin
+  select tenant_id, role::text into v_tenant, v_role
+  from public.profiles where id = v_uid;
+  if v_tenant is null or v_role <> 'USTADZ' then
+    raise exception 'AKSES_DITOLAK';
+  end if;
+
+  select t.id into v_teacher from public.teachers t
+    where t.tenant_id = v_tenant and t.profile_id = v_uid
+    order by t.created_at desc limit 1;
+  if v_teacher is null then
+    select t.id into v_teacher from public.teachers t
+      where t.tenant_id = v_tenant
+        and lower(btrim(t.full_name)) = lower(btrim((select full_name from public.profiles where id = v_uid)))
+      order by t.created_at desc limit 1;
+  end if;
+  if v_teacher is null then raise exception 'GURU_TIDAK_DITEMUKAN'; end if;
+
+  return query
+  select a.student_id, a.material_id, a.pages_label, a.status,
+         a.score_value, a.score_label, a.free_note, a.id
+  from public.tartil_assessments a
+  where a.tenant_id = v_tenant
+    and a.teacher_id = v_teacher
+    and (a.assessed_at at time zone 'Asia/Jakarta')::date = p_date
+    and a.deleted_at is null
+  order by a.assessed_at desc;
+end;
+$$;
+
+revoke execute on function public.tartil_assessments_on_date(date) from public;
+grant execute on function public.tartil_assessments_on_date(date) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 5. Riwayat satu santri untuk form/histori guru (UUID-first binaan check)
