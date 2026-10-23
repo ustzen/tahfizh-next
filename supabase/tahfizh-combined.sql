@@ -16286,15 +16286,19 @@ begin
     where id = p_material_id and tenant_id = v_profile.tenant_id and is_active;
   if v_material is null then raise exception 'MATERI_TIDAK_AKTIF'; end if;
 
-  select mode into v_mode from public.tahfidz_settings where tenant_id = v_profile.tenant_id;
-  v_mode := coalesce(v_mode, 'HURUF');
+  -- V72 — FIX: mode nilai Tartil per lembaga (tartil_settings), SAMA dengan
+  -- sumber UI (Pengaturan → Tartil & form guru). Fallback 'CENTANG' = default
+  -- aplikasi. Sebelumnya keliru membaca tahfidz_settings → semua simpan gagal
+  -- saat mode Tartil ≠ mode Tahfidz.
+  select mode into v_mode from public.tartil_settings where tenant_id = v_profile.tenant_id;
+  v_mode := coalesce(v_mode, 'CENTANG');
 
   if p_status not in ('BELUM', 'DIPELAJARI', 'DINILAI') then
     raise exception 'STATUS_TIDAK_VALID';
   end if;
   v_status := p_status::public.tahfidz_progress;
 
-  -- Validasi nilai sesuai mode lembaga (rule #46: satu sumber konfigurasi).
+  -- Validasi nilai sesuai mode TARTIL lembaga (rule #46: satu sumber konfigurasi).
   if v_status = 'DINILAI' then
     if v_mode = 'ANGKA' then
       if p_score_value is null or p_score_value < 1 or p_score_value > 100 then
