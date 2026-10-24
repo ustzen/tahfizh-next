@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AudioLines } from "lucide-react";
+import { AudioLines, CheckCircle2 } from "lucide-react";
 
 import { requireRole } from "@/lib/auth";
 import {
@@ -133,6 +133,16 @@ export default async function UstadzTartilPage() {
                         <span className="bg-gradient-brand inline-flex items-center rounded-lg px-2.5 py-0.5 text-xs font-bold text-white shadow-card">
                           {s.lastScoreValue}
                         </span>
+                      ) : s.lastStatus === "DINILAI" && s.lastAssessedAt ? (
+                        // V74/V75 — penilaian CENTANG (✓ Lancar) tersimpan tanpa
+                        // label/angka; jangan tampil sebagai "—" di daftar.
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
+                          <CheckCircle2 className="size-3.5" /> Lancar
+                        </span>
+                      ) : s.lastStatus === "DIPELAJARI" ? (
+                        <span className="text-muted-foreground inline-flex text-xs font-semibold">Dipelajari</span>
+                      ) : s.lastStatus === "BELUM" ? (
+                        <span className="text-muted-foreground inline-flex text-xs font-semibold">Belum lancar</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}

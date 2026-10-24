@@ -190,6 +190,8 @@ export type TartilStudentSummary = {
   lastScoreValue: number | null;
   lastMode: TahfidzMode | null;
   lastAssessedAt: string | null;
+  /** V75 — status penilaian terakhir: BELUM / DIPELAJARI / DINILAI. */
+  lastStatus: "BELUM" | "DIPELAJARI" | "DINILAI" | null;
 };
 
 /** Assigned-student summaries for the Tartil list (rule #33). */
@@ -229,6 +231,7 @@ export async function getTartilStudentSummaries(teacherId: string): Promise<Tart
     lastScoreValue: (r.last_score_value as number | null) ?? null,
     lastMode: (r.last_mode as TahfidzMode | null) ?? null,
     lastAssessedAt: (r.last_assessed_at as string | null) ?? null,
+    lastStatus: (r.last_status as TartilStudentSummary["lastStatus"]) ?? null,
   }));
   return mapped.sort((a, b) =>
     compareByNis({ nis: a.nis, name: a.fullName }, { nis: b.nis, name: b.fullName })

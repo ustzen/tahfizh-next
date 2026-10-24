@@ -442,6 +442,10 @@ $$;
 -- ============================================================================
 -- 6. RPC — TEACHER SUMMARIES (fast list; rule #33)
 -- ============================================================================
+-- Idempoten: definisi ulang sintas V12+ bisa mengembalikan tipe berbeda;
+-- buang versi lama dulu supaya rerun file gabungan tidak berhenti (42P13).
+drop function if exists public.tartil_teacher_summaries(uuid);
+
 create or replace function public.tartil_teacher_summaries(p_teacher_id uuid)
 returns table (
   student_id       uuid,

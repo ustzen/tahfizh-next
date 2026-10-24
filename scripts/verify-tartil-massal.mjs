@@ -139,6 +139,19 @@ try {
   else fail("Tes G error tidak sesuai: " + String(e?.message ?? e).split("\n")[0]);
 }
 
+// Tes H — ringkasan guru (daftar menu Tartil): last_status harus ikut
+// terkirim sehingga centang (✓), Dipelajari/Belum tidak tampil sebagai "—".
+try {
+  const [teacher] = await q(`select id from public.teachers where profile_id = '${uid}'`);
+  const summaries = await db.query(`select * from public.tartil_teacher_summaries($1::uuid)`, [teacher.id]);
+  const rows = summaries.rows;
+  const bad = rows.filter((r) => !r.last_status || !r.last_assessed_at || r.assessed_count < 1);
+  if (rows.length === 3 && bad.length === 0) console.log(`Tes H (ringkasan last_status): OK — 3 santri, semua ber-status ${rows[0].last_status}.`);
+  else fail("Tes H ringkasan salah: " + JSON.stringify(rows.size !== null ? rows.map((r) => ({ n: r.full_name, st: r.last_status, c: r.assessed_count })) : rows));
+} catch (e) {
+  fail("Tes H ringkasan gagal: " + String(e?.message ?? e).split("\n").slice(0, 3).join(" | "));
+}
+
 await db.close();
 if (failed) process.exit(1);
 console.log("HASIL: PASS");
