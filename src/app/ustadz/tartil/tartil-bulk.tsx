@@ -142,14 +142,15 @@ export function TartilBulkForm({
     return map;
   }, [onDateEntries, materialId]);
 
-  // V74 (LANJUTAN) — PREFILL (semua santri): jika santri sudah punya nilai
-  // pada tanggal yang dipilih (selama jilid yang dipilih atau jilid lain
-  // yang aktif saat ini), nilai sebelumnya langsung muncul di kolom input
-  // sebagai ganti dari kosong. Refund inttermediate dofill = update==AssessmentId.
-  // Jika status != DINILAI: nilai tetap kosong (gelas manual).
+  // V74 (LANJUTAN) — PREFILL (sembarang santri): saat guru memilih tanggal,
+  // nampakkan nilai terakhir per santri (meskipun jilid berbeda). Sementara
+  // baris yang sesuai jilid aktif diupdate tanpa duplikat. Baris jilid lain
+  // cukup ditampilkan (tidak disimpan bila dikosongkan).
   useEffect(() => {
     const next: Record<string, string> = {};
     const ids: Record<string, string> = {};
+
+    // 1) Jilid aktif → prefill + siap update (assessment_id).
     for (const [studentId, id] of existingIdByStudent) {
       const e = lastEntryByStudent.get(studentId);
       if (!e || e.status !== "DINILAI") continue;
@@ -164,6 +165,22 @@ export function TartilBulkForm({
       }
       if (next[studentId]) ids[studentId] = id;
     }
+
+    // 2) Jilid lain → hanya tampilkan (tidak disimpan bila dikosongkan).
+    for (const [studentId, e] of lastEntryByStudent) {
+      if (!e || e.status !== "DINILAI" || e.materialId === materialId) continue;
+      if (next[studentId]) continue;
+      if (mode === "CENTANG") {
+        next[studentId] = "1";
+      } else if (mode === "HURUF") {
+        const label = (e.scoreLabel ?? "").trim();
+        const match = grades.find((g) => g.label.trim().toUpperCase() === label.toUpperCase());
+        if (match) next[studentId] = match.label;
+      } else if (e.scoreValue !== null) {
+        next[studentId] = String(e.scoreValue);
+      }
+    }
+
     setEntries(next);
     setExistingIds(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
