@@ -100,8 +100,8 @@ export function TartilBulkForm({
   /** V74 — assessment_id baris prefilled (studentId → id): simpan = update. */
   const [existingIds, setExistingIds] = useState<Record<string, string>>({});
 
-  // V73 — penilaian guru pada tanggal terpilih: santri yang sudah dinilai
-  // ditandai langsung di daftar, jadi guru tahu siapa yang belum & sudah.
+  // V73 — fetch entri guru pada tanggal terpilih: sudah dinilai, pakai
+  // untuk prefill kolom & badge jilid lain.
   const [onDateEntries, setOnDateEntries] = useState<TartilOnDateEntry[]>([]);
   const fetchOnDate = useCallback(
     async (date: string | "") => {
@@ -118,16 +118,19 @@ export function TartilBulkForm({
     void fetchOnDate(assessedDate);
   }, [assessedDate, fetchOnDate]);
 
-  /** Terakhir penilaian per santri pada tanggal ini (dedup per santri+materi). */
-  const alreadyByStudent = useMemo(() => {
+  /** (V74) entri terakhir per santri pada tanggal terpilih (status & nilai serta assessmentId.
+   * Gunakan untuk prefill umum & badge jilid lain. Bukan jilid-friendly.
+   */
+  const lastEntryByStudent = useMemo(() => {
     const map = new Map<string, TartilOnDateEntry>();
     for (const e of onDateEntries) {
-      map.set(e.studentId, e); // list diurut assessed_at desc oleh RPC
+      map.set(e.studentId, e
+        ); // list diurut assessed_at desc oleh RPC, jadi paling akhir di-akhir
     }
     return map;
   }, [onDateEntries]);
 
-  /** V74 — penilaian yang sudah ada pada JILID yang dipilih (student → id). */
+  /** (V74) id penilaian yang berelasi dengan jilid yang dipilih (student → id) */
   const existingIdByStudent = useMemo(() => {
     const map = new Map<string, string>();
     if (!materialId) return map;
@@ -139,15 +142,17 @@ export function TartilBulkForm({
     return map;
   }, [onDateEntries, materialId]);
 
-  // V74 — PREFILL: isi baris pengisian dengan nilai yang sudah tersimpan pada
-  // jilid terpilih, dalam bentuk yang bisa direpresentasikan mode saat ini.
-  // Guru membiarkan artinya nilai tetap; mengosongkan berarti tidak disentuh.
+  // V74 (LANJUTAN) — PREFILL (semua santri): jika santri sudah punya nilai
+  // pada tanggal yang dipilih (selama jilid yang dipilih atau jilid lain
+  // yang aktif saat ini), nilai sebelumnya langsung muncul di kolom input
+  // sebagai ganti dari kosong. Refund inttermediate dofill = update==AssessmentId.
+  // Jika status != DINILAI: nilai tetap kosong (gelas manual).
   useEffect(() => {
     const next: Record<string, string> = {};
     const ids: Record<string, string> = {};
-    for (const [studentId, assessmentId] of existingIdByStudent) {
-      const e = alreadyByStudent.get(studentId);
-      if (!e) continue;
+    for (const [studentId, id] of existingIdByStudent) {
+      const e = lastEntryByStudent.get(studentId);
+      if (!e || e.status !== "DINILAI") continue;
       if (mode === "CENTANG") {
         next[studentId] = "1";
       } else if (mode === "HURUF") {
@@ -157,12 +162,12 @@ export function TartilBulkForm({
       } else if (e.scoreValue !== null) {
         next[studentId] = String(e.scoreValue);
       }
-      if (next[studentId]) ids[studentId] = assessmentId;
+      if (next[studentId]) ids[studentId] = id;
     }
     setEntries(next);
     setExistingIds(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialId, mode, existingIdByStudent, alreadyByStudent]);
+  }, [materialId, mode, existingIdByStudent, lastEntryByStudent]);
 
   const method = methods.find((m) => m.id === methodId) ?? null;
   const methodJilids = method
@@ -473,7 +478,7 @@ export function TartilBulkForm({
                   dipilih (atau yang tidak bisa direpresentasikan mode ini);
                   nilai jilid terpilih sudah tampil di kolom pengisian. */}
               {(() => {
-                const prev = alreadyByStudent.get(s.studentId);
+                const prev = lastEntryByStudent.get(s.studentId);
                 if (!prev || (prev.materialId === materialId && value !== "")) return null;
                 const mat = materials.find((m) => m.id === prev.materialId);
                 const score = prev.status !== "DINILAI"
