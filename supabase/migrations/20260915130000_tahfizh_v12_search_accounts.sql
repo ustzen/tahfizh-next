@@ -63,6 +63,9 @@ $$;
 -- ----------------------------------------------------------------------------
 -- Memakai RLS + pemeriksaan role eksplisit. Tidak ada USING(true).
 -- Hasil TIDAK memuat ID internal — hanya id UUID untuk navigasi + nama/label.
+-- Idempoten: buang versi lama sebelum definisi ulang (return type bisa beda).
+drop function if exists public.search_global(text);
+
 create or replace function public.search_global(p_query text)
 returns table (
   type        text,        -- 'SANTRI' | 'GURU' | 'HALAQAH' | 'TAGIHAN' | 'SURAT'

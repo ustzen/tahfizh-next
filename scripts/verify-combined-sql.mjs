@@ -129,7 +129,7 @@ if (!failed) {
   console.log("\nSanity setelah 2x run:");
   console.log(`  tabel public: ${tables}, view: ${views}, enum: ${enums}`);
   console.log(`  trigger non-internal: ${triggers}, policy RLS public: ${policies}, fungsi public: ${funcs}`);
-  console.log(`  seed surah Juz 30: ${surahs} baris (harus 37 — tidak dobel), template raport global: ${templates} (harus 3 — tidak dobel)`);
+  console.log(`  seed surah Juz 30: ${surahs} baris (harus 37 — tidak dobel), template raport global: ${templates} (harus 4 — tidak dobel; V9 ×3 + V13.1 "Raport 2 Kolom Modern")`);
 }
 
 await db.close();

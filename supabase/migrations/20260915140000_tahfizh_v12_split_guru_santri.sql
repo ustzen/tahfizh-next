@@ -8,6 +8,9 @@
 -- Idempotent — aman dijalankan berulang.
 -- ============================================================================
 
+-- Buang versi lama sebelum definisi ulang (return type beda — 42P13).
+drop function if exists public.search_global(text);
+
 create or replace function public.search_global(p_query text)
 returns table (
   type        text,

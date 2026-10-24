@@ -1573,6 +1573,8 @@ as $$
   ) u;
 $$;
 
+drop function if exists public.v7_student_summary(uuid);
+
 create or replace function public.v7_student_summary(p_student_id uuid)
 returns table (
   active_targets integer,

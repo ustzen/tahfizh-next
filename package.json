@@ -14,7 +14,8 @@
     "test:raport-edit": "node scripts/verify-raport-edit.mjs",
     "test:infak": "node scripts/verify-infak-platform.mjs && node scripts/verify-infak-bayar-bersama.mjs",
     "test:infak-tidak-mampu": "node scripts/verify-infak-tidak-mampu.mjs",
-    "test:nis-lembaga": "node scripts/verify-nis-lembaga-grid.mjs"
+    "test:nis-lembaga": "node scripts/verify-nis-lembaga-grid.mjs",
+    "test:tartil-massal": "node scripts/verify-tartil-massal.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

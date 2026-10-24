@@ -25,6 +25,8 @@ const TARTIL_ERROR_MAP: { match: RegExp; message: string }[] = [
   { match: /CATATAN_TIDAK_VALID/, message: "Isi catatan tidak valid." },
   { match: /BATCH_KOSONG|BATCH_TERLALU_BESAR/, message: "Daftar penilaian tidak valid." },
   { match: /TANGGAL_TIDAK_VALID|TANGGAL_MASSAL_TIDAK_VALID/, message: "Tanggal penilaian tidak boleh di masa depan." },
+  { match: /PENILAIAN_TIDAK_DITEMUKAN/, message: "Penilaian tidak ditemukan atau bukan milik Anda." },
+  { match: /Could not find the function|does not exist|PGRST202/i, message: "Fitur Tartil butuh pembaruan skema database — minta Admin menjalankan ulang supabase/tahfizh-combined.sql di Supabase SQL Editor, lalu coba lagi." },
 ];
 
 function friendlyError(message: string): string {
@@ -227,6 +229,8 @@ export type TartilBulkItem = {
   status: string;
   scoreValue: number | null;
   scoreLabel: string;
+  /** V74 — baris prefilled: set = UPDATE penilaian yang ada, bukan duplikat. */
+  assessmentId?: string | null;
 };
 
 export async function saveTartilAssessmentsBulkAction(
@@ -254,11 +258,15 @@ export async function saveTartilAssessmentsBulkAction(
       score_value: it.scoreValue,
       score_label: it.scoreLabel || null,
       free_note: null,
+      assessment_id: it.assessmentId ?? null,
     };
   });
 
   for (const p of payload) {
     if (!UUID_RE.test(p.student_id) || !UUID_RE.test(p.material_id)) {
+      return { error: "Data penilaian tidak valid." };
+    }
+    if (p.assessment_id !== null && !UUID_RE.test(p.assessment_id)) {
       return { error: "Data penilaian tidak valid." };
     }
     if (!["BELUM", "DIPELAJARI", "DINILAI"].includes(p.status)) {

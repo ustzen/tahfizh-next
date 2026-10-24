@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   BookMarked,
@@ -43,6 +43,11 @@ import {
  * tabel. Baris yang kosong tidak ikut tersimpan; tombol "Set Semua" membantu
  * bila nilainya seragam. Semua aturan (binaan, materi aktif, mode lembaga)
  * tetap ditegakkan oleh RPC — client tidak pernah dipercaya.
+ *
+ * V74 — santri yang SUDAH bernilai pada tanggal terpilih langsung tampil di
+ * baris pengisiannya (prefill). Guru bisa membiarkan nilainya (simpan = update
+ * baris yang sama lewat assessment_id — bukan duplikat) atau menggantinya;
+ * baris yang dikosongkan tidak diubah sama sekali.
  */
 
 type StudentOption = { studentId: string; fullName: string; nis: string | null };
@@ -92,23 +97,26 @@ export function TartilBulkForm({
   const [pending, startTransition] = useTransition();
   const [genPending, startGen] = useTransition();
 
+  /** V74 — assessment_id baris prefilled (studentId → id): simpan = update. */
+  const [existingIds, setExistingIds] = useState<Record<string, string>>({});
+
   // V73 — penilaian guru pada tanggal terpilih: santri yang sudah dinilai
   // ditandai langsung di daftar, jadi guru tahu siapa yang belum & sudah.
   const [onDateEntries, setOnDateEntries] = useState<TartilOnDateEntry[]>([]);
+  const fetchOnDate = useCallback(
+    async (date: string | "") => {
+      if (!date) {
+        setOnDateEntries([]);
+        return;
+      }
+      const { entries } = await getTartilOnDateEntriesAction(date);
+      setOnDateEntries(entries);
+    },
+    []
+  );
   useEffect(() => {
-    if (!assessedDate) {
-      setOnDateEntries([]);
-      return;
-    }
-    let alive = true;
-    (async () => {
-      const { entries } = await getTartilOnDateEntriesAction(assessedDate);
-      if (alive) setOnDateEntries(entries);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [assessedDate]);
+    void fetchOnDate(assessedDate);
+  }, [assessedDate, fetchOnDate]);
 
   /** Terakhir penilaian per santri pada tanggal ini (dedup per santri+materi). */
   const alreadyByStudent = useMemo(() => {
@@ -118,6 +126,43 @@ export function TartilBulkForm({
     }
     return map;
   }, [onDateEntries]);
+
+  /** V74 — penilaian yang sudah ada pada JILID yang dipilih (student → id). */
+  const existingIdByStudent = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!materialId) return map;
+    for (const e of onDateEntries) {
+      if (e.materialId === materialId && e.status === "DINILAI") {
+        map.set(e.studentId, e.assessmentId);
+      }
+    }
+    return map;
+  }, [onDateEntries, materialId]);
+
+  // V74 — PREFILL: isi baris pengisian dengan nilai yang sudah tersimpan pada
+  // jilid terpilih, dalam bentuk yang bisa direpresentasikan mode saat ini.
+  // Guru membiarkan artinya nilai tetap; mengosongkan berarti tidak disentuh.
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    const ids: Record<string, string> = {};
+    for (const [studentId, assessmentId] of existingIdByStudent) {
+      const e = alreadyByStudent.get(studentId);
+      if (!e) continue;
+      if (mode === "CENTANG") {
+        next[studentId] = "1";
+      } else if (mode === "HURUF") {
+        const label = (e.scoreLabel ?? "").trim();
+        const match = grades.find((g) => g.label.trim().toUpperCase() === label.toUpperCase());
+        if (match) next[studentId] = match.label;
+      } else if (e.scoreValue !== null) {
+        next[studentId] = String(e.scoreValue);
+      }
+      if (next[studentId]) ids[studentId] = assessmentId;
+    }
+    setEntries(next);
+    setExistingIds(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materialId, mode, existingIdByStudent, alreadyByStudent]);
 
   const method = methods.find((m) => m.id === methodId) ?? null;
   const methodJilids = method
@@ -192,21 +237,22 @@ export function TartilBulkForm({
       .filter((s) => (entries[s.studentId] ?? "") !== "")
       .map((s) => {
         const raw = entries[s.studentId];
+        const assessmentId = existingIds[s.studentId] ?? null;
         if (mode === "HURUF") {
           return {
             studentId: s.studentId, materialId, pagesLabel, status: "DINILAI",
-            scoreValue: null, scoreLabel: raw,
+            scoreValue: null, scoreLabel: raw, assessmentId,
           };
         }
         if (mode === "ANGKA") {
           return {
             studentId: s.studentId, materialId, pagesLabel, status: "DINILAI",
-            scoreValue: Number(raw), scoreLabel: "",
+            scoreValue: Number(raw), scoreLabel: "", assessmentId,
           };
         }
         return {
           studentId: s.studentId, materialId, pagesLabel, status: "DINILAI",
-          scoreValue: null, scoreLabel: "",
+          scoreValue: null, scoreLabel: "", assessmentId,
         };
       });
 
@@ -215,6 +261,8 @@ export function TartilBulkForm({
       if (res.success) {
         toast.success(res.success);
         setEntries({});
+        setExistingIds({});
+        void fetchOnDate(assessedDate); // V74 — badge & prefill segarkan
       } else if (res.error) toast.error(res.error);
     });
   }
@@ -420,10 +468,13 @@ export function TartilBulkForm({
                 <p className="text-muted-foreground font-mono text-[0.7rem]">{s.nis ?? "—"}</p>
               </div>
 
-              {/* V73 — sudah dinilai pada tanggal terpilih? */}
+              {/* V73/V74 — sudah dinilai pada tanggal terpilih?: tampil di baris.
+                  Kolom badge hanya untuk entri di JILID BERBEDA dari yang
+                  dipilih (atau yang tidak bisa direpresentasikan mode ini);
+                  nilai jilid terpilih sudah tampil di kolom pengisian. */}
               {(() => {
                 const prev = alreadyByStudent.get(s.studentId);
-                if (!prev) return null;
+                if (!prev || (prev.materialId === materialId && value !== "")) return null;
                 const mat = materials.find((m) => m.id === prev.materialId);
                 const score = prev.status !== "DINILAI"
                   ? prev.status === "DIPELAJARI" ? "Dipelajari" : "Belum"
