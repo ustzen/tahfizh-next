@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getReportLiveData, getReportSettings, getTemplateDetail, getReportAssetUrl } from "@/lib/report";
 import { getCustomModules } from "@/lib/custom-module";
+import { getReportPeriodDefaults } from "@/lib/akademik";
 import { ReportBuilder } from "@/components/report/report-builder";
 import { saveReportTemplateLayoutAction } from "@/app/actions/report-layout";
 import type { CanvasContext } from "@/components/report/component-content";
@@ -39,13 +40,14 @@ export default async function ReportBuilderPage({
 
   // Prefer an existing report's student/period; fall back to the first student
   // of the tenant purely for preview values (never persisted).
+  const period = await getReportPeriodDefaults();
   let ctx: CanvasContext = {
     title: "RAPORT TAHFIZH",
-    academicYear: "2026/2027",
-    semesterLabel: "Semester 1",
+    academicYear: period.academicYear,
+    semesterLabel: period.semester,
     periodLabel: null,
-    periodStart: "2026-07-01",
-    periodEnd: "2026-12-31",
+    periodStart: period.periodStart,
+    periodEnd: period.periodEnd,
   };
   let data: Awaited<ReturnType<typeof getReportLiveData>> = null;
   if (sp.report) {
