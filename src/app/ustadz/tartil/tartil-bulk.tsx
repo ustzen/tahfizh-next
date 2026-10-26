@@ -118,6 +118,8 @@ export function TartilBulkForm({
   // V73 — fetch entri guru pada tanggal terpilih.
   const [onDateEntries, setOnDateEntries] = useState<TartilOnDateEntry[]>([]);
   const [loadingDate, setLoadingDate] = useState(false);
+  /** V76 — pesan bila gagal memuat nilai pada tanggal terpilih. */
+  const [loadError, setLoadError] = useState<string | null>(null);
   /** Anti balapan: hanya respons fetch terakhir yang dipakai. */
   const fetchSeq = useRef(0);
   /** True bila guru sendiri sudah memilih jilid (jangan di-override auto-pilih). */
@@ -128,15 +130,22 @@ export function TartilBulkForm({
     const seq = ++fetchSeq.current;
     if (!date) {
       setOnDateEntries([]);
+      setLoadError(null);
       setLoadingDate(false);
       return;
     }
     setLoadingDate(true);
     try {
-      const { entries } = await getTartilOnDateEntriesAction(date);
-      if (seq === fetchSeq.current) setOnDateEntries(entries);
+      const { entries, error } = await getTartilOnDateEntriesAction(date);
+      if (seq === fetchSeq.current) {
+        setOnDateEntries(entries);
+        setLoadError(error ?? null);
+      }
     } catch {
-      if (seq === fetchSeq.current) setOnDateEntries([]);
+      if (seq === fetchSeq.current) {
+        setOnDateEntries([]);
+        setLoadError("Gagal memuat nilai pada tanggal ini. Coba pilih ulang tanggalnya.");
+      }
     } finally {
       if (seq === fetchSeq.current) setLoadingDate(false);
     }
@@ -539,6 +548,18 @@ export function TartilBulkForm({
           Baris yang dikosongkan tidak ikut tersimpan — lengkapi bertahap jika data belum semua.
           Nilai yang sudah ada pada tanggal ini tampil otomatis; ubah nilainya untuk memperbarui.
         </p>
+        {loadError && !loadingDate && (
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+            <span>{loadError}</span>
+            <button
+              type="button"
+              onClick={() => void fetchOnDate(assessedDate)}
+              className="shrink-0 font-bold underline"
+            >
+              Coba lagi
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           {loadingDate ? (
             <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
@@ -613,6 +634,7 @@ export function TartilBulkForm({
                 }
                 const prev = list.find((e) => e.status === "DINILAI") ?? list[0];
                 if (!prev) {
+                  if (loadError) return null;
                   return (
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       <CircleDashed className="size-3" /> Belum dinilai
