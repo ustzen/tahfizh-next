@@ -30,6 +30,12 @@ const TARTIL_ERROR_MAP: { match: RegExp; message: string }[] = [
 ];
 
 function friendlyError(message: string): string {
+  // V77 — santri tidak hadir (presensi izin/sakit/alpa) tidak bisa dinilai.
+  const abs = /SANTRI_TIDAK_HADIR:?\s*(SAKIT|IZIN|ALPA)?/.exec(message);
+  if (abs) {
+    const label = abs[1] === "SAKIT" ? "sakit" : abs[1] === "IZIN" ? "izin" : abs[1] === "ALPA" ? "alpa" : "tidak hadir";
+    return `Santri tercatat ${label} pada tanggal tersebut (presensi), sehingga tidak dapat dinilai.`;
+  }
   for (const { match, message: friendly } of TARTIL_ERROR_MAP) {
     if (match.test(message)) return friendly;
   }
@@ -215,6 +221,46 @@ export async function getTartilOnDateEntriesAction(
       scoreLabel: (r.score_label as string | null) ?? null,
       freeNote: (r.free_note as string | null) ?? null,
       assessmentId: r.assessment_id as string,
+    })),
+  };
+}
+
+/**
+ * V77 — santri binaan yang TIDAK HADIR (izin/sakit/alpa) pada tanggal tertentu
+ * menurut presensi halaqah. Dipakai form Tartil untuk menampilkan keterangan
+ * & mengunci input. Penegak sebenarnya ada di trigger database.
+ */
+export type TartilAbsence = {
+  studentId: string;
+  status: "IZIN" | "SAKIT" | "ALPA";
+  note: string | null;
+};
+
+export async function getTartilAbsencesOnDateAction(
+  date: string
+): Promise<{ absences: TartilAbsence[]; error?: string }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { absences: [] };
+  const profile = await getSessionProfile();
+  if (!profile || profile.role !== "USTADZ") {
+    return { absences: [], error: "Sesi Anda telah berakhir. Silakan login kembali." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("tartil_absences_on_date", { p_date: date });
+  if (error) {
+    console.error("tartil_absences_on_date failed:", error.message);
+    const missing = /could not find the function|does not exist|schema cache/i.test(error.message);
+    return {
+      absences: [],
+      error: missing
+        ? "Cek presensi per tanggal belum aktif di database (migrasi V77 belum dijalankan)."
+        : `Gagal memuat presensi pada tanggal ini: ${error.message}`,
+    };
+  }
+  return {
+    absences: ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+      studentId: r.student_id as string,
+      status: r.status as TartilAbsence["status"],
+      note: (r.note as string | null) ?? null,
     })),
   };
 }
