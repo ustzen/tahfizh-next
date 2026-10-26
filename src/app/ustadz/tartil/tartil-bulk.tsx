@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   BookMarked,
@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   CheckSquare,
   ClipboardCheck,
+  CircleDashed,
   GraduationCap,
   Layers,
   Loader2,
@@ -48,6 +49,18 @@ import {
  * baris pengisiannya (prefill). Guru bisa membiarkan nilainya (simpan = update
  * baris yang sama lewat assessment_id — bukan duplikat) atau menggantinya;
  * baris yang dikosongkan tidak diubah sama sekali.
+ *
+ * V76 — perbaikan & penegasan:
+ *   * Nilai lama otomatis tampil begitu tanggal dipilih (jilid & halaman ikut
+ *     terpilih bila guru belum memilih jilid).
+ *   * Tiap baris diberi penanda "Sudah dinilai" / "Belum dinilai" + ringkasan
+ *     dan filter, supaya guru langsung tahu siapa yang belum bernilai.
+ *   * Hanya baris BARU atau yang nilainya DIUBAH yang dikirim saat simpan —
+ *     nilai lama yang dibiarkan tidak ditulis ulang.
+ *   * Nilai di jilid LAIN pada tanggal itu hanya ditampilkan sebagai badge,
+ *     tidak lagi ikut tersimpan sebagai penilaian baru di jilid terpilih.
+ *   * Baris lama yang diedit mempertahankan halaman aslinya.
+ *   * Entri terbaru yang dipakai (bukan yang terlama) + anti balapan fetch.
  */
 
 type StudentOption = { studentId: string; fullName: string; nis: string | null };
@@ -97,94 +110,119 @@ export function TartilBulkForm({
   const [pending, startTransition] = useTransition();
   const [genPending, startGen] = useTransition();
 
-  /** V74 — assessment_id baris prefilled (studentId → id): simpan = update. */
-  const [existingIds, setExistingIds] = useState<Record<string, string>>({});
+  /** V76 — metadata baris yang sudah tersimpan (studentId → id, nilai awal, halaman asli). */
+  const [existing, setExisting] = useState<
+    Record<string, { id: string; value: string; pages: string | null }>
+  >({});
 
-  // V73 — fetch entri guru pada tanggal terpilih: sudah dinilai, pakai
-  // untuk prefill kolom & badge jilid lain.
+  // V73 — fetch entri guru pada tanggal terpilih.
   const [onDateEntries, setOnDateEntries] = useState<TartilOnDateEntry[]>([]);
-  const fetchOnDate = useCallback(
-    async (date: string | "") => {
-      if (!date) {
-        setOnDateEntries([]);
-        return;
-      }
+  const [loadingDate, setLoadingDate] = useState(false);
+  /** Anti balapan: hanya respons fetch terakhir yang dipakai. */
+  const fetchSeq = useRef(0);
+  /** True bila guru sendiri sudah memilih jilid (jangan di-override auto-pilih). */
+  const userPickedMaterial = useRef(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "belum" | "sudah">("all");
+
+  const fetchOnDate = useCallback(async (date: string | "") => {
+    const seq = ++fetchSeq.current;
+    if (!date) {
+      setOnDateEntries([]);
+      setLoadingDate(false);
+      return;
+    }
+    setLoadingDate(true);
+    try {
       const { entries } = await getTartilOnDateEntriesAction(date);
-      setOnDateEntries(entries);
-    },
-    []
-  );
+      if (seq === fetchSeq.current) setOnDateEntries(entries);
+    } catch {
+      if (seq === fetchSeq.current) setOnDateEntries([]);
+    } finally {
+      if (seq === fetchSeq.current) setLoadingDate(false);
+    }
+  }, []);
   useEffect(() => {
     void fetchOnDate(assessedDate);
   }, [assessedDate, fetchOnDate]);
 
-  /** (V74) entri terakhir per santri pada tanggal terpilih (status & nilai serta assessmentId.
-   * Gunakan untuk prefill umum & badge jilid lain. Bukan jilid-friendly.
-   */
-  const lastEntryByStudent = useMemo(() => {
-    const map = new Map<string, TartilOnDateEntry>();
+  /** Semua entri per santri pada tanggal terpilih (terbaru dulu — urutan RPC). */
+  const entriesByStudent = useMemo(() => {
+    const map = new Map<string, TartilOnDateEntry[]>();
     for (const e of onDateEntries) {
-      map.set(e.studentId, e
-        ); // list diurut assessed_at desc oleh RPC, jadi paling akhir di-akhir
+      const arr = map.get(e.studentId);
+      if (arr) arr.push(e);
+      else map.set(e.studentId, [e]);
     }
     return map;
   }, [onDateEntries]);
 
-  /** (V74) id penilaian yang berelasi dengan jilid yang dipilih (student → id) */
-  const existingIdByStudent = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!materialId) return map;
-    for (const e of onDateEntries) {
-      if (e.materialId === materialId && e.status === "DINILAI") {
-        map.set(e.studentId, e.assessmentId);
-      }
-    }
-    return map;
-  }, [onDateEntries, materialId]);
+  /** Santri yang sudah punya nilai (status DINILAI) pada tanggal terpilih. */
+  const gradedIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of onDateEntries) if (e.status === "DINILAI") set.add(e.studentId);
+    return set;
+  }, [onDateEntries]);
 
-  // V74 (LANJUTAN) — PREFILL (sembarang santri): saat guru memilih tanggal,
-  // nampakkan nilai terakhir per santri (meskipun jilid berbeda). Sementara
-  // baris yang sesuai jilid aktif diupdate tanpa duplikat. Baris jilid lain
-  // cukup ditampilkan (tidak disimpan bila dikosongkan).
+  /** Nilai entri → string input sesuai mode aktif ("" bila tak bisa diwakili mode ini). */
+  const entryToValue = useCallback(
+    (e: TartilOnDateEntry): string => {
+      if (e.status !== "DINILAI") return "";
+      if (mode === "CENTANG") return e.scoreLabel === null && e.scoreValue === null ? "1" : "";
+      if (mode === "HURUF") {
+        const label = (e.scoreLabel ?? "").trim().toUpperCase();
+        if (!label) return "";
+        return grades.find((g) => g.label.trim().toUpperCase() === label)?.label ?? "";
+      }
+      return e.scoreValue !== null ? String(e.scoreValue) : "";
+    },
+    [mode, grades]
+  );
+
+  // V76 — Auto-pilih jilid (& halaman) dari nilai yang sudah ada, bila guru
+  // belum memilih jilid sendiri. Jilid yang paling banyak dipakai menang.
+  useEffect(() => {
+    if (userPickedMaterial.current || materialId || onDateEntries.length === 0) return;
+    const count = new Map<string, number>();
+    for (const e of onDateEntries) {
+      if (e.status !== "DINILAI") continue;
+      if (!materials.some((m) => m.id === e.materialId)) continue;
+      count.set(e.materialId, (count.get(e.materialId) ?? 0) + 1);
+    }
+    let best = "";
+    let bestN = 0;
+    for (const [id, n] of count) if (n > bestN) { best = id; bestN = n; }
+    if (!best) return;
+    const mat = materials.find((m) => m.id === best);
+    const owner = mat ? methods.find((m) => mat.name.startsWith(`${m.name} Jilid`)) : null;
+    if (owner) setMethodId(owner.id);
+    setMaterialId(best);
+    const pg = onDateEntries.find((e) => e.materialId === best && e.pagesLabel)?.pagesLabel ?? "";
+    const m = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(pg.trim());
+    if (m) {
+      setFromPage(m[1]);
+      setToPage(m[2] ?? m[1]);
+    }
+  }, [onDateEntries, materialId, materials, methods]);
+
+  // V76 — PREFILL: nilai lama pada JILID TERPILIH langsung masuk ke kolom
+  // pengisian (siap diubah / dibiarkan). Entri jilid lain TIDAK diprefill —
+  // hanya tampil sebagai badge, supaya tidak tersimpan sebagai nilai baru.
   useEffect(() => {
     const next: Record<string, string> = {};
-    const ids: Record<string, string> = {};
-
-    // 1) Jilid aktif → prefill + siap update (assessment_id).
-    for (const [studentId, id] of existingIdByStudent) {
-      const e = lastEntryByStudent.get(studentId);
-      if (!e || e.status !== "DINILAI") continue;
-      if (mode === "CENTANG") {
-        next[studentId] = "1";
-      } else if (mode === "HURUF") {
-        const label = (e.scoreLabel ?? "").trim();
-        const match = grades.find((g) => g.label.trim().toUpperCase() === label.toUpperCase());
-        if (match) next[studentId] = match.label;
-      } else if (e.scoreValue !== null) {
-        next[studentId] = String(e.scoreValue);
-      }
-      if (next[studentId]) ids[studentId] = id;
-    }
-
-    // 2) Jilid lain → hanya tampilkan (tidak disimpan bila dikosongkan).
-    for (const [studentId, e] of lastEntryByStudent) {
-      if (!e || e.status !== "DINILAI" || e.materialId === materialId) continue;
-      if (next[studentId]) continue;
-      if (mode === "CENTANG") {
-        next[studentId] = "1";
-      } else if (mode === "HURUF") {
-        const label = (e.scoreLabel ?? "").trim();
-        const match = grades.find((g) => g.label.trim().toUpperCase() === label.toUpperCase());
-        if (match) next[studentId] = match.label;
-      } else if (e.scoreValue !== null) {
-        next[studentId] = String(e.scoreValue);
+    const meta: Record<string, { id: string; value: string; pages: string | null }> = {};
+    if (materialId) {
+      for (const [studentId, list] of entriesByStudent) {
+        // terbaru dulu; ambil entri jilid terpilih yang bisa diwakili mode ini
+        const e = list.find((x) => x.materialId === materialId && entryToValue(x) !== "");
+        if (!e) continue;
+        const v = entryToValue(e);
+        next[studentId] = v;
+        meta[studentId] = { id: e.assessmentId, value: v, pages: e.pagesLabel };
       }
     }
-
     setEntries(next);
-    setExistingIds(ids);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialId, mode, existingIdByStudent, lastEntryByStudent]);
+    setExisting(meta);
+  }, [materialId, entriesByStudent, entryToValue]);
 
   const method = methods.find((m) => m.id === methodId) ?? null;
   const methodJilids = method
@@ -193,12 +231,28 @@ export function TartilBulkForm({
   const jilids = methodJilids.length > 0 ? methodJilids : materials;
 
   const q = query.trim().toLowerCase();
-  const visibleStudents = students.filter(
-    (s) => !q || s.fullName.toLowerCase().includes(q) || (s.nis ?? "").toLowerCase().includes(q)
-  );
-  const filledCount = visibleStudents.filter((s) => (entries[s.studentId] ?? "") !== "").length;
+  const visibleStudents = students.filter((s) => {
+    if (q && !s.fullName.toLowerCase().includes(q) && !(s.nis ?? "").toLowerCase().includes(q)) {
+      return false;
+    }
+    if (statusFilter === "belum") return !gradedIds.has(s.studentId);
+    if (statusFilter === "sudah") return gradedIds.has(s.studentId);
+    return true;
+  });
+  const gradedTotal = students.filter((s) => gradedIds.has(s.studentId)).length;
+  const belumTotal = students.length - gradedTotal;
+
+  /** Baris yang perlu dikirim: BARU, atau nilai lama yang DIUBAH. */
+  function isDirty(studentId: string): boolean {
+    const v = entries[studentId] ?? "";
+    if (v === "") return false;
+    const ex = existing[studentId];
+    return !ex || ex.value !== v;
+  }
+  const filledCount = visibleStudents.filter((s) => isDirty(s.studentId)).length;
 
   function pickMethod(nextId: string) {
+    userPickedMaterial.current = true;
     setMethodId(nextId);
     setMaterialId("");
     setShowMethodPicker(false);
@@ -252,28 +306,37 @@ export function TartilBulkForm({
   function onSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!materialId) return toast.error("Pilih jilid terlebih dahulu.");
-    if (filledCount === 0) return toast.error("Isi nilai minimal satu santri.");
+    if (filledCount === 0) {
+      return toast.error(
+        gradedTotal > 0
+          ? "Belum ada nilai baru atau perubahan untuk disimpan."
+          : "Isi nilai minimal satu santri."
+      );
+    }
 
     const pagesLabel = fromPage === toPage ? fromPage : `${fromPage}-${toPage}`;
     const items = visibleStudents
-      .filter((s) => (entries[s.studentId] ?? "") !== "")
+      .filter((s) => isDirty(s.studentId))
       .map((s) => {
         const raw = entries[s.studentId];
-        const assessmentId = existingIds[s.studentId] ?? null;
+        const ex = existing[s.studentId];
+        // Edit nilai lama → pertahankan halaman aslinya; baris baru → halaman form.
+        const pages = ex ? ex.pages ?? "" : pagesLabel;
+        const assessmentId = ex?.id ?? null;
         if (mode === "HURUF") {
           return {
-            studentId: s.studentId, materialId, pagesLabel, status: "DINILAI",
+            studentId: s.studentId, materialId, pagesLabel: pages, status: "DINILAI",
             scoreValue: null, scoreLabel: raw, assessmentId,
           };
         }
         if (mode === "ANGKA") {
           return {
-            studentId: s.studentId, materialId, pagesLabel, status: "DINILAI",
+            studentId: s.studentId, materialId, pagesLabel: pages, status: "DINILAI",
             scoreValue: Number(raw), scoreLabel: "", assessmentId,
           };
         }
         return {
-          studentId: s.studentId, materialId, pagesLabel, status: "DINILAI",
+          studentId: s.studentId, materialId, pagesLabel: pages, status: "DINILAI",
           scoreValue: null, scoreLabel: "", assessmentId,
         };
       });
@@ -282,9 +345,7 @@ export function TartilBulkForm({
       const res = await saveTartilAssessmentsBulkAction(items, assessedDate === today ? null : assessedDate);
       if (res.success) {
         toast.success(res.success);
-        setEntries({});
-        setExistingIds({});
-        void fetchOnDate(assessedDate); // V74 — badge & prefill segarkan
+        void fetchOnDate(assessedDate); // V76 — segarkan: nilai baru jadi "sudah dinilai"
       } else if (res.error) toast.error(res.error);
     });
   }
@@ -307,7 +368,10 @@ export function TartilBulkForm({
           <Input
             id="tb-tanggal" type="date" required
             className="h-11" value={assessedDate} max={today}
-            onChange={(e) => setAssessedDate(e.target.value)}
+            onChange={(e) => {
+              setAssessedDate(e.target.value);
+              // Ganti tanggal tanpa jilid pilihan sendiri → boleh auto-pilih lagi.
+            }}
             aria-label="Tanggal penilaian (sesuai catatan kertas)"
           />
           <p className="text-muted-foreground text-[0.7rem]">
@@ -327,7 +391,13 @@ export function TartilBulkForm({
               <Settings2 className="size-3.5" /> Ganti Metode
             </button>
           </div>
-          <Select value={materialId} onValueChange={setMaterialId}>
+          <Select
+            value={materialId}
+            onValueChange={(v) => {
+              userPickedMaterial.current = true;
+              setMaterialId(v);
+            }}
+          >
             <SelectTrigger id="tb-jilid" className="h-11 w-full">
               <SelectValue placeholder={method ? `${method.name} — pilih jilid…` : "Pilih jilid…"} />
             </SelectTrigger>
@@ -467,7 +537,36 @@ export function TartilBulkForm({
         </div>
         <p className="text-muted-foreground text-[0.7rem]">
           Baris yang dikosongkan tidak ikut tersimpan — lengkapi bertahap jika data belum semua.
+          Nilai yang sudah ada pada tanggal ini tampil otomatis; ubah nilainya untuk memperbarui.
         </p>
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          {loadingDate ? (
+            <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+              <Loader2 className="size-3.5 animate-spin" /> Memeriksa nilai pada tanggal ini…
+            </span>
+          ) : (
+            <>
+              {([
+                { v: "all", label: `Semua (${students.length})` },
+                { v: "belum", label: `Belum dinilai (${belumTotal})` },
+                { v: "sudah", label: `Sudah dinilai (${gradedTotal})` },
+              ] as const).map((f) => (
+                <button
+                  key={f.v}
+                  type="button"
+                  onClick={() => setStatusFilter(f.v)}
+                  className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    statusFilter === f.v
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
       </div>
 
       <div className="max-h-[24rem] space-y-1.5 overflow-y-auto pr-1">
@@ -490,24 +589,47 @@ export function TartilBulkForm({
                 <p className="text-muted-foreground font-mono text-[0.7rem]">{s.nis ?? "—"}</p>
               </div>
 
-              {/* V73/V74 — sudah dinilai pada tanggal terpilih?: tampil di baris.
-                  Kolom badge hanya untuk entri di JILID BERBEDA dari yang
-                  dipilih (atau yang tidak bisa direpresentasikan mode ini);
-                  nilai jilid terpilih sudah tampil di kolom pengisian. */}
+              {/* V76 — penanda status pada tanggal terpilih:
+                  • nilai di jilid terpilih sudah ada → "Sudah dinilai" (atau "Diubah")
+                  • hanya ada nilai di jilid lain / tak terwakili mode ini → badge info
+                  • belum ada apa pun → "Belum dinilai" */}
               {(() => {
-                const prev = lastEntryByStudent.get(s.studentId);
-                if (!prev || (prev.materialId === materialId && value !== "")) return null;
+                const list = entriesByStudent.get(s.studentId) ?? [];
+                const ex = existing[s.studentId];
+                if (ex) {
+                  const changed = value !== ex.value;
+                  return (
+                    <span
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-0.5 text-[0.65rem] font-bold ${
+                        changed
+                          ? "bg-amber-100 text-amber-800 dark:bg-yellow-500/15 dark:text-yellow-300"
+                          : "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300"
+                      }`}
+                    >
+                      <CheckCircle2 className="size-3" />
+                      {changed ? "Akan diubah" : "Sudah dinilai"}
+                    </span>
+                  );
+                }
+                const prev = list.find((e) => e.status === "DINILAI") ?? list[0];
+                if (!prev) {
+                  return (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                      <CircleDashed className="size-3" /> Belum dinilai
+                    </span>
+                  );
+                }
                 const mat = materials.find((m) => m.id === prev.materialId);
                 const score = prev.status !== "DINILAI"
-                  ? prev.status === "DIPELAJARI" ? "Dipelajari" : "Belum"
-                  : prev.scoreLabel ?? (prev.scoreValue !== null ? String(prev.scoreValue) : "✓");
+                  ? prev.status === "DIPELAJARI" ? "Dipelajari" : "Belum lancar"
+                  : prev.scoreLabel ?? (prev.scoreValue !== null ? String(prev.scoreValue) : "✓ Lancar");
                 return (
                   <span
-                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-bold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300"
-                    title={mat?.name}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-sky-100 px-2 py-0.5 text-[0.65rem] font-bold text-sky-800 dark:bg-sky-500/15 dark:text-sky-300"
+                    title={`Sudah tercatat pada tanggal ini: ${mat?.name ?? "jilid lain"}`}
                   >
                     <CheckCircle2 className="size-3" />
-                    {mat?.name ?? "Sudah"} · {score}
+                    {mat?.name ?? "Jilid lain"} · {score}
                   </span>
                 );
               })()}
@@ -556,11 +678,12 @@ export function TartilBulkForm({
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending || filledCount === 0 || !materialId} className="bg-gradient-brand">
           {pending ? <Loader2 className="size-4 animate-spin" /> : <ClipboardCheck className="size-4" />}
-          Simpan {filledCount} Penilaian Sekaligus
+          {gradedTotal > 0 ? `Simpan ${filledCount} Penilaian / Perubahan` : `Simpan ${filledCount} Penilaian Sekaligus`}
         </Button>
         <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
           <GraduationCap className="size-3.5" />
-          {filledCount} dari {visibleStudents.length} santri sudah diisi
+          {gradedTotal} dari {students.length} santri sudah dinilai pada tanggal ini
+          {filledCount > 0 ? ` · ${filledCount} menunggu disimpan` : ""}
         </span>
       </div>
     </form>
