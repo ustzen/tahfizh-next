@@ -1,6 +1,8 @@
 import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
+import Link from "next/link";
 import { getReportStudents } from "@/lib/report";
+import { getReportPeriodDefaults } from "@/lib/akademik";
 import { NewReportForm } from "@/components/report/new-report-form";
 
 export const metadata = { title: "Buat Raport" };
@@ -17,7 +19,7 @@ export default async function AdminRaportBuatPage({
 }) {
   await requireRole(["ADMIN"], "/admin/raport");
   const sp = await searchParams;
-  const students = await getReportStudents();
+  const [students, period] = await Promise.all([getReportStudents(), getReportPeriodDefaults()]);
   const templateId = sp.template ?? "";
 
   return (
@@ -26,14 +28,23 @@ export default async function AdminRaportBuatPage({
         title="Buat Raport"
         description="Pilih santri dan periode — nilai diambil otomatis dari modul pembelajaran."
       />
+      {!period.hasActiveYear && (
+        <div className="mx-auto max-w-2xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300">
+          Tahun ajaran belum diatur. Nilai di bawah hanya perkiraan —{" "}
+          <Link href="/admin/akademik" className="font-semibold underline">
+            atur Tahun Ajaran di menu Akademik
+          </Link>{" "}
+          agar raport otomatis mengikuti tahun ajaran dan semester aktif.
+        </div>
+      )}
       <NewReportForm
         templateId={templateId}
         students={students}
         defaults={{
-          academicYear: sp.year ?? "2026/2027",
-          semester: sp.semester ?? "Semester 1",
-          periodStart: sp.start ?? "2026-07-01",
-          periodEnd: sp.end ?? "2026-12-31",
+          academicYear: sp.year ?? period.academicYear,
+          semester: sp.semester ?? period.semester,
+          periodStart: sp.start ?? period.periodStart,
+          periodEnd: sp.end ?? period.periodEnd,
         }}
       />
     </div>
