@@ -26,7 +26,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -71,6 +70,7 @@ export function YearManager({ years }: { years: YearItem[] }) {
     if (state?.success) {
       toast.success(state.success);
       setOpen(false);
+      setEditing(null);
     } else if (state?.error) {
       toast.error(state.error);
     }
@@ -95,7 +95,7 @@ export function YearManager({ years }: { years: YearItem[] }) {
               <Plus className="size-4" /> Tahun Ajaran
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent key={editing?.id ?? "new"} className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>{editing ? "Edit Tahun Ajaran" : "Tambah Tahun Ajaran"}</DialogTitle>
               <DialogDescription>
@@ -155,7 +155,7 @@ export function YearManager({ years }: { years: YearItem[] }) {
               </details>
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => { setOpen(false); setEditing(null); }}>
                   Batal
                 </Button>
                 <Button type="submit" disabled={pending} className="bg-gradient-brand hover:opacity-90">
@@ -183,7 +183,7 @@ export function YearManager({ years }: { years: YearItem[] }) {
           </TableHeader>
           <TableBody>
             {years.map((y) => (
-              <YearRow key={y.id} year={y} onEdit={() => setEditing(y)} />
+              <YearRow key={y.id} year={y} onEdit={() => { setEditing(y); setOpen(true); }} />
             ))}
           </TableBody>
         </Table>
@@ -194,6 +194,8 @@ export function YearManager({ years }: { years: YearItem[] }) {
 
 function YearRow({ year, onEdit }: { year: YearItem; onEdit: () => void }) {
   const active = year.status === "ACTIVE";
+  const [activateOpen, setActivateOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   return (
     <TableRow>
       <TableCell className="px-4 font-semibold text-foreground">
@@ -214,14 +216,14 @@ function YearRow({ year, onEdit }: { year: YearItem; onEdit: () => void }) {
       <TableCell className="px-4">
         <div className="flex items-center justify-end gap-1.5">
           {!active && (
-            <AlertDialog>
+            <AlertDialog open={activateOpen} onOpenChange={setActivateOpen}>
               <AlertDialogTrigger asChild>
                 <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
                   <CheckCircle2 className="size-3.5" /> Aktifkan
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
-                <ActivateForm yearId={year.id} yearName={year.name} />
+                <ActivateForm yearId={year.id} yearName={year.name} onDone={() => setActivateOpen(false)} />
               </AlertDialogContent>
             </AlertDialog>
           )}
@@ -229,14 +231,14 @@ function YearRow({ year, onEdit }: { year: YearItem; onEdit: () => void }) {
             <Pencil className="size-3.5" /> Edit
           </Button>
           {active && (
-            <AlertDialog>
+            <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
               <AlertDialogTrigger asChild>
                 <Button size="sm" variant="ghost" className="h-8 gap-1 text-xs text-amber-700 dark:text-amber-300">
                   <Archive className="size-3.5" /> Arsipkan
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
-                <ArchiveForm yearId={year.id} yearName={year.name} />
+                <ArchiveForm yearId={year.id} yearName={year.name} onDone={() => setArchiveOpen(false)} />
               </AlertDialogContent>
             </AlertDialog>
           )}
@@ -246,14 +248,19 @@ function YearRow({ year, onEdit }: { year: YearItem; onEdit: () => void }) {
   );
 }
 
-function ActivateForm({ yearId, yearName }: { yearId: string; yearName: string }) {
+function ActivateForm({ yearId, yearName, onDone }: { yearId: string; yearName: string; onDone: () => void }) {
   const [state, action, pending] = useActionState<V11Result | null, FormData>(
     activateAcademicYearAction as never,
     null
   );
   useEffect(() => {
-    if (state?.success) toast.success(state.success);
-    else if (state?.error) toast.error(state.error);
+    if (state?.success) {
+      toast.success(state.success);
+      onDone();
+    } else if (state?.error) {
+      toast.error(state.error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
   return (
     <form action={action}>
@@ -265,25 +272,28 @@ function ActivateForm({ yearId, yearName }: { yearId: string; yearName: string }
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>Batal</AlertDialogCancel>
-        <AlertDialogAction asChild>
-          <Button type="submit" disabled={pending} className="bg-gradient-brand hover:opacity-90">
-            {pending && <Spinner />} YA, AKTIFKAN
-          </Button>
-        </AlertDialogAction>
+        <Button type="submit" disabled={pending} className="bg-gradient-brand hover:opacity-90">
+          {pending && <Spinner />} YA, AKTIFKAN
+        </Button>
       </AlertDialogFooter>
       <input type="hidden" name="yearId" value={yearId} />
     </form>
   );
 }
 
-function ArchiveForm({ yearId, yearName }: { yearId: string; yearName: string }) {
+function ArchiveForm({ yearId, yearName, onDone }: { yearId: string; yearName: string; onDone: () => void }) {
   const [state, action, pending] = useActionState<V11Result | null, FormData>(
     archiveAcademicYearAction as never,
     null
   );
   useEffect(() => {
-    if (state?.success) toast.success(state.success);
-    else if (state?.error) toast.error(state.error);
+    if (state?.success) {
+      toast.success(state.success);
+      onDone();
+    } else if (state?.error) {
+      toast.error(state.error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
   return (
     <form action={action}>
@@ -296,11 +306,9 @@ function ArchiveForm({ yearId, yearName }: { yearId: string; yearName: string })
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>Batal</AlertDialogCancel>
-        <AlertDialogAction asChild>
-          <Button type="submit" disabled={pending} className="bg-gradient-brand hover:opacity-90">
-            {pending && <Spinner />} YA, ARSIPKAN
-          </Button>
-        </AlertDialogAction>
+        <Button type="submit" disabled={pending} className="bg-gradient-brand hover:opacity-90">
+          {pending && <Spinner />} YA, ARSIPKAN
+        </Button>
       </AlertDialogFooter>
       <input type="hidden" name="yearId" value={yearId} />
     </form>
