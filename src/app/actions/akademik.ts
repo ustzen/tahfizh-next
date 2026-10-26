@@ -26,6 +26,29 @@ function requireStaff(profile: Awaited<ReturnType<typeof getSessionProfile>>) {
 /* Tahun ajaran & semester (#4-#12, #61)                                    */
 /* ------------------------------------------------------------------------ */
 
+/**
+ * Setelah tahun ajaran diaktifkan semester-nya masih "Belum Aktif", sehingga
+ * lembaga tidak punya semester aktif sampai admin menekannya manual. Aktifkan
+ * otomatis semester yang mencakup hari ini (atau Semester 1) bila belum ada
+ * semester aktif di tahun tersebut. Gagal diam-diam: admin tetap bisa
+ * mengaturnya manual di panel Semester.
+ */
+async function ensureActiveSemester(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  yearId: string
+) {
+  const { data: sems } = await supabase
+    .from("academic_semesters")
+    .select("id, sequence, start_date, end_date, status")
+    .eq("academic_year_id", yearId)
+    .order("sequence");
+  if (!sems || sems.length === 0 || sems.some((x) => x.status === "AKTIF")) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const pick = sems.find((x) => x.start_date <= today && today <= x.end_date) ?? sems[0];
+  await supabase.rpc("academic_semester_set_active", { p_semester_id: pick.id });
+}
+
 export async function saveAcademicYearAction(
   _prev: V11Result | null,
   formData: FormData
@@ -60,8 +83,11 @@ export async function saveAcademicYearAction(
   });
   if (error) return fail(error);
 
+  const yearId = (data as string | null) ?? id;
+  if (activate && yearId) await ensureActiveSemester(supabase, yearId);
+
   invalidateAkademik();
-  return { success: id ? "Tahun ajaran diperbarui." : `Tahun ajaran ${name} dibuat.`, data: { id } };
+  return { success: id ? "Tahun ajaran diperbarui." : `Tahun ajaran ${name} dibuat.`, data: { id: yearId } };
 }
 
 export async function activateAcademicYearAction(
@@ -77,6 +103,8 @@ export async function activateAcademicYearAction(
   const supabase = await createClient();
   const { error } = await supabase.rpc("academic_year_activate", { p_year_id: yearId });
   if (error) return fail(error);
+
+  await ensureActiveSemester(supabase, yearId);
 
   invalidateAkademik();
   return { success: "Tahun ajaran diaktifkan. Tahun lain otomatis menjadi arsip." };
