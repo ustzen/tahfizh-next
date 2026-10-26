@@ -13,6 +13,7 @@ import {
   GraduationCap,
   Layers,
   Loader2,
+  UserX,
   Search,
   Settings2,
   Square,
@@ -20,8 +21,10 @@ import {
 
 import {
   generateTartilJilidsAction,
+  getTartilAbsencesOnDateAction,
   getTartilOnDateEntriesAction,
   saveTartilAssessmentsBulkAction,
+  type TartilAbsence,
   type TartilOnDateEntry,
 } from "@/app/actions/tartil";
 import type { TahfidzMode } from "@/lib/tahfidz";
@@ -60,12 +63,21 @@ import {
  *   * Nilai di jilid LAIN pada tanggal itu hanya ditampilkan sebagai badge,
  *     tidak lagi ikut tersimpan sebagai penilaian baru di jilid terpilih.
  *   * Baris lama yang diedit mempertahankan halaman aslinya.
+ *   * V77 — santri yang di presensi tercatat izin/sakit/alpa pada tanggal itu
+ *     diberi keterangan "tidak masuk" dan barisnya dikunci (tidak bisa dinilai);
+ *     penegak sebenarnya trigger database.
  *   * Entri terbaru yang dipakai (bukan yang terlama) + anti balapan fetch.
  */
 
 type StudentOption = { studentId: string; fullName: string; nis: string | null };
 type MaterialOption = { id: string; name: string };
 type GradeOption = { label: string; minValue: number; maxValue: number };
+
+const ABSENCE_LABEL: Record<TartilAbsence["status"], string> = {
+  SAKIT: "Sakit",
+  IZIN: "Izin",
+  ALPA: "Alpa",
+};
 
 const LABEL_CLS = "flex items-center gap-1.5 text-[0.82rem] font-bold";
 
@@ -117,6 +129,8 @@ export function TartilBulkForm({
 
   // V73 — fetch entri guru pada tanggal terpilih.
   const [onDateEntries, setOnDateEntries] = useState<TartilOnDateEntry[]>([]);
+  /** V77 — santri tidak hadir (presensi) pada tanggal terpilih. */
+  const [absences, setAbsences] = useState<TartilAbsence[]>([]);
   const [loadingDate, setLoadingDate] = useState(false);
   /** V76 — pesan bila gagal memuat nilai pada tanggal terpilih. */
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -124,26 +138,32 @@ export function TartilBulkForm({
   const fetchSeq = useRef(0);
   /** True bila guru sendiri sudah memilih jilid (jangan di-override auto-pilih). */
   const userPickedMaterial = useRef(false);
-  const [statusFilter, setStatusFilter] = useState<"all" | "belum" | "sudah">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "belum" | "sudah" | "absen">("all");
 
   const fetchOnDate = useCallback(async (date: string | "") => {
     const seq = ++fetchSeq.current;
     if (!date) {
       setOnDateEntries([]);
+      setAbsences([]);
       setLoadError(null);
       setLoadingDate(false);
       return;
     }
     setLoadingDate(true);
     try {
-      const { entries, error } = await getTartilOnDateEntriesAction(date);
+      const [{ entries, error }, abs] = await Promise.all([
+        getTartilOnDateEntriesAction(date),
+        getTartilAbsencesOnDateAction(date),
+      ]);
       if (seq === fetchSeq.current) {
         setOnDateEntries(entries);
-        setLoadError(error ?? null);
+        setAbsences(abs.absences);
+        setLoadError(error ?? abs.error ?? null);
       }
     } catch {
       if (seq === fetchSeq.current) {
         setOnDateEntries([]);
+        setAbsences([]);
         setLoadError("Gagal memuat nilai pada tanggal ini. Coba pilih ulang tanggalnya.");
       }
     } finally {
@@ -164,6 +184,13 @@ export function TartilBulkForm({
     }
     return map;
   }, [onDateEntries]);
+
+  /** V77 — studentId → presensi tidak hadir pada tanggal terpilih. */
+  const absentById = useMemo(() => {
+    const map = new Map<string, TartilAbsence>();
+    for (const a of absences) map.set(a.studentId, a);
+    return map;
+  }, [absences]);
 
   /** Santri yang sudah punya nilai (status DINILAI) pada tanggal terpilih. */
   const gradedIds = useMemo(() => {
@@ -222,6 +249,7 @@ export function TartilBulkForm({
     if (materialId) {
       for (const [studentId, list] of entriesByStudent) {
         // terbaru dulu; ambil entri jilid terpilih yang bisa diwakili mode ini
+        if (absentById.has(studentId)) continue; // V77 — tidak hadir: tidak diprefill
         const e = list.find((x) => x.materialId === materialId && entryToValue(x) !== "");
         if (!e) continue;
         const v = entryToValue(e);
@@ -231,7 +259,7 @@ export function TartilBulkForm({
     }
     setEntries(next);
     setExisting(meta);
-  }, [materialId, entriesByStudent, entryToValue]);
+  }, [materialId, entriesByStudent, entryToValue, absentById]);
 
   const method = methods.find((m) => m.id === methodId) ?? null;
   const methodJilids = method
@@ -244,15 +272,22 @@ export function TartilBulkForm({
     if (q && !s.fullName.toLowerCase().includes(q) && !(s.nis ?? "").toLowerCase().includes(q)) {
       return false;
     }
-    if (statusFilter === "belum") return !gradedIds.has(s.studentId);
+    const absent = absentById.has(s.studentId);
+    if (statusFilter === "absen") return absent;
+    if (statusFilter === "belum") return !absent && !gradedIds.has(s.studentId);
     if (statusFilter === "sudah") return gradedIds.has(s.studentId);
     return true;
   });
+  const absentTotal = students.filter((s) => absentById.has(s.studentId)).length;
   const gradedTotal = students.filter((s) => gradedIds.has(s.studentId)).length;
-  const belumTotal = students.length - gradedTotal;
+  const belumTotal = students.filter(
+    (s) => !absentById.has(s.studentId) && !gradedIds.has(s.studentId)
+  ).length;
+  const eligibleTotal = students.length - absentTotal;
 
   /** Baris yang perlu dikirim: BARU, atau nilai lama yang DIUBAH. */
   function isDirty(studentId: string): boolean {
+    if (absentById.has(studentId)) return false; // V77
     const v = entries[studentId] ?? "";
     if (v === "") return false;
     const ex = existing[studentId];
@@ -287,7 +322,7 @@ export function TartilBulkForm({
   function setAllCentang(on: boolean) {
     setEntries((prev) => {
       const next = { ...prev };
-      for (const s of visibleStudents) next[s.studentId] = on ? "1" : "";
+      for (const s of visibleStudents) if (!absentById.has(s.studentId)) next[s.studentId] = on ? "1" : "";
       return next;
     });
   }
@@ -297,7 +332,7 @@ export function TartilBulkForm({
       if (!bulkGrade) return toast.error("Pilih nilai huruf terlebih dahulu.");
       setEntries((prev) => {
         const next = { ...prev };
-        for (const s of visibleStudents) next[s.studentId] = bulkGrade;
+        for (const s of visibleStudents) if (!absentById.has(s.studentId)) next[s.studentId] = bulkGrade;
         return next;
       });
       return;
@@ -307,7 +342,7 @@ export function TartilBulkForm({
     if (n < 1 || n > 100) return toast.error("Nilai harus angka 1-100.");
     setEntries((prev) => {
       const next = { ...prev };
-      for (const s of visibleStudents) next[s.studentId] = bulkValue;
+      for (const s of visibleStudents) if (!absentById.has(s.studentId)) next[s.studentId] = bulkValue;
       return next;
     });
   }
@@ -571,7 +606,10 @@ export function TartilBulkForm({
                 { v: "all", label: `Semua (${students.length})` },
                 { v: "belum", label: `Belum dinilai (${belumTotal})` },
                 { v: "sudah", label: `Sudah dinilai (${gradedTotal})` },
-              ] as const).map((f) => (
+                ...(absentTotal > 0
+                  ? [{ v: "absen", label: `Tidak hadir (${absentTotal})` }]
+                  : []),
+              ] as { v: "all" | "belum" | "sudah" | "absen"; label: string }[]).map((f) => (
                 <button
                   key={f.v}
                   type="button"
@@ -593,6 +631,30 @@ export function TartilBulkForm({
       <div className="max-h-[24rem] space-y-1.5 overflow-y-auto pr-1">
         {visibleStudents.map((s) => {
           const value = entries[s.studentId] ?? "";
+          const absent = absentById.get(s.studentId) ?? null;
+          if (absent) {
+            // V77 — tidak hadir pada tanggal ini: tidak bisa dinilai.
+            return (
+              <div
+                key={s.studentId}
+                className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/60 px-3 py-2 dark:border-rose-500/30 dark:bg-rose-500/10"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xs font-bold text-rose-700 dark:bg-rose-500/20 dark:text-rose-300" aria-hidden>
+                  {s.fullName.charAt(0).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{s.fullName}</p>
+                  <p className="text-[0.7rem] text-rose-700 dark:text-rose-300">
+                    Tidak masuk pada tanggal ini ({ABSENCE_LABEL[absent.status]})
+                    {absent.note ? ` — ${absent.note}` : ""} · tidak bisa dinilai
+                  </p>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-rose-100 px-2 py-0.5 text-[0.65rem] font-bold text-rose-800 dark:bg-rose-500/20 dark:text-rose-300">
+                  <UserX className="size-3" /> {ABSENCE_LABEL[absent.status]}
+                </span>
+              </div>
+            );
+          }
           return (
             <div
               key={s.studentId}
@@ -704,7 +766,8 @@ export function TartilBulkForm({
         </Button>
         <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
           <GraduationCap className="size-3.5" />
-          {gradedTotal} dari {students.length} santri sudah dinilai pada tanggal ini
+          {gradedTotal} dari {eligibleTotal} santri hadir sudah dinilai pada tanggal ini
+          {absentTotal > 0 ? ` · ${absentTotal} tidak hadir` : ""}
           {filledCount > 0 ? ` · ${filledCount} menunggu disimpan` : ""}
         </span>
       </div>
