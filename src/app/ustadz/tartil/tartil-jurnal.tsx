@@ -15,15 +15,18 @@ import {
   Save,
   Settings2,
   Star,
+  UserX,
   X,
 } from "lucide-react";
 
 import {
   generateTartilJilidsAction,
+  getTartilAbsencesOnDateAction,
   getTartilOnDateEntriesAction,
   saveTartilAssessmentAction,
   saveTartilTemplateAction,
   deleteTartilTemplateAction,
+  type TartilAbsence,
   type TartilNoteInput,
   type TartilOnDateEntry,
 } from "@/app/actions/tartil";
@@ -130,6 +133,30 @@ export function TartilJurnalForm({
     };
   }, [studentId, assessedDate]);
 
+  // V77 — presensi: santri izin/sakit/alpa pada tanggal terpilih tidak bisa dinilai.
+  const [absences, setAbsences] = useState<TartilAbsence[]>([]);
+  useEffect(() => {
+    if (!assessedDate) {
+      setAbsences([]);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const { absences: list } = await getTartilAbsencesOnDateAction(assessedDate);
+      if (alive) setAbsences(list);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [assessedDate]);
+  const absentById = useMemo(() => {
+    const map = new Map<string, TartilAbsence>();
+    for (const a of absences) map.set(a.studentId, a);
+    return map;
+  }, [absences]);
+  const selectedAbsence = studentId ? absentById.get(studentId) ?? null : null;
+  const ABSENCE_LABEL: Record<TartilAbsence["status"], string> = { SAKIT: "Sakit", IZIN: "Izin", ALPA: "Alpa" };
+
   const existingForStudent = useMemo(
     () => existingOnDate.filter((e) => e.studentId === studentId),
     [existingOnDate, studentId]
@@ -212,6 +239,11 @@ export function TartilJurnalForm({
     e.preventDefault();
     if (!studentId) return toast.error("Pilih santri terlebih dahulu.");
     if (!materialId) return toast.error("Pilih jilid terlebih dahulu.");
+    if (selectedAbsence) {
+      return toast.error(
+        `Santri tercatat ${ABSENCE_LABEL[selectedAbsence.status].toLowerCase()} pada tanggal tersebut, sehingga tidak dapat dinilai.`
+      );
+    }
 
     const pages = fromPage === toPage ? fromPage : `${fromPage}-${toPage}`;
     const noteInputs: TartilNoteInput[] = [];
@@ -265,6 +297,9 @@ export function TartilJurnalForm({
             {students.map((s) => (
               <SelectItem key={s.studentId} value={s.studentId}>
                 {s.fullName} ({s.nis ?? "—"})
+                {absentById.has(s.studentId)
+                  ? ` — ${ABSENCE_LABEL[absentById.get(s.studentId)!.status]}`
+                  : ""}
               </SelectItem>
             ))}
           </SelectContent>
@@ -316,6 +351,21 @@ export function TartilJurnalForm({
           </Select>
         </div>
       </div>
+
+      {/* V77 — santri tidak masuk pada tanggal ini: tidak bisa dinilai */}
+      {selectedAbsence && (
+        <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-xs text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+          <UserX className="mt-0.5 size-4 shrink-0" />
+          <p>
+            <span className="font-bold">
+              Santri ini tidak masuk pada tanggal ini ({ABSENCE_LABEL[selectedAbsence.status]}).
+            </span>{" "}
+            Berdasarkan presensi halaqah, santri tidak dapat dinilai pada tanggal tersebut.
+            {selectedAbsence.note ? ` Catatan presensi: ${selectedAbsence.note}.` : ""} Pilih
+            tanggal lain atau ubah presensinya bila keliru.
+          </p>
+        </div>
+      )}
 
       {/* V73 — penilaian yang sudah ada untuk santri + tanggal ini */}
       {studentId !== "" && existingForStudent.length > 0 && (
@@ -591,7 +641,7 @@ export function TartilJurnalForm({
 
       <Button
         type="submit"
-        disabled={pending || !studentId || !materialId}
+        disabled={pending || !studentId || !materialId || !!selectedAbsence}
         className="bg-gradient-brand w-full sm:w-auto"
       >
         {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
