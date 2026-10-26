@@ -62,6 +62,9 @@ export const V11_ERRORS: Record<string, string> = {
 };
 
 export function v11ErrorMessage(message: string): string {
+  if (/could not find the function|PGRST202|does not exist/i.test(message)) {
+    return "Fitur tahun ajaran belum aktif di database. Jalankan migrasi V11 (20260915120000_tahfizh_v11_akademik.sql) di Supabase.";
+  }
   for (const key of Object.keys(V11_ERRORS)) {
     if (message.includes(key)) return V11_ERRORS[key];
   }
