@@ -144,6 +144,53 @@ export async function resolveViewYear(searchYearId?: string) {
   return { year, semesters, semester };
 }
 
+export type ReportPeriodDefaults = {
+  academicYear: string;
+  semester: string; // "Semester 1" | "Semester 2"
+  periodStart: string; // YYYY-MM-DD
+  periodEnd: string; // YYYY-MM-DD
+  /** false = admin belum mengaktifkan tahun ajaran (nilai di atas hanya perkiraan). */
+  hasActiveYear: boolean;
+};
+
+/**
+ * Default tahun ajaran + semester + periode untuk raport, diambil dari
+ * pengaturan Akademik admin (tahun ajaran aktif & semester aktif).
+ * Bila admin belum mengatur tahun ajaran, dipakai perkiraan dari tanggal hari
+ * ini (Juli–Juni) supaya form tidak terkunci pada tahun yang di-hardcode.
+ */
+export async function getReportPeriodDefaults(): Promise<ReportPeriodDefaults> {
+  const today = new Date().toISOString().slice(0, 10);
+  const year = await getActiveYear();
+
+  if (year) {
+    const semesters = await getSemesters(year.id);
+    const sem =
+      semesters.find((x) => x.status === "AKTIF") ??
+      semesters.find((x) => x.startDate <= today && today <= x.endDate) ??
+      semesters[0] ??
+      null;
+    return {
+      academicYear: year.name,
+      semester: sem ? `Semester ${sem.sequence}` : "Semester 1",
+      periodStart: sem?.startDate ?? year.startDate,
+      periodEnd: sem?.endDate ?? year.endDate,
+      hasActiveYear: true,
+    };
+  }
+
+  const now = new Date();
+  const startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const firstHalf = now.getMonth() >= 6; // Jul–Des = Semester 1
+  return {
+    academicYear: `${startYear}/${startYear + 1}`,
+    semester: firstHalf ? "Semester 1" : "Semester 2",
+    periodStart: firstHalf ? `${startYear}-07-01` : `${startYear + 1}-01-01`,
+    periodEnd: firstHalf ? `${startYear}-12-31` : `${startYear + 1}-06-30`,
+    hasActiveYear: false,
+  };
+}
+
 /* ------------------------------------------------------------------------ */
 /* Schedules (#13-#15)                                                      */
 /* ------------------------------------------------------------------------ */
