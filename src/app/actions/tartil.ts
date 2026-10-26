@@ -183,10 +183,12 @@ export type TartilOnDateEntry = {
 
 export async function getTartilOnDateEntriesAction(
   date: string
-): Promise<{ entries: TartilOnDateEntry[] }> {
+): Promise<{ entries: TartilOnDateEntry[]; error?: string }> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { entries: [] };
   const profile = await getSessionProfile();
-  if (!profile || profile.role !== "USTADZ") return { entries: [] };
+  if (!profile || profile.role !== "USTADZ") {
+    return { entries: [], error: "Sesi Anda telah berakhir. Silakan login kembali." };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("tartil_assessments_on_date", {
@@ -194,7 +196,14 @@ export async function getTartilOnDateEntriesAction(
   });
   if (error) {
     console.error("tartil_assessments_on_date failed:", error.message);
-    return { entries: [] };
+    // V76 — jangan diam-diam kosong: kabari guru agar tidak mengira semua "belum dinilai".
+    const missing = /could not find the function|does not exist|schema cache/i.test(error.message);
+    return {
+      entries: [],
+      error: missing
+        ? "Fitur cek nilai per tanggal belum aktif di database (migrasi V76 belum dijalankan)."
+        : `Gagal memuat nilai pada tanggal ini: ${friendlyError(error.message)}`,
+    };
   }
   return {
     entries: ((data ?? []) as Record<string, unknown>[]).map((r) => ({
