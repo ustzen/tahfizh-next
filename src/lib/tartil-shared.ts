@@ -38,3 +38,49 @@ export const NOTE_SLOT_COLORS: Record<NoteSlot, string> = {
   SARAN: "text-teal-600",
   CATATAN_ORANG_TUA: "text-slate-600",
 };
+
+/**
+ * Penilaian TERAKHIR per santri — dipakai form Tartil guru untuk mengisi
+ * Jilid + Halaman otomatis (mis. Zain terakhir Iqro Jilid 4 halaman 5).
+ */
+export type TartilLastAssessment = {
+  studentId: string;
+  materialId: string;
+  /** Label halaman apa adanya: "5" atau "3-5". */
+  pagesLabel: string | null;
+  /** ISO timestamp penilaian terakhir. */
+  assessedAt: string;
+};
+
+/**
+ * "5" → {from:"5",to:"5"}; "3-5" → {from:"3",to:"5"}; selain itu null.
+ * Halaman TERAKHIR dibaca = angka paling akhir.
+ */
+export function parsePagesLabel(label: string | null | undefined): { from: string; to: string } | null {
+  const m = /^(\d+)(?:\s*-\s*(\d+))?$/.exec((label ?? "").trim());
+  if (!m) return null;
+  return { from: m[1], to: m[2] ?? m[1] };
+}
+
+/**
+ * Jilid + halaman terakhir yang dinilai di antara sekelompok santri: entri
+ * PALING BARU; bila beberapa santri dinilai pada hari terbaru yang sama, jilid
+ * yang paling banyak dipakai pada hari itu menang.
+ */
+export function pickLatestAssessment(list: TartilLastAssessment[]): TartilLastAssessment | null {
+  if (list.length === 0) return null;
+  const sorted = [...list].sort((a, b) => (a.assessedAt < b.assessedAt ? 1 : a.assessedAt > b.assessedAt ? -1 : 0));
+  const day = sorted[0].assessedAt.slice(0, 10);
+  const sameDay = sorted.filter((x) => x.assessedAt.slice(0, 10) === day);
+  const count = new Map<string, number>();
+  for (const x of sameDay) count.set(x.materialId, (count.get(x.materialId) ?? 0) + 1);
+  let bestId = sameDay[0].materialId;
+  let bestN = 0;
+  for (const [id, n] of count) {
+    if (n > bestN) {
+      bestId = id;
+      bestN = n;
+    }
+  }
+  return sameDay.find((x) => x.materialId === bestId) ?? sorted[0];
+}
