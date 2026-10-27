@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -48,7 +47,7 @@ const STATUS_LABEL: Record<SemesterItem["status"], string> = {
 
 /**
  * Semester panel (#6/#8): exactly one ACTIVE semester inside the active year —
- * switching marks the previous one SELESAI (handled by the DB RPC).
+ * mengaktifkan satu semester otomatis menandai semester lain SELESAI.
  */
 export function SemesterPanel({ semesters }: { semesters: SemesterItem[] }) {
   if (semesters.length === 0) {
@@ -81,7 +80,7 @@ export function SemesterPanel({ semesters }: { semesters: SemesterItem[] }) {
                 label="Aktifkan"
                 icon={<CalendarCheck2 className="size-3.5" />}
                 title={`Aktifkan ${s.name}?`}
-                description="Semester lain pada tahun ajaran aktif otomatis ditandai selesai."
+                description="Semester lain pada tahun ajaran ini otomatis ditandai Selesai."
                 hidden={{ semesterId: s.id }}
                 action={activateSemesterAction}
               />
@@ -128,17 +127,22 @@ function ConfirmAction({
   hidden: Record<string, string>;
   action: (prev: V11Result | null, formData: FormData) => Promise<V11Result>;
 }) {
+  const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<V11Result | null, FormData>(
     action as never,
     null
   );
   useEffect(() => {
-    if (state?.success) toast.success(state.success);
-    else if (state?.error) toast.error(state.error);
+    if (state?.success) {
+      toast.success(state.success);
+      setOpen(false);
+    } else if (state?.error) {
+      toast.error(state.error);
+    }
   }, [state]);
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
         <Button size="sm" variant="outline" className="h-7 gap-1 text-xs">
           {icon} {label}
@@ -152,11 +156,9 @@ function ConfirmAction({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button type="submit" disabled={pending} className="bg-gradient-brand hover:opacity-90">
-                {pending && <Spinner />} YA, LANJUTKAN
-              </Button>
-            </AlertDialogAction>
+            <Button type="submit" disabled={pending} className="bg-gradient-brand hover:opacity-90">
+              {pending && <Spinner />} YA, LANJUTKAN
+            </Button>
           </AlertDialogFooter>
           {Object.entries(hidden).map(([k, v]) => (
             <input key={k} type="hidden" name={k} value={v} />
