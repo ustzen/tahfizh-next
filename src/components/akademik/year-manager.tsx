@@ -53,6 +53,19 @@ export type YearItem = {
 };
 
 /**
+ * Default tahun ajaran baru mengikuti tanggal hari ini (tahun ajaran berjalan
+ * Juli–Juni). Bila nama itu sudah dipakai, otomatis maju ke tahun berikutnya
+ * supaya tidak bertabrakan dengan tahun ajaran yang sudah ada.
+ */
+function newYearDefaults(years: YearItem[]) {
+  const now = new Date();
+  let start = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const taken = new Set(years.map((y) => y.name));
+  while (taken.has(`${start}/${start + 1}`)) start += 1;
+  return { name: `${start}/${start + 1}`, startDate: `${start}-07-01`, endDate: `${start + 1}-06-30` };
+}
+
+/**
  * Tahun Ajaran manager (#4-#9, #60-#61): create/edit dialog, activate &
  * archive with confirmation dialogs. One ACTIVE year per tenant is enforced
  * by the DB RPC — activating another archives the previous one automatically.
@@ -65,6 +78,7 @@ export function YearManager({ years }: { years: YearItem[] }) {
     saveAcademicYearAction as never,
     null
   );
+  const defaults = newYearDefaults(years);
 
   useEffect(() => {
     if (state?.success) {
@@ -99,7 +113,8 @@ export function YearManager({ years }: { years: YearItem[] }) {
             <DialogHeader>
               <DialogTitle>{editing ? "Edit Tahun Ajaran" : "Tambah Tahun Ajaran"}</DialogTitle>
               <DialogDescription>
-                Contoh: nama 2026/2027, mulai 01-07-2026, selesai 30-06-2027.
+                Terisi otomatis sesuai tanggal hari ini (tahun ajaran Juli–Juni). Ubah bila perlu.
+                Semester yang sedang berjalan langsung diaktifkan.
               </DialogDescription>
             </DialogHeader>
             <form action={formAction} className="space-y-4">
@@ -107,7 +122,7 @@ export function YearManager({ years }: { years: YearItem[] }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="name">Nama</Label>
-                  <Input id="name" name="name" defaultValue={editing?.name ?? ""} placeholder="2026/2027" required />
+                  <Input id="name" name="name" defaultValue={editing?.name ?? defaults.name} placeholder="2026/2027" required />
                 </div>
                 <div className="flex items-end space-x-2 pb-2">
                   <input
@@ -123,11 +138,11 @@ export function YearManager({ years }: { years: YearItem[] }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="startDate">Tanggal mulai</Label>
-                  <Input id="startDate" name="startDate" type="date" defaultValue={editing?.startDate ?? ""} required />
+                  <Input id="startDate" name="startDate" type="date" defaultValue={editing?.startDate ?? defaults.startDate} required />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="endDate">Tanggal selesai</Label>
-                  <Input id="endDate" name="endDate" type="date" defaultValue={editing?.endDate ?? ""} required />
+                  <Input id="endDate" name="endDate" type="date" defaultValue={editing?.endDate ?? defaults.endDate} required />
                 </div>
               </div>
               <details className="rounded-lg border border-role/15 bg-role-soft/50 px-3 py-2">
