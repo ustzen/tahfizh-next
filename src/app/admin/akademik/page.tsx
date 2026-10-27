@@ -3,7 +3,6 @@ import { requireRole } from "@/lib/auth";
 import { getAcademicYears, getSemesters, getActiveYear } from "@/lib/akademik";
 import { YearManager } from "@/components/akademik/year-manager";
 import { SemesterPanel } from "@/components/akademik/semester-panel";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { CalendarRange, Layers } from "lucide-react";
 
 export const metadata = { title: "Tahun Ajaran" };
@@ -25,19 +24,7 @@ export default async function AdminAkademikPage() {
         icon={<CalendarRange className="size-6" />}
       />
 
-      {years.length === 0 ? (
-        <Empty className="rounded-2xl border border-dashed border-role/25 bg-role-soft/40 py-14">
-          <EmptyHeader>
-            <EmptyMedia variant="icon"><CalendarRange /></EmptyMedia>
-            <EmptyTitle>Belum ada tahun ajaran.</EmptyTitle>
-            <EmptyDescription>
-              Buat tahun ajaran pertama lembaga Anda — misalnya 2026/2027 — beserta Semester 1 dan 2.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <YearManager years={years} />
-      )}
+      <YearManager years={years} />
 
       {activeYear && (
         <section className="space-y-3">
