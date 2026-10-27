@@ -169,7 +169,8 @@ export function YearManager({ years }: { years: YearItem[] }) {
 
       {years.length === 0 ? (
         <p className="text-muted-foreground rounded-xl border border-dashed border-role/25 bg-role-soft/40 px-4 py-6 text-center text-sm">
-          Belum ada tahun ajaran. Buat tahun ajaran pertama Anda.
+          Belum ada tahun ajaran. Klik tombol &quot;+ Tahun Ajaran&quot; di kanan atas untuk membuat yang pertama
+          (misalnya 2026/2027, mulai 01-07-2026, selesai 30-06-2027) — Semester 1 dan 2 dibuat otomatis.
         </p>
       ) : (
         <Table>
