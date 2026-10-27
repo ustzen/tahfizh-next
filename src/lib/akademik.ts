@@ -65,6 +65,9 @@ export function v11ErrorMessage(message: string): string {
   if (/could not find the function|PGRST202|does not exist/i.test(message)) {
     return "Fitur tahun ajaran belum aktif di database. Jalankan migrasi V11 (20260915120000_tahfizh_v11_akademik.sql) di Supabase.";
   }
+  if (/semester_period_check/i.test(message)) {
+    return "Tanggal semester tidak valid: tanggal selesai semester harus sama atau setelah tanggal mulainya.";
+  }
   for (const key of Object.keys(V11_ERRORS)) {
     if (message.includes(key)) return V11_ERRORS[key];
   }
