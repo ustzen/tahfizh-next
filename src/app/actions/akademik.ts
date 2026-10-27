@@ -49,6 +49,27 @@ async function ensureActiveSemester(
   await supabase.rpc("academic_semester_set_active", { p_semester_id: pick.id });
 }
 
+/* ---- tanggal (YYYY-MM-DD, dihitung di UTC agar tidak bergeser zona waktu) ---- */
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isoToMs(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+function msToIso(ms: number) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+function addDaysIso(iso: string, days: number) {
+  return msToIso(isoToMs(iso) + days * 86_400_000);
+}
+function addMonthsIso(iso: string, months: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const total = y * 12 + (m - 1) + months;
+  const ny = Math.floor(total / 12);
+  const nm = total % 12;
+  const last = new Date(Date.UTC(ny, nm + 1, 0)).getUTCDate(); // hari terakhir bulan tujuan
+  return msToIso(Date.UTC(ny, nm, Math.min(d, last)));
+}
+
 export async function saveAcademicYearAction(
   _prev: V11Result | null,
   formData: FormData
@@ -68,6 +89,42 @@ export async function saveAcademicYearAction(
 
   if (!/^\d{4}\/\d{4}$/.test(name)) return { error: "Format nama harus 2026/2027." };
   if (!startDate || !endDate) return { error: "Tanggal mulai dan selesai wajib diisi." };
+  for (const v of [startDate, endDate, s1Start, s1End, s2Start, s2End]) {
+    if (v && !ISO_RE.test(v)) return { error: "Format tanggal tidak valid." };
+  }
+  if (endDate <= startDate) return { error: "Tanggal selesai harus setelah tanggal mulai." };
+
+  // Tahun ajaran baru: hitung batas semester di sini (Semester 1 = 6 bulan pertama,
+  // atau separuh periode bila tahunnya lebih pendek) supaya tidak melanggar
+  // constraint database. Saat edit, hanya tanggal yang diisi admin yang dikirim
+  // sehingga pengaturan semester yang sudah ada tidak tertimpa.
+  let p1s: string | null = s1Start || null;
+  let p1e: string | null = s1End || null;
+  let p2s: string | null = s2Start || null;
+  let p2e: string | null = s2End || null;
+
+  if (!id) {
+    const sixMonthEnd = addDaysIso(addMonthsIso(startDate, 6), -1);
+    const halfEnd = addDaysIso(startDate, Math.floor((isoToMs(endDate) - isoToMs(startDate)) / 86_400_000 / 2));
+    p1s = p1s ?? startDate;
+    p1e = p1e ?? (sixMonthEnd < endDate ? sixMonthEnd : halfEnd);
+    p2s = p2s ?? addDaysIso(p1e, 1);
+    p2e = p2e ?? endDate;
+  }
+
+  const sems: [string, string | null, string | null][] = [
+    ["Semester 1", p1s, p1e],
+    ["Semester 2", p2s, p2e],
+  ];
+  for (const [label, a, b] of sems) {
+    if (a && b && b < a) return { error: `${label}: tanggal selesai harus setelah tanggal mulai.` };
+    for (const v of [a, b]) {
+      if (v && (v < startDate || v > endDate)) {
+        return { error: `${label}: tanggal harus berada di dalam periode tahun ajaran (${startDate} s/d ${endDate}).` };
+      }
+    }
+  }
+  if (p1e && p2s && p2s <= p1e) return { error: "Semester 2 harus dimulai setelah Semester 1 selesai." };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("academic_year_save", {
@@ -76,10 +133,10 @@ export async function saveAcademicYearAction(
     p_start: startDate,
     p_end: endDate,
     p_activate: activate,
-    p_s1_start: s1Start || null,
-    p_s1_end: s1End || null,
-    p_s2_start: s2Start || null,
-    p_s2_end: s2End || null,
+    p_s1_start: p1s,
+    p_s1_end: p1e,
+    p_s2_start: p2s,
+    p_s2_end: p2e,
   });
   if (error) return fail(error);
 
