@@ -10,6 +10,7 @@ import {
   type NoteTemplate,
 } from "@/lib/tartil";
 import { getTerminology } from "@/lib/terminology";
+import type { TartilLastAssessment } from "@/lib/tartil-shared";
 import { TartilJurnalForm } from "./tartil-jurnal";
 import { TartilBulkForm } from "./tartil-bulk";
 import { PageHeader } from "@/components/dashboard/section";
@@ -37,6 +38,21 @@ export default async function UstadzTartilPage() {
     profile.tenantId ? getActiveTartilConfig(profile.tenantId) : Promise.resolve(null),
     getTartilMethods(),
   ]);
+
+  // Penilaian terakhir tiap santri → form mengisi Jilid & Halaman otomatis.
+  const materialIdByName = new Map<string, string>();
+  for (const m of config?.materials ?? []) if (!materialIdByName.has(m.name)) materialIdByName.set(m.name, m.id);
+  const lastAssessments: TartilLastAssessment[] = [];
+  for (const s of summaries) {
+    const materialId = s.lastMaterial ? materialIdByName.get(s.lastMaterial) : undefined;
+    if (!materialId || !s.lastAssessedAt) continue;
+    lastAssessments.push({
+      studentId: s.studentId,
+      materialId,
+      pagesLabel: s.lastPages,
+      assessedAt: s.lastAssessedAt,
+    });
+  }
 
   return (
     <div>
@@ -68,6 +84,7 @@ export default async function UstadzTartilPage() {
                   grades={config.grades.map((g) => ({ label: g.label, minValue: g.minValue, maxValue: g.maxValue }))}
                   mode={config.mode}
                   templates={config.templates.map((t: NoteTemplate) => ({ id: t.id, slot: t.slot, content: t.content }))}
+                  lastAssessments={lastAssessments}
                   today={hariIniWib()}
                 />
               </TabsContent>
@@ -82,6 +99,7 @@ export default async function UstadzTartilPage() {
                   methods={methods.map((m) => ({ id: m.id, name: m.name, jilidCount: m.jilidCount }))}
                   grades={config.grades.map((g) => ({ label: g.label, minValue: g.minValue, maxValue: g.maxValue }))}
                   mode={config.mode}
+                  lastAssessments={lastAssessments}
                   today={hariIniWib()}
                 />
               </TabsContent>
