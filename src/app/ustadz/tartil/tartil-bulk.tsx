@@ -28,6 +28,11 @@ import {
   type TartilOnDateEntry,
 } from "@/app/actions/tartil";
 import type { TahfidzMode } from "@/lib/tahfidz";
+import {
+  parsePagesLabel,
+  pickLatestAssessment,
+  type TartilLastAssessment,
+} from "@/lib/tartil-shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,11 +98,14 @@ export function TartilBulkForm({
   methods,
   grades,
   mode: initialMode,
+  lastAssessments,
   today,
 }: {
   students: StudentOption[];
   materials: MaterialOption[];
   methods: { id: string; name: string; jilidCount: number }[];
+  /** Penilaian terakhir tiap santri — Jilid & Halaman terisi otomatis dari yang paling baru. */
+  lastAssessments: TartilLastAssessment[];
   grades: GradeOption[];
   /** Mode bawaan Pengaturan → Tartil (admin); guru bisa ganti langsung di sini. */
   mode: TahfidzMode;
@@ -132,6 +140,8 @@ export function TartilBulkForm({
   /** V77 — santri tidak hadir (presensi) pada tanggal terpilih. */
   const [absences, setAbsences] = useState<TartilAbsence[]>([]);
   const [loadingDate, setLoadingDate] = useState(false);
+  /** Tanggal yang datanya sudah selesai dimuat (auto-pilih jilid menunggu ini). */
+  const [loadedDate, setLoadedDate] = useState<string | null>(null);
   /** V76 — pesan bila gagal memuat nilai pada tanggal terpilih. */
   const [loadError, setLoadError] = useState<string | null>(null);
   /** Anti balapan: hanya respons fetch terakhir yang dipakai. */
@@ -147,6 +157,7 @@ export function TartilBulkForm({
       setAbsences([]);
       setLoadError(null);
       setLoadingDate(false);
+      setLoadedDate("");
       return;
     }
     setLoadingDate(true);
@@ -159,12 +170,14 @@ export function TartilBulkForm({
         setOnDateEntries(entries);
         setAbsences(abs.absences);
         setLoadError(error ?? abs.error ?? null);
+        setLoadedDate(date);
       }
     } catch {
       if (seq === fetchSeq.current) {
         setOnDateEntries([]);
         setAbsences([]);
         setLoadError("Gagal memuat nilai pada tanggal ini. Coba pilih ulang tanggalnya.");
+        setLoadedDate(date);
       }
     } finally {
       if (seq === fetchSeq.current) setLoadingDate(false);
@@ -214,31 +227,50 @@ export function TartilBulkForm({
     [mode, grades]
   );
 
-  // V76 — Auto-pilih jilid (& halaman) dari nilai yang sudah ada, bila guru
-  // belum memilih jilid sendiri. Jilid yang paling banyak dipakai menang.
+  /** Jilid + halaman TERAKHIR dinilai di antara santri binaan (paling baru). */
+  const latestPick = useMemo(() => pickLatestAssessment(lastAssessments), [lastAssessments]);
+
+  // Auto-pilih jilid (& halaman) begitu data tanggal terpilih selesai dimuat,
+  // selama guru belum memilih jilid sendiri:
+  //   1. V76 — dari nilai yang SUDAH ADA pada tanggal itu (jilid terbanyak), atau
+  //   2. bila belum ada → jilid & halaman penilaian TERAKHIR (mis. Iqro Jilid 4).
   useEffect(() => {
-    if (userPickedMaterial.current || materialId || onDateEntries.length === 0) return;
+    if (userPickedMaterial.current || materialId) return;
+    if (loadedDate !== assessedDate) return; // tunggu data tanggal ini selesai dimuat
+
+    let pickId = "";
+    let pages: string | null = null;
+    let useLastPage = false;
+
     const count = new Map<string, number>();
     for (const e of onDateEntries) {
       if (e.status !== "DINILAI") continue;
       if (!materials.some((m) => m.id === e.materialId)) continue;
       count.set(e.materialId, (count.get(e.materialId) ?? 0) + 1);
     }
-    let best = "";
     let bestN = 0;
-    for (const [id, n] of count) if (n > bestN) { best = id; bestN = n; }
-    if (!best) return;
-    const mat = materials.find((m) => m.id === best);
+    for (const [id, n] of count) if (n > bestN) { pickId = id; bestN = n; }
+    if (pickId) {
+      pages = onDateEntries.find((e) => e.materialId === pickId && e.pagesLabel)?.pagesLabel ?? null;
+    } else if (latestPick && materials.some((m) => m.id === latestPick.materialId)) {
+      pickId = latestPick.materialId;
+      pages = latestPick.pagesLabel;
+      useLastPage = true;
+    }
+    if (!pickId) return;
+
+    const mat = materials.find((m) => m.id === pickId);
     const owner = mat ? methods.find((m) => mat.name.startsWith(`${m.name} Jilid`)) : null;
     if (owner) setMethodId(owner.id);
-    setMaterialId(best);
-    const pg = onDateEntries.find((e) => e.materialId === best && e.pagesLabel)?.pagesLabel ?? "";
-    const m = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(pg.trim());
-    if (m) {
-      setFromPage(m[1]);
-      setToPage(m[2] ?? m[1]);
+    setMaterialId(pickId);
+    const pg = parsePagesLabel(pages);
+    if (pg) {
+      // Dari nilai tanggal itu: pakai rentang apa adanya. Dari penilaian
+      // terakhir: halaman terakhir dibaca (angka paling akhir).
+      setFromPage(useLastPage ? pg.to : pg.from);
+      setToPage(pg.to);
     }
-  }, [onDateEntries, materialId, materials, methods]);
+  }, [onDateEntries, materialId, materials, methods, loadedDate, assessedDate, latestPick]);
 
   // V76 — PREFILL: nilai lama pada JILID TERPILIH langsung masuk ke kolom
   // pengisian (siap diubah / dibiarkan). Entri jilid lain TIDAK diprefill —
@@ -414,7 +446,9 @@ export function TartilBulkForm({
             className="h-11" value={assessedDate} max={today}
             onChange={(e) => {
               setAssessedDate(e.target.value);
-              // Ganti tanggal tanpa jilid pilihan sendiri → boleh auto-pilih lagi.
+              // Ganti tanggal tanpa jilid pilihan sendiri → auto-pilih lagi
+              // (nilai pada tanggal itu, atau jilid terakhir dinilai).
+              if (!userPickedMaterial.current) setMaterialId("");
             }}
             aria-label="Tanggal penilaian (sesuai catatan kertas)"
           />
