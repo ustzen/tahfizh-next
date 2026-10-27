@@ -34,7 +34,9 @@ import {
   NOTE_SLOTS,
   NOTE_SLOT_LABELS,
   NOTE_SLOT_COLORS,
+  parsePagesLabel,
   type NoteSlot,
+  type TartilLastAssessment,
 } from "@/lib/tartil-shared";
 import type { TahfidzMode } from "@/lib/tahfidz";
 import { Button } from "@/components/ui/button";
@@ -80,6 +82,7 @@ export function TartilJurnalForm({
   grades,
   mode: initialMode,
   templates,
+  lastAssessments,
   today,
 }: {
   students: StudentOption[];
@@ -90,6 +93,8 @@ export function TartilJurnalForm({
   /** Mode bawaan dari Pengaturan → Tartil (admin); guru tetap bisa ganti sendiri di form ini. */
   mode: TahfidzMode;
   templates: TemplateOption[];
+  /** Penilaian terakhir tiap santri — Jilid & Halaman terisi otomatis saat santri dipilih. */
+  lastAssessments: TartilLastAssessment[];
   /** Hari ini (WIB, YYYY-MM-DD) — default & batas input tanggal penilaian (V69, sama dgn massal). */
   today: string;
 }) {
@@ -188,6 +193,40 @@ export function TartilJurnalForm({
     const own = materials.filter((m) => m.name.startsWith(prefix));
     return own.length > 0 ? own : materials;
   }, [materials, method]);
+
+  const lastByStudent = useMemo(() => {
+    const map = new Map<string, TartilLastAssessment>();
+    for (const l of lastAssessments) map.set(l.studentId, l);
+    return map;
+  }, [lastAssessments]);
+  const lastForSelected = studentId ? lastByStudent.get(studentId) ?? null : null;
+  const lastMaterialName = lastForSelected
+    ? materials.find((m) => m.id === lastForSelected.materialId)?.name ?? null
+    : null;
+
+  /**
+   * Pilih santri → Metode, Jilid, dan Halaman langsung mengikuti penilaian
+   * TERAKHIR santri itu (mis. Zain: Iqro Jilid 4 halaman 5). Santri yang belum
+   * pernah dinilai: Jilid dikosongkan supaya jilid santri sebelumnya tidak terbawa.
+   */
+  function pickStudent(nextId: string) {
+    setStudentId(nextId);
+    const last = lastByStudent.get(nextId);
+    const mat = last ? materials.find((m) => m.id === last.materialId) : undefined;
+    if (!last || !mat) {
+      setMaterialId("");
+      setFromPage("1");
+      setToPage("1");
+      return;
+    }
+    const owner = methods.find((m) => mat.name.startsWith(`${m.name} Jilid`));
+    if (owner) setMethodId(owner.id);
+    setMaterialId(mat.id);
+    const pg = parsePagesLabel(last.pagesLabel);
+    // Halaman terakhir dibaca = angka paling akhir dari rentang.
+    setFromPage(pg ? pg.to : "1");
+    setToPage(pg ? pg.to : "1");
+  }
 
   function pickMethod(nextId: string) {
     setMethodId(nextId);
@@ -289,7 +328,7 @@ export function TartilJurnalForm({
         <Label htmlFor="tj-student" className="text-blue-700 dark:text-blue-400">
           <span className={LABEL_CLS}><GraduationCap className="size-4" /> Pilih Santri</span>
         </Label>
-        <Select value={studentId} onValueChange={setStudentId}>
+        <Select value={studentId} onValueChange={pickStudent}>
           <SelectTrigger id="tj-student" className="h-11 w-full">
             <SelectValue placeholder="Pilih santri…" />
           </SelectTrigger>
@@ -349,6 +388,14 @@ export function TartilJurnalForm({
               ))}
             </SelectContent>
           </Select>
+          {lastForSelected && lastMaterialName ? (
+            <p className="text-muted-foreground text-[0.7rem]">
+              Terisi otomatis dari penilaian terakhir: {lastMaterialName}
+              {lastForSelected.pagesLabel ? ` · Hal. ${lastForSelected.pagesLabel}` : ""}. Ubah bila perlu.
+            </p>
+          ) : studentId ? (
+            <p className="text-muted-foreground text-[0.7rem]">Santri ini belum pernah dinilai — pilih jilid secara manual.</p>
+          ) : null}
         </div>
       </div>
 
