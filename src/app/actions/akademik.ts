@@ -27,11 +27,41 @@ function requireStaff(profile: Awaited<ReturnType<typeof getSessionProfile>>) {
 /* ------------------------------------------------------------------------ */
 
 /**
- * Setelah tahun ajaran diaktifkan semester-nya masih "Belum Aktif", sehingga
- * lembaga tidak punya semester aktif sampai admin menekannya manual. Aktifkan
- * otomatis semester yang mencakup hari ini (atau Semester 1) bila belum ada
- * semester aktif di tahun tersebut. Gagal diam-diam: admin tetap bisa
- * mengaturnya manual di panel Semester.
+ * Aktifkan satu semester dan tandai semester LAIN di tahun ajaran yang sama
+ * sebagai SELESAI (mis. mengaktifkan Semester 1 membuat Semester 2 Selesai).
+ * Mengembalikan error RPC bila gagal, atau null bila berhasil.
+ */
+async function activateSemesterExclusive(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  semesterId: string
+): Promise<{ message: string } | null> {
+  const { error } = await supabase.rpc("academic_semester_set_active", { p_semester_id: semesterId });
+  if (error) return error;
+
+  const { data: me } = await supabase
+    .from("academic_semesters")
+    .select("academic_year_id")
+    .eq("id", semesterId)
+    .maybeSingle();
+  if (!me) return null;
+
+  const { data: others } = await supabase
+    .from("academic_semesters")
+    .select("id")
+    .eq("academic_year_id", me.academic_year_id)
+    .neq("id", semesterId)
+    .neq("status", "SELESAI");
+  for (const o of others ?? []) {
+    await supabase.rpc("academic_semester_set_status", { p_semester_id: o.id, p_status: "SELESAI" });
+  }
+  return null;
+}
+
+/**
+ * Setelah tahun ajaran diaktifkan, aktifkan otomatis semester yang mencakup
+ * hari ini (atau Semester 1 bila hari ini di luar periode) bila belum ada
+ * semester aktif; semester lainnya otomatis Selesai. Gagal diam-diam: admin
+ * tetap bisa mengaturnya manual di panel Semester.
  */
 async function ensureActiveSemester(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -46,7 +76,7 @@ async function ensureActiveSemester(
 
   const today = new Date().toISOString().slice(0, 10);
   const pick = sems.find((x) => x.start_date <= today && today <= x.end_date) ?? sems[0];
-  await supabase.rpc("academic_semester_set_active", { p_semester_id: pick.id });
+  await activateSemesterExclusive(supabase, pick.id);
 }
 
 /* ---- tanggal (YYYY-MM-DD, dihitung di UTC agar tidak bergeser zona waktu) ---- */
@@ -196,11 +226,11 @@ export async function activateSemesterAction(
   if (!semesterId) return { error: "Semester tidak valid." };
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("academic_semester_set_active", { p_semester_id: semesterId });
+  const error = await activateSemesterExclusive(supabase, semesterId);
   if (error) return fail(error);
 
   invalidateAkademik();
-  return { success: "Semester aktif diperbarui." };
+  return { success: "Semester aktif diperbarui. Semester lain otomatis Selesai." };
 }
 
 export async function setSemesterStatusAction(
