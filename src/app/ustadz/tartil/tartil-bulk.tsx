@@ -132,8 +132,10 @@ export function TartilBulkForm({
 
   /** V76 — metadata baris yang sudah tersimpan (studentId → id, nilai awal, halaman asli). */
   const [existing, setExisting] = useState<
-    Record<string, { id: string; value: string; pages: string | null }>
+    Record<string, { id: string; value: string; pages: string | null; freeNote: string | null }>
   >({});
+  /** Halaman yang DIKOREKSI guru pada baris yang sudah dinilai (studentId → "5" / "3-5"). */
+  const [pageEdits, setPageEdits] = useState<Record<string, string>>({});
 
   // V73 — fetch entri guru pada tanggal terpilih.
   const [onDateEntries, setOnDateEntries] = useState<TartilOnDateEntry[]>([]);
@@ -277,7 +279,7 @@ export function TartilBulkForm({
   // hanya tampil sebagai badge, supaya tidak tersimpan sebagai nilai baru.
   useEffect(() => {
     const next: Record<string, string> = {};
-    const meta: Record<string, { id: string; value: string; pages: string | null }> = {};
+    const meta: Record<string, { id: string; value: string; pages: string | null; freeNote: string | null }> = {};
     if (materialId) {
       for (const [studentId, list] of entriesByStudent) {
         // terbaru dulu; ambil entri jilid terpilih yang bisa diwakili mode ini
@@ -286,11 +288,12 @@ export function TartilBulkForm({
         if (!e) continue;
         const v = entryToValue(e);
         next[studentId] = v;
-        meta[studentId] = { id: e.assessmentId, value: v, pages: e.pagesLabel };
+        meta[studentId] = { id: e.assessmentId, value: v, pages: e.pagesLabel, freeNote: e.freeNote };
       }
     }
     setEntries(next);
     setExisting(meta);
+    setPageEdits({}); // data segar dari server → koreksi halaman sebelumnya sudah tersimpan/dibuang
   }, [materialId, entriesByStudent, entryToValue, absentById]);
 
   const method = methods.find((m) => m.id === methodId) ?? null;
@@ -317,13 +320,33 @@ export function TartilBulkForm({
   ).length;
   const eligibleTotal = students.length - absentTotal;
 
-  /** Baris yang perlu dikirim: BARU, atau nilai lama yang DIUBAH. */
+  /** Halaman yang berlaku untuk baris yang sudah dinilai (koreksi guru, atau yang tersimpan). */
+  function pageOf(studentId: string): string {
+    return pageEdits[studentId] ?? existing[studentId]?.pages ?? "";
+  }
+  /** True bila halaman baris yang sudah dinilai berbeda dari yang tersimpan. */
+  function pagesChanged(studentId: string): boolean {
+    const ex = existing[studentId];
+    if (!ex) return false;
+    return pageOf(studentId).trim() !== (ex.pages ?? "").trim();
+  }
+  /** Format halaman sah: "5" atau "3-5" (boleh kosong = tanpa halaman). */
+  function validPages(label: string): boolean {
+    const t = label.trim();
+    if (t === "") return true;
+    const pg = parsePagesLabel(t);
+    return pg !== null && Number(pg.from) >= 1 && Number(pg.from) <= Number(pg.to) && Number(pg.to) <= 999;
+  }
+
+  /** Baris yang perlu dikirim: BARU, atau nilai lama yang DIUBAH / halamannya dikoreksi. */
   function isDirty(studentId: string): boolean {
     if (absentById.has(studentId)) return false; // V77
     const v = entries[studentId] ?? "";
     if (v === "") return false;
     const ex = existing[studentId];
-    return !ex || ex.value !== v;
+    if (!ex) return true;
+    // Nilai diubah ATAU halaman dikoreksi (nilai tetap) → ikut disimpan.
+    return ex.value !== v || pagesChanged(studentId);
   }
   const filledCount = visibleStudents.filter((s) => isDirty(s.studentId)).length;
 
@@ -379,6 +402,21 @@ export function TartilBulkForm({
     });
   }
 
+  /** Terapkan halaman "Dari–Sampai" form ke SEMUA santri yang sudah dinilai (nilai tetap). */
+  function applyFormPagesToGraded() {
+    const label = fromPage === toPage ? fromPage : `${fromPage}-${toPage}`;
+    if (!validPages(label) || label.trim() === "") {
+      return toast.error("Isi Dari Halaman dan Sampai Halaman dengan benar dulu (mis. 5 atau 3-5).");
+    }
+    setPageEdits((prev) => {
+      const next = { ...prev };
+      for (const s of visibleStudents) {
+        if (existing[s.studentId] && !absentById.has(s.studentId)) next[s.studentId] = label;
+      }
+      return next;
+    });
+  }
+
   function onSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!materialId) return toast.error("Pilih jilid terlebih dahulu.");
@@ -391,29 +429,35 @@ export function TartilBulkForm({
     }
 
     const pagesLabel = fromPage === toPage ? fromPage : `${fromPage}-${toPage}`;
+    for (const s of visibleStudents) {
+      if (isDirty(s.studentId) && existing[s.studentId] && !validPages(pageOf(s.studentId))) {
+        return toast.error(`Halaman ${s.fullName} tidak valid. Isi seperti 5 atau 3-5.`);
+      }
+    }
     const items = visibleStudents
       .filter((s) => isDirty(s.studentId))
       .map((s) => {
         const raw = entries[s.studentId];
         const ex = existing[s.studentId];
-        // Edit nilai lama → pertahankan halaman aslinya; baris baru → halaman form.
-        const pages = ex ? ex.pages ?? "" : pagesLabel;
+        // Baris lama → halaman tersimpan (atau yang dikoreksi guru); baris baru → halaman form.
+        const pages = ex ? pageOf(s.studentId).trim() : pagesLabel;
         const assessmentId = ex?.id ?? null;
+        const freeNote = ex?.freeNote ?? null;
         if (mode === "HURUF") {
           return {
             studentId: s.studentId, materialId, pagesLabel: pages, status: "DINILAI",
-            scoreValue: null, scoreLabel: raw, assessmentId,
+            scoreValue: null, scoreLabel: raw, assessmentId, freeNote,
           };
         }
         if (mode === "ANGKA") {
           return {
             studentId: s.studentId, materialId, pagesLabel: pages, status: "DINILAI",
-            scoreValue: Number(raw), scoreLabel: "", assessmentId,
+            scoreValue: Number(raw), scoreLabel: "", assessmentId, freeNote,
           };
         }
         return {
           studentId: s.studentId, materialId, pagesLabel: pages, status: "DINILAI",
-          scoreValue: null, scoreLabel: "", assessmentId,
+          scoreValue: null, scoreLabel: "", assessmentId, freeNote,
         };
       });
 
@@ -616,7 +660,18 @@ export function TartilBulkForm({
         <p className="text-muted-foreground text-[0.7rem]">
           Baris yang dikosongkan tidak ikut tersimpan — lengkapi bertahap jika data belum semua.
           Nilai yang sudah ada pada tanggal ini tampil otomatis; ubah nilainya untuk memperbarui.
+          Salah halaman? Ubah kolom <span className="font-semibold">Hal.</span> pada baris yang sudah dinilai —
+          nilainya tetap sama.
         </p>
+        {Object.keys(existing).length > 0 && (
+          <Button
+            type="button" size="sm" variant="outline"
+            className="h-8 gap-1.5 text-xs" onClick={applyFormPagesToGraded}
+          >
+            <BookOpen className="size-3.5" />
+            Terapkan halaman {fromPage === toPage ? fromPage : `${fromPage}-${toPage}`} ke semua yang sudah dinilai
+          </Button>
+        )}
         {loadError && !loadingDate && (
           <div className="flex items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
             <span>{loadError}</span>
@@ -714,7 +769,9 @@ export function TartilBulkForm({
                 const list = entriesByStudent.get(s.studentId) ?? [];
                 const ex = existing[s.studentId];
                 if (ex) {
-                  const changed = value !== ex.value;
+                  const valueChanged = value !== ex.value;
+                  const pageChanged = pagesChanged(s.studentId);
+                  const changed = valueChanged || pageChanged;
                   return (
                     <span
                       className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-0.5 text-[0.65rem] font-bold ${
@@ -724,7 +781,7 @@ export function TartilBulkForm({
                       }`}
                     >
                       <CheckCircle2 className="size-3" />
-                      {changed ? "Akan diubah" : "Sudah dinilai"}
+                      {valueChanged ? "Akan diubah" : pageChanged ? "Halaman diubah" : "Sudah dinilai"}
                     </span>
                   );
                 }
@@ -751,6 +808,25 @@ export function TartilBulkForm({
                   </span>
                 );
               })()}
+
+              {existing[s.studentId] && (
+                <label className="flex shrink-0 items-center gap-1 text-[0.7rem] font-semibold text-violet-700 dark:text-violet-300">
+                  Hal.
+                  <Input
+                    value={pageOf(s.studentId)}
+                    onChange={(e) =>
+                      setPageEdits((prev) => ({
+                        ...prev,
+                        [s.studentId]: e.target.value.replace(/[^0-9-]/g, "").slice(0, 7),
+                      }))
+                    }
+                    inputMode="numeric"
+                    placeholder="—"
+                    className="h-8 w-16 text-center text-xs"
+                    aria-label={`Halaman — ${s.fullName}`}
+                  />
+                </label>
+              )}
 
               {mode === "CENTANG" ? (
                 <label className="flex cursor-pointer select-none items-center gap-2 text-xs font-semibold text-foreground/85">
