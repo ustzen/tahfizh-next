@@ -286,6 +286,8 @@ export type TartilBulkItem = {
   scoreLabel: string;
   /** V74 — baris prefilled: set = UPDATE penilaian yang ada, bukan duplikat. */
   assessmentId?: string | null;
+  /** Catatan bebas penilaian yang ada — diteruskan agar tidak terhapus saat edit. */
+  freeNote?: string | null;
 };
 
 export async function saveTartilAssessmentsBulkAction(
@@ -312,7 +314,7 @@ export async function saveTartilAssessmentsBulkAction(
       status: it.status,
       score_value: it.scoreValue,
       score_label: it.scoreLabel || null,
-      free_note: null,
+      free_note: (it.freeNote ?? "").trim().slice(0, 500) || null,
       assessment_id: it.assessmentId ?? null,
     };
   });
