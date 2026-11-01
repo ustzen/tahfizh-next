@@ -21,6 +21,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { genderLabel } from "@/lib/roles";
+import { formatDate } from "@/lib/utils";
 
 export const metadata = { title: "Tartil" };
 
@@ -108,7 +109,8 @@ export default async function UstadzTartilPage() {
         </Card>
       )}
 
-      <Card className="shadow-card mt-6 rounded-2xl">
+      <h2 className="text-foreground mt-8 mb-3 text-lg font-bold tracking-tight">Riwayat</h2>
+      <Card className="shadow-card rounded-2xl">
         <CardContent className="px-0 py-0">
           {summaries.length > 0 ? (
             <Table>
@@ -116,6 +118,7 @@ export default async function UstadzTartilPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Nama {terms.santri}</TableHead>
                   <TableHead>Tartil Terakhir</TableHead>
+                  <TableHead>Tanggal</TableHead>
                   <TableHead>Nilai</TableHead>
                   <TableHead className="px-5">Status</TableHead>
                   <TableHead className="pr-5 text-right">Aksi</TableHead>
@@ -141,6 +144,9 @@ export default async function UstadzTartilPage() {
                       ) : (
                         "Belum ada"
                       )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
+                      {s.lastAssessedAt ? formatDate(s.lastAssessedAt) : "-"}
                     </TableCell>
                     <TableCell>
                       {s.lastScoreLabel ? (
