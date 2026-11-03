@@ -14,11 +14,12 @@ import { genderLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import type { TeacherStudentRow } from "@/lib/teacher-students";
 import type { TeacherStudentRank } from "@/lib/santri-pantauan-shared";
+import { gradeFor, rankModuleLabel, type GradeBand } from "@/lib/rank-settings-shared";
 
 const ALL_HALAQAH = "ALL";
 
 /** V45 — badge peringkat: warna medali untuk 3 besar, netral setelahnya. */
-function RankBadge({ rank, totalRanked, avgScore }: TeacherStudentRank) {
+function RankBadge({ rank, totalRanked, avgScore, moduls }: TeacherStudentRank) {
   if (rank === null) {
     return <span className="text-muted-foreground text-xs">—</span>;
   }
@@ -33,7 +34,13 @@ function RankBadge({ rank, totalRanked, avgScore }: TeacherStudentRank) {
   return (
     <span
       className={cn("tabular inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold", tone)}
-      title={`Rata-rata nilai ${avgScore ?? "–"} · dari ${totalRanked} santri bernilai`}
+      title={`Rata-rata nilai ${avgScore ?? "–"} · dari ${totalRanked} santri bernilai${
+        moduls && Object.keys(moduls).length > 0
+          ? ` · ${Object.entries(moduls)
+              .map(([k, v]) => `${rankModuleLabel(k)} ${v}`)
+              .join(", ")}`
+          : ""
+      }`}
     >
       #{rank}
       <span className="text-[0.65rem] font-medium opacity-70">/{totalRanked}</span>
@@ -52,11 +59,14 @@ function RankBadge({ rank, totalRanked, avgScore }: TeacherStudentRank) {
 export function SantriClient({
   students,
   ranks,
+  scale,
   santriLabel,
   halaqahLabel,
 }: {
   students: TeacherStudentRow[];
   ranks: Map<string, TeacherStudentRank>;
+  /** V78 — skala nilai huruf milik guru. */
+  scale: GradeBand[];
   santriLabel: string;
   halaqahLabel: string;
 }) {
@@ -145,9 +155,23 @@ export function SantriClient({
                         })()}
                       </TableCell>
                       <TableCell className="tabular text-center text-sm font-semibold">
-                        {ranks.get(s.id ?? "")?.avgScore ?? (
-                          <span className="text-muted-foreground font-normal">—</span>
-                        )}
+                        {(() => {
+                          const avg = ranks.get(s.id ?? "")?.avgScore ?? null;
+                          if (avg === null) {
+                            return <span className="text-muted-foreground font-normal">—</span>;
+                          }
+                          const huruf = gradeFor(avg, scale);
+                          return (
+                            <span className="inline-flex items-center justify-center gap-1.5">
+                              {avg}
+                              {huruf && (
+                                <span className="bg-gradient-brand rounded-md px-1.5 py-0.5 text-[0.7rem] font-bold text-white">
+                                  {huruf}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{s.nickname ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{genderLabel(s.gender)}</TableCell>
