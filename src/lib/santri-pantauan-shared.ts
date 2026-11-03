@@ -255,6 +255,8 @@ export type TeacherStudentRank = {
   rank: number | null;
   totalRanked: number;
   avgScore: number | null;
+  /** V78 — skor per modul yang ikut dihitung, mis. { TAHFIDZ: 90, ABSENSI: 80 }. */
+  moduls?: Record<string, number>;
 };
 
 /** V40 — hasil RPC santri_meter_totals: penyebut persentase per anak. */
