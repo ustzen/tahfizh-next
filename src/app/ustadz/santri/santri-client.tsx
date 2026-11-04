@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { GraduationCap } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, GraduationCap, RotateCcw } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +17,65 @@ import type { TeacherStudentRank } from "@/lib/santri-pantauan-shared";
 import { gradeFor, rankModuleLabel, type GradeBand } from "@/lib/rank-settings-shared";
 
 const ALL_HALAQAH = "ALL";
+
+/** V81 — kolom yang bisa diurutkan di tabel Data Santri. */
+type SortKey =
+  | "nis"
+  | "nisn"
+  | "nama"
+  | "peringkat"
+  | "skor"
+  | "panggilan"
+  | "gender"
+  | "halaqah"
+  | "wali"
+  | "online";
+type SortDir = "asc" | "desc";
+type SortState = { key: SortKey; dir: SortDir };
+
+/** Klik pertama: Skor & Online mulai dari yang tertinggi/terbaru, sisanya A→Z / terkecil. */
+function firstDir(key: SortKey): SortDir {
+  return key === "skor" || key === "online" ? "desc" : "asc";
+}
+
+function SortHead({
+  label,
+  k,
+  sort,
+  onSort,
+  className,
+  center,
+}: {
+  label: string;
+  k: SortKey;
+  sort: SortState | null;
+  onSort: (k: SortKey) => void;
+  className?: string;
+  center?: boolean;
+}) {
+  const active = sort?.key === k;
+  const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <TableHead
+      className={className}
+      aria-sort={!active ? "none" : sort.dir === "asc" ? "ascending" : "descending"}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        title={`Urutkan berdasarkan ${label}`}
+        className={cn(
+          "hover:text-foreground inline-flex items-center gap-1 whitespace-nowrap transition-colors",
+          center && "w-full justify-center",
+          active && "text-foreground"
+        )}
+      >
+        {label}
+        <Icon className={cn("size-3.5 shrink-0", !active && "opacity-40")} />
+      </button>
+    </TableHead>
+  );
+}
 
 /** V45 — badge peringkat: warna medali untuk 3 besar, netral setelahnya. */
 function RankBadge({ rank, totalRanked, avgScore, moduls }: TeacherStudentRank) {
@@ -92,6 +151,64 @@ export function SantriClient({
   // Filter hanya relevan bila guru punya >1 halaqah — sembunyikan bila cuma 1.
   const showFilter = halaqahOptions.length > 1;
 
+  // V81 — pengurutan kolom. null = urutan awal dari server (kode santri).
+  const [sort, setSort] = useState<SortState | null>(null);
+
+  function onSort(key: SortKey) {
+    setSort((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: firstDir(key) };
+      if (prev.dir === firstDir(key)) return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
+      return null; // klik ketiga → kembali ke urutan awal
+    });
+  }
+
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const mul = sort.dir === "asc" ? 1 : -1;
+
+    const valueOf = (s: TeacherStudentRow): string | number | null => {
+      const r = ranks.get(s.id ?? "");
+      switch (sort.key) {
+        case "nis":
+          return s.nis?.trim() || null;
+        case "nisn":
+          return s.nisn?.trim() || null;
+        case "nama":
+          return s.full_name;
+        case "peringkat":
+          return r?.rank ?? null;
+        case "skor":
+          return r?.avgScore ?? null;
+        case "panggilan":
+          return s.nickname?.trim() || null;
+        case "gender":
+          return s.gender ? genderLabel(s.gender) : null;
+        case "halaqah":
+          return s.halaqah_name?.trim() || null;
+        case "wali":
+          return s.guardian_name?.trim() || null;
+        case "online": {
+          const t = s.wali_last_online ? Date.parse(s.wali_last_online) : NaN;
+          return Number.isNaN(t) ? null : t;
+        }
+      }
+    };
+
+    return [...filtered].sort((a, b) => {
+      const va = valueOf(a);
+      const vb = valueOf(b);
+      // Data kosong selalu di paling bawah, apa pun arah urutannya.
+      if (va === null && vb === null) return a.full_name.localeCompare(b.full_name, "id");
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      const c =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va).localeCompare(String(vb), "id", { numeric: true, sensitivity: "base" });
+      return c * mul || a.full_name.localeCompare(b.full_name, "id");
+    });
+  }, [filtered, sort, ranks]);
+
   return (
     <div className="space-y-4">
       {showFilter && (
@@ -116,6 +233,21 @@ export function SantriClient({
         </div>
       )}
 
+      {filtered.length > 1 && (
+        <div className="text-muted-foreground flex items-center gap-2 text-xs">
+          <span>Klik judul kolom untuk mengurutkan (NIS, NISN, Peringkat, Terakhir Online, dll).</span>
+          {sort && (
+            <button
+              type="button"
+              onClick={() => setSort(null)}
+              className="hover:text-foreground inline-flex items-center gap-1 font-medium underline-offset-2 hover:underline"
+            >
+              <RotateCcw className="size-3" /> Urutan awal
+            </button>
+          )}
+        </div>
+      )}
+
       <Card className="shadow-card rounded-2xl">
         <CardContent className="px-0 py-0">
           {filtered.length > 0 ? (
@@ -124,21 +256,21 @@ export function SantriClient({
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-10 px-3">No.</TableHead>
-                    <TableHead className="px-5">NIS</TableHead>
-                    <TableHead>NISN</TableHead>
-                    <TableHead>Nama</TableHead>
-                    <TableHead className="text-center">Peringkat</TableHead>
-                    <TableHead className="text-center">Skor</TableHead>
-                    <TableHead>Panggilan</TableHead>
-                    <TableHead>Gender</TableHead>
-                    <TableHead>{halaqahLabel}</TableHead>
-                    <TableHead>Wali</TableHead>
-                    <TableHead>Online</TableHead>
+                    <SortHead label="NIS" k="nis" sort={sort} onSort={onSort} className="px-5" />
+                    <SortHead label="NISN" k="nisn" sort={sort} onSort={onSort} />
+                    <SortHead label="Nama" k="nama" sort={sort} onSort={onSort} />
+                    <SortHead label="Peringkat" k="peringkat" sort={sort} onSort={onSort} className="text-center" center />
+                    <SortHead label="Skor" k="skor" sort={sort} onSort={onSort} className="text-center" center />
+                    <SortHead label="Panggilan" k="panggilan" sort={sort} onSort={onSort} />
+                    <SortHead label="Gender" k="gender" sort={sort} onSort={onSort} />
+                    <SortHead label={halaqahLabel} k="halaqah" sort={sort} onSort={onSort} />
+                    <SortHead label="Wali" k="wali" sort={sort} onSort={onSort} />
+                    <SortHead label="Terakhir Online" k="online" sort={sort} onSort={onSort} />
                     <TableHead className="px-5 text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((s, i) => (
+                  {sorted.map((s, i) => (
                     <TableRow key={s.id}>
                       <TableCell className="px-3 text-muted-foreground text-xs">{i + 1}</TableCell>
                       <TableCell className="px-5 font-mono text-xs text-muted-foreground">{s.nis ?? "—"}</TableCell>
