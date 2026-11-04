@@ -178,9 +178,6 @@ export async function KeamananSection({ role }: { role: AppRole }) {
       <Card className="shadow-card rounded-2xl">
         <CardHeader>
           <CardTitle>Email</CardTitle>
-          <CardDescription>
-            Perubahan email mengikuti mekanisme verifikasi Supabase Auth.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <EmailForm currentEmail={profile.email} />
