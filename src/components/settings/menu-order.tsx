@@ -108,7 +108,6 @@ export function MenuOrderEditor({
           >
             <GripVertical className="text-muted-foreground size-4 shrink-0" />
             <span className="flex-1 text-sm font-medium text-foreground">{item.label}</span>
-            <span className="text-muted-foreground font-mono text-xs">{item.href}</span>
             <span className="flex gap-1">
               <button
                 type="button"
