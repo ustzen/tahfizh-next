@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   RANK_MODULES,
+  fmtGradeNum,
   scaleGapWarning,
   validateGradeScale,
   type GradeBand,
@@ -32,16 +33,30 @@ function toRows(scale: GradeBand[]): Row[] {
   return scale.map((g, i) => ({
     key: `${g.label}-${i}-${Math.random().toString(36).slice(2, 7)}`,
     label: g.label,
-    min: String(g.min),
-    max: String(g.max),
+    min: fmtGradeNum(g.min),
+    max: fmtGradeNum(g.max),
   }));
+}
+
+/** V86 — terima koma maupun titik sebagai pemisah desimal ("95,5" / "95.5"). */
+function parseNum(v: string): number {
+  const t = v.trim().replace(",", ".");
+  return t === "" ? NaN : Number(t);
+}
+
+/** V86 — sisakan angka + satu pemisah desimal + maksimal 1 angka di belakangnya. */
+function cleanNumInput(v: string): string {
+  const only = v.replace(/[^\d.,]/g, "");
+  const m = only.match(/^(\d{0,3})([.,]?)(\d?)/);
+  if (!m) return "";
+  return m[1] + m[2] + m[3];
 }
 
 function rowsToScale(rows: Row[]): GradeBand[] {
   return rows.map((r) => ({
     label: r.label.trim(),
-    min: r.min.trim() === "" ? NaN : Number(r.min),
-    max: r.max.trim() === "" ? NaN : Number(r.max),
+    min: parseNum(r.min),
+    max: parseNum(r.max),
   }));
 }
 
@@ -129,7 +144,7 @@ export function RankSettingsPanel({ settings }: { settings: TeacherRankSettings 
                 key={g.label}
                 className="bg-muted text-muted-foreground tabular rounded-md px-2 py-1 text-xs"
               >
-                <span className="text-foreground font-bold">{g.label}</span> {g.min}–{g.max}
+                <span className="text-foreground font-bold">{g.label}</span> {fmtGradeNum(g.min)}–{fmtGradeNum(g.max)}
               </span>
             ))}
           </div>
@@ -181,16 +196,16 @@ export function RankSettingsPanel({ settings }: { settings: TeacherRankSettings 
                     />
                     <Input
                       value={r.min}
-                      onChange={(e) => updateRow(r.key, { min: e.target.value.replace(/\D/g, "").slice(0, 3) })}
-                      inputMode="numeric"
+                      onChange={(e) => updateRow(r.key, { min: cleanNumInput(e.target.value) })}
+                      inputMode="decimal"
                       aria-label="Nilai awal"
                       className="h-9 w-20 text-center"
                     />
                     <span className="text-muted-foreground text-sm">sampai</span>
                     <Input
                       value={r.max}
-                      onChange={(e) => updateRow(r.key, { max: e.target.value.replace(/\D/g, "").slice(0, 3) })}
-                      inputMode="numeric"
+                      onChange={(e) => updateRow(r.key, { max: cleanNumInput(e.target.value) })}
+                      inputMode="decimal"
                       aria-label="Nilai akhir"
                       className="h-9 w-20 text-center"
                     />
@@ -221,6 +236,10 @@ export function RankSettingsPanel({ settings }: { settings: TeacherRankSettings 
               >
                 <Plus className="size-4" /> Tambah nilai
               </Button>
+              <p className="text-muted-foreground text-xs">
+                Batas nilai boleh memakai 1 angka di belakang koma, mis. A+ = 96,0 sampai 100
+                dan A = 91,0 sampai 95,9 — jadi nilai 95,5 masih A.
+              </p>
               {scaleError && <p className="text-destructive text-xs">{scaleError}</p>}
               {gapWarning && <p className="text-xs text-amber-600 dark:text-amber-400">{gapWarning}</p>}
             </div>
