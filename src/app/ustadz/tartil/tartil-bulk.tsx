@@ -17,9 +17,11 @@ import {
   Search,
   Settings2,
   Square,
+  Trash2,
 } from "lucide-react";
 
 import {
+  deleteTartilAssessmentAction,
   generateTartilJilidsAction,
   getTartilAbsencesOnDateAction,
   getTartilOnDateEntriesAction,
@@ -72,6 +74,13 @@ import {
  *     diberi keterangan "tidak masuk" dan barisnya dikunci (tidak bisa dinilai);
  *     penegak sebenarnya trigger database.
  *   * Entri terbaru yang dipakai (bukan yang terlama) + anti balapan fetch.
+ *
+ * V84 — HAPUS NILAI SALAH ISI: tiap santri yang sudah punya nilai pada tanggal
+ * terpilih punya tombol "Hapus" (konfirmasi 2 langkah, soft delete). Santri
+ * tidak hadir yang terlanjur dinilai kini tetap menampilkan nilainya beserta
+ * tombol hapus (sebelumnya tersembunyi sehingga tidak bisa dibersihkan), plus
+ * banner peringatan dan hitungan "hadir sudah dinilai" yang tidak lagi
+ * menghitung santri tidak hadir.
  */
 
 type StudentOption = { studentId: string; fullName: string; nis: string | null };
@@ -151,6 +160,9 @@ export function TartilBulkForm({
   /** True bila guru sendiri sudah memilih jilid (jangan di-override auto-pilih). */
   const userPickedMaterial = useRef(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "belum" | "sudah" | "absen">("all");
+  /** V84 — konfirmasi hapus 2 langkah: id penilaian yang sedang menunggu konfirmasi / diproses. */
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchOnDate = useCallback(async (date: string | "") => {
     const seq = ++fetchSeq.current;
@@ -310,11 +322,18 @@ export function TartilBulkForm({
     const absent = absentById.has(s.studentId);
     if (statusFilter === "absen") return absent;
     if (statusFilter === "belum") return !absent && !gradedIds.has(s.studentId);
-    if (statusFilter === "sudah") return gradedIds.has(s.studentId);
+    if (statusFilter === "sudah") return !absent && gradedIds.has(s.studentId);
     return true;
   });
   const absentTotal = students.filter((s) => absentById.has(s.studentId)).length;
-  const gradedTotal = students.filter((s) => gradedIds.has(s.studentId)).length;
+  /** V84 — hanya santri HADIR yang dihitung "sudah dinilai". */
+  const gradedTotal = students.filter(
+    (s) => gradedIds.has(s.studentId) && !absentById.has(s.studentId)
+  ).length;
+  /** V84 — santri tidak hadir yang terlanjur punya nilai (perlu dihapus). */
+  const absentGradedTotal = students.filter(
+    (s) => absentById.has(s.studentId) && (entriesByStudent.get(s.studentId)?.length ?? 0) > 0
+  ).length;
   const belumTotal = students.filter(
     (s) => !absentById.has(s.studentId) && !gradedIds.has(s.studentId)
   ).length;
@@ -349,6 +368,67 @@ export function TartilBulkForm({
     return ex.value !== v || pagesChanged(studentId);
   }
   const filledCount = visibleStudents.filter((s) => isDirty(s.studentId)).length;
+
+  /** V84 — teks nilai ringkas sebuah entri (untuk badge). */
+  function entryScoreText(e: TartilOnDateEntry): string {
+    if (e.status !== "DINILAI") return e.status === "DIPELAJARI" ? "Dipelajari" : "Belum lancar";
+    return e.scoreLabel ?? (e.scoreValue !== null ? String(e.scoreValue) : "✓ Lancar");
+  }
+
+  /** V84 — hapus (soft delete) satu penilaian yang salah isi, lalu segarkan data tanggal ini. */
+  async function deleteEntry(entry: TartilOnDateEntry) {
+    setDeletingId(entry.assessmentId);
+    try {
+      const res = await deleteTartilAssessmentAction(entry.assessmentId, entry.studentId);
+      if (res.success) {
+        toast.success(res.success);
+        setConfirmId(null);
+        await fetchOnDate(assessedDate);
+      } else if (res.error) {
+        toast.error(res.error);
+      }
+    } catch {
+      toast.error("Penilaian belum berhasil dihapus. Silakan coba lagi.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  /** V84 — tombol Hapus + konfirmasi 2 langkah untuk satu entri. */
+  function renderDelete(e: TartilOnDateEntry) {
+    const busy = deletingId === e.assessmentId;
+    if (confirmId === e.assessmentId) {
+      return (
+        <span className="inline-flex shrink-0 items-center gap-1">
+          <Button
+            type="button" size="sm" variant="destructive"
+            className="h-7 gap-1 px-2 text-[0.65rem]" disabled={busy}
+            onClick={() => void deleteEntry(e)}
+          >
+            {busy ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+            Ya, hapus
+          </Button>
+          <Button
+            type="button" size="sm" variant="ghost"
+            className="h-7 px-2 text-[0.65rem]" disabled={busy}
+            onClick={() => setConfirmId(null)}
+          >
+            Batal
+          </Button>
+        </span>
+      );
+    }
+    return (
+      <Button
+        type="button" size="sm" variant="ghost"
+        className="h-7 gap-1 px-2 text-[0.65rem] text-rose-600 hover:text-rose-700 dark:text-rose-300"
+        title="Hapus nilai ini (salah isi)"
+        onClick={() => setConfirmId(e.assessmentId)}
+      >
+        <Trash2 className="size-3" /> Hapus
+      </Button>
+    );
+  }
 
   function pickMethod(nextId: string) {
     userPickedMaterial.current = true;
@@ -684,6 +764,21 @@ export function TartilBulkForm({
             </button>
           </div>
         )}
+        {absentGradedTotal > 0 && !loadingDate && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-300">
+            <span>
+              {absentGradedTotal} santri tercatat tidak hadir tetapi sudah terlanjur dinilai pada
+              tanggal ini. Hapus nilainya bila keliru.
+            </span>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("absen")}
+              className="shrink-0 font-bold underline"
+            >
+              Tampilkan
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           {loadingDate ? (
             <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
@@ -696,7 +791,12 @@ export function TartilBulkForm({
                 { v: "belum", label: `Belum dinilai (${belumTotal})` },
                 { v: "sudah", label: `Sudah dinilai (${gradedTotal})` },
                 ...(absentTotal > 0
-                  ? [{ v: "absen", label: `Tidak hadir (${absentTotal})` }]
+                  ? [{
+                      v: "absen",
+                      label: `Tidak hadir (${absentTotal}${
+                        absentGradedTotal > 0 ? `, ${absentGradedTotal} terlanjur dinilai` : ""
+                      })`,
+                    }]
                   : []),
               ] as { v: "all" | "belum" | "sudah" | "absen"; label: string }[]).map((f) => (
                 <button
@@ -737,6 +837,23 @@ export function TartilBulkForm({
                     Tidak masuk pada tanggal ini ({ABSENCE_LABEL[absent.status]})
                     {absent.note ? ` — ${absent.note}` : ""} · tidak bisa dinilai
                   </p>
+                  {(entriesByStudent.get(s.studentId) ?? []).length > 0 && (
+                    <div className="mt-1.5 space-y-1">
+                      <p className="text-[0.7rem] font-semibold text-amber-800 dark:text-yellow-300">
+                        Sudah terlanjur dinilai — hapus bila keliru:
+                      </p>
+                      {(entriesByStudent.get(s.studentId) ?? []).map((e) => (
+                        <div key={e.assessmentId} className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-sky-100 px-2 py-0.5 text-[0.65rem] font-bold text-sky-800 dark:bg-sky-500/15 dark:text-sky-300">
+                            <CheckCircle2 className="size-3" />
+                            {materials.find((m) => m.id === e.materialId)?.name ?? "Jilid lain"} · {entryScoreText(e)}
+                            {e.pagesLabel ? ` · hal. ${e.pagesLabel}` : ""}
+                          </span>
+                          {renderDelete(e)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-rose-100 px-2 py-0.5 text-[0.65rem] font-bold text-rose-800 dark:bg-rose-500/20 dark:text-rose-300">
                   <UserX className="size-3" /> {ABSENCE_LABEL[absent.status]}
@@ -747,7 +864,7 @@ export function TartilBulkForm({
           return (
             <div
               key={s.studentId}
-              className={`flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors ${
+              className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border px-3 py-2 transition-colors ${
                 value !== ""
                   ? "border-role/40 bg-role-soft/40"
                   : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
@@ -807,6 +924,16 @@ export function TartilBulkForm({
                     {mat?.name ?? "Jilid lain"} · {score}
                   </span>
                 );
+              })()}
+
+              {/* V84 — hapus nilai yang salah isi pada tanggal ini */}
+              {(() => {
+                const list = entriesByStudent.get(s.studentId) ?? [];
+                const ex = existing[s.studentId];
+                const target = ex
+                  ? list.find((x) => x.assessmentId === ex.id)
+                  : (list.find((x) => x.status === "DINILAI") ?? list[0]);
+                return target ? renderDelete(target) : null;
               })()}
 
               {existing[s.studentId] && (
