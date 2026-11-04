@@ -399,8 +399,15 @@ export async function deleteTartilTemplateAction(id: string): Promise<ActionResu
   return { success: "Template dihapus." };
 }
 
-/** Soft delete (rule #40) — history & Kartu Prestasi stay consistent. */
-export async function deleteTartilAssessmentAction(assessmentId: string): Promise<ActionResult> {
+/**
+ * Soft delete (rule #40) — history & Kartu Prestasi stay consistent.
+ * V84 — `studentId` opsional (dikirim form massal) agar cache santri itu pasti
+ * dibersihkan walau barisnya tak terbaca lewat RLS (mis. nilai guru lain).
+ */
+export async function deleteTartilAssessmentAction(
+  assessmentId: string,
+  studentId?: string
+): Promise<ActionResult> {
   const profile = await getSessionProfile();
   if (!profile || profile.role !== "USTADZ") {
     return { error: "Session Anda telah berakhir. Silakan login kembali." };
@@ -410,17 +417,22 @@ export async function deleteTartilAssessmentAction(assessmentId: string): Promis
   const supabase = await createClient();
 
   // Need the student id for cache invalidation.
-  const { data: row } = await supabase
-    .from("tartil_assessments")
-    .select("student_id")
-    .eq("id", assessmentId)
-    .maybeSingle();
+  let sid: string | null = studentId && UUID_RE.test(studentId) ? studentId : null;
+  if (!sid) {
+    const { data: row } = await supabase
+      .from("tartil_assessments")
+      .select("student_id")
+      .eq("id", assessmentId)
+      .maybeSingle();
+    sid = (row?.student_id as string | undefined) ?? null;
+  }
 
   const { error } = await supabase.rpc("tartil_soft_delete_assessment", {
     p_assessment_id: assessmentId,
   });
   if (error) return { error: friendlyError(error.message) };
 
-  if (row?.student_id) invalidateTartilAssessments([row.student_id as string]);
+  if (sid) invalidateTartilAssessments([sid]);
+  revalidatePath("/ustadz/tartil");
   return { success: "Penilaian dihapus." };
 }
