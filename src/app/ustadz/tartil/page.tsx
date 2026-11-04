@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AudioLines, CheckCircle2 } from "lucide-react";
+import { AudioLines, CheckCircle2, User, Users } from "lucide-react";
 
 import { requireRole } from "@/lib/auth";
 import {
@@ -67,11 +67,24 @@ export default async function UstadzTartilPage() {
         <Card className="shadow-card rounded-2xl">
           <CardContent className="pt-6">
             {/* V67 — dua cara input: satu santri (per jurnal) atau banyak
-                santri sekaligus untuk lembaga baru yang datanya di kertas. */}
+                santri sekaligus untuk lembaga baru yang datanya di kertas.
+                Tab dibuat besar & rata tengah agar pilihan cara input jelas. */}
             <Tabs defaultValue="satu">
-              <TabsList className="mb-5">
-                <TabsTrigger value="satu">Per Santri</TabsTrigger>
-                <TabsTrigger value="banyak">Banyak Santri (Massal)</TabsTrigger>
+              <TabsList className="mx-auto mb-6 h-14 w-full max-w-xl rounded-2xl p-1.5">
+                <TabsTrigger
+                  value="satu"
+                  className="gap-2 rounded-xl px-4 text-sm font-semibold sm:text-base data-[state=active]:shadow-md"
+                >
+                  <User className="size-5" />
+                  Individual
+                </TabsTrigger>
+                <TabsTrigger
+                  value="banyak"
+                  className="gap-2 rounded-xl px-4 text-sm font-semibold sm:text-base data-[state=active]:shadow-md"
+                >
+                  <Users className="size-5" />
+                  Massal
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="satu" className="mt-0">
                 <TartilJurnalForm
