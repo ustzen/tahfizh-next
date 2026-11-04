@@ -47,8 +47,9 @@ export async function saveRankSettingsAction(input: {
 
   const grades = (input.grades ?? []).map((g) => ({
     label: String(g.label ?? "").trim(),
-    min: Math.trunc(Number(g.min)),
-    max: Math.trunc(Number(g.max)),
+    // V86 — batas boleh 1 desimal (mis. 95,9); bulatkan ke 0,1 terdekat.
+    min: Math.round(Number(g.min) * 10) / 10,
+    max: Math.round(Number(g.max) * 10) / 10,
   }));
   const invalid = validateGradeScale(grades);
   if (invalid) return { error: invalid };
