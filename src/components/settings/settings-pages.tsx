@@ -173,7 +173,6 @@ export async function KeamananSection({ role }: { role: AppRole }) {
       sections={sections}
       active="keamanan"
       title="Pengaturan"
-      description="Email dan password dikelola melalui Supabase Auth yang aman."
     >
       <Card className="shadow-card rounded-2xl">
         <CardHeader>
