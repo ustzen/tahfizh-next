@@ -145,7 +145,6 @@ export function MenuIconManager({
               </button>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-foreground">{row.label}</p>
-                <p className="text-muted-foreground truncate font-mono text-[0.7rem]">{row.key}</p>
               </div>
               {override && (
                 <Badge variant="secondary" className="shrink-0 text-[0.66rem]">
