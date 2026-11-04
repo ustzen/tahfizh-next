@@ -258,12 +258,12 @@ export function SantriClient({
                     <TableHead className="w-10 px-3">No.</TableHead>
                     <SortHead label="NIS" k="nis" sort={sort} onSort={onSort} className="px-5" />
                     <SortHead label="NISN" k="nisn" sort={sort} onSort={onSort} />
-                    <SortHead label="Nama" k="nama" sort={sort} onSort={onSort} />
-                    <SortHead label="Peringkat" k="peringkat" sort={sort} onSort={onSort} className="text-center" center />
-                    <SortHead label="Skor" k="skor" sort={sort} onSort={onSort} className="text-center" center />
-                    <SortHead label="Panggilan" k="panggilan" sort={sort} onSort={onSort} />
+                    <SortHead label="Nama Lengkap" k="nama" sort={sort} onSort={onSort} />
+                    <SortHead label="Nama Panggilan" k="panggilan" sort={sort} onSort={onSort} />
                     <SortHead label="Gender" k="gender" sort={sort} onSort={onSort} />
                     <SortHead label={halaqahLabel} k="halaqah" sort={sort} onSort={onSort} />
+                    <SortHead label="Peringkat" k="peringkat" sort={sort} onSort={onSort} className="text-center" center />
+                    <SortHead label="Skor" k="skor" sort={sort} onSort={onSort} className="text-center" center />
                     <SortHead label="Wali" k="wali" sort={sort} onSort={onSort} />
                     <SortHead label="Terakhir Online" k="online" sort={sort} onSort={onSort} />
                     <TableHead className="px-5 text-right">Aksi</TableHead>
@@ -276,6 +276,15 @@ export function SantriClient({
                       <TableCell className="px-5 font-mono text-xs text-muted-foreground">{s.nis ?? "—"}</TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{s.nisn ?? "—"}</TableCell>
                       <TableCell className="font-medium">{s.full_name}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.nickname ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{genderLabel(s.gender)}</TableCell>
+                      <TableCell>
+                        {s.halaqah_name ? (
+                          <Badge variant="secondary" className="font-medium">{s.halaqah_name}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center">
                         {(() => {
                           const r = ranks.get(s.id ?? "");
@@ -304,15 +313,6 @@ export function SantriClient({
                             </span>
                           );
                         })()}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{s.nickname ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{genderLabel(s.gender)}</TableCell>
-                      <TableCell>
-                        {s.halaqah_name ? (
-                          <Badge variant="secondary" className="font-medium">{s.halaqah_name}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         <div className="leading-tight">
