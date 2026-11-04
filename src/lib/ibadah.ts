@@ -41,3 +41,36 @@ export const getIbadahRekapGuru = cache(async (days = 30): Promise<IbadahRekapRo
     lastLogDate: (r.last_log_date as string | null) ?? null,
   }));
 });
+
+/**
+ * TAHFIZH V83 — Rekap ibadah HARIAN per santri (SERVER ONLY).
+ *
+ * Pembungkus RPC `ibadah_rekap_harian`: seluruh santri aktif dalam lingkup
+ * pemanggil + daftar kegiatan yang dicentang pada satu tanggal. Dipakai guru
+ * untuk melihat siapa yang belum mengerjakan ibadah tertentu (bisa tanggal
+ * lampau). `ok=false` bila RPC belum dijalankan di database lembaga.
+ */
+export type IbadahHarianRow = {
+  studentId: string;
+  studentName: string;
+  halaqahName: string | null;
+  doneIds: string[];
+};
+
+export const getIbadahRekapHarian = cache(
+  async (date: string): Promise<{ rows: IbadahHarianRow[]; ok: boolean }> => {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("ibadah_rekap_harian", { p_date: date });
+    if (error) {
+      console.error("[ibadah_rekap_harian]", error.message);
+      return { rows: [], ok: false };
+    }
+    const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+      studentId: String(r.student_id ?? ""),
+      studentName: String(r.student_name ?? ""),
+      halaqahName: (r.halaqah_name as string | null) ?? null,
+      doneIds: Array.isArray(r.done_ids) ? (r.done_ids as string[]) : [],
+    }));
+    return { rows, ok: true };
+  }
+);
