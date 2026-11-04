@@ -77,6 +77,11 @@ function SortHead({
   );
 }
 
+/** V85 — skor dengan 1 angka di belakang koma (format Indonesia, mis. 85,4). */
+function fmtScore(n: number): string {
+  return n.toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
 /** V45 — badge peringkat: warna medali untuk 3 besar, netral setelahnya. */
 function RankBadge({ rank, totalRanked, avgScore, moduls }: TeacherStudentRank) {
   if (rank === null) {
@@ -93,7 +98,7 @@ function RankBadge({ rank, totalRanked, avgScore, moduls }: TeacherStudentRank) 
   return (
     <span
       className={cn("tabular inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold", tone)}
-      title={`Rata-rata nilai ${avgScore ?? "–"} · dari ${totalRanked} santri bernilai${
+      title={`Rata-rata nilai ${avgScore !== null ? fmtScore(avgScore) : "–"} · dari ${totalRanked} santri bernilai${
         moduls && Object.keys(moduls).length > 0
           ? ` · ${Object.entries(moduls)
               .map(([k, v]) => `${rankModuleLabel(k)} ${v}`)
@@ -304,7 +309,7 @@ export function SantriClient({
                           const huruf = gradeFor(avg, scale);
                           return (
                             <span className="inline-flex items-center justify-center gap-1.5">
-                              {avg}
+                              {fmtScore(avg)}
                               {huruf && (
                                 <span className="bg-gradient-brand rounded-md px-1.5 py-0.5 text-[0.7rem] font-bold text-white">
                                   {huruf}
