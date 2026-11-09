@@ -16,6 +16,7 @@ import type { SubmissionNoteSlot } from "@/lib/setoran-shared";
 import { NOTE_SLOT_LABELS } from "@/lib/learning-shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -263,11 +264,10 @@ export function SetoranMultiForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="setoran-date">Tanggal</Label>
-        <Input
+        <DateInput
           id="setoran-date"
-          type="date"
           value={assessedDate}
-          onChange={(e) => setAssessedDate(e.target.value)}
+          onChange={setAssessedDate}
           required
           className="w-full"
         />
