@@ -22,6 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -138,11 +139,11 @@ export function YearManager({ years }: { years: YearItem[] }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="startDate">Tanggal mulai</Label>
-                  <Input id="startDate" name="startDate" type="date" defaultValue={editing?.startDate ?? defaults.startDate} required />
+                  <DateField id="startDate" name="startDate" defaultValue={editing?.startDate ?? defaults.startDate} required />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="endDate">Tanggal selesai</Label>
-                  <Input id="endDate" name="endDate" type="date" defaultValue={editing?.endDate ?? defaults.endDate} required />
+                  <DateField id="endDate" name="endDate" defaultValue={editing?.endDate ?? defaults.endDate} required />
                 </div>
               </div>
               <details className="rounded-lg border border-role/15 bg-role-soft/50 px-3 py-2">
@@ -152,19 +153,19 @@ export function YearManager({ years }: { years: YearItem[] }) {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="s1Start" className="text-xs">Semester 1 mulai</Label>
-                    <Input id="s1Start" name="s1Start" type="date" />
+                    <DateField id="s1Start" name="s1Start" />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="s1End" className="text-xs">Semester 1 selesai</Label>
-                    <Input id="s1End" name="s1End" type="date" />
+                    <DateField id="s1End" name="s1End" />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="s2Start" className="text-xs">Semester 2 mulai</Label>
-                    <Input id="s2Start" name="s2Start" type="date" />
+                    <DateField id="s2Start" name="s2Start" />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="s2End" className="text-xs">Semester 2 selesai</Label>
-                    <Input id="s2End" name="s2End" type="date" />
+                    <DateField id="s2End" name="s2End" />
                   </div>
                 </div>
               </details>
