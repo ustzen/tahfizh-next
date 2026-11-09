@@ -37,6 +37,7 @@ import {
 } from "@/lib/tartil-shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -565,16 +566,16 @@ export function TartilBulkForm({
           <Label htmlFor="tb-tanggal" className="text-rose-600 dark:text-rose-300">
             <span className={LABEL_CLS}><CalendarDays className="size-4" /> Tanggal Penilaian</span>
           </Label>
-          <Input
-            id="tb-tanggal" type="date" required
+          <DateInput
+            id="tb-tanggal" required
             className="h-11" value={assessedDate} max={today}
-            onChange={(e) => {
-              setAssessedDate(e.target.value);
+            onChange={(iso) => {
+              setAssessedDate(iso);
               // Ganti tanggal tanpa jilid pilihan sendiri → auto-pilih lagi
               // (nilai pada tanggal itu, atau jilid terakhir dinilai).
               if (!userPickedMaterial.current) setMaterialId("");
             }}
-            aria-label="Tanggal penilaian (sesuai catatan kertas)"
+            ariaLabel="Tanggal penilaian (sesuai catatan kertas)"
           />
           <p className="text-muted-foreground text-[0.7rem]">
             Ubah untuk data kertas lama — semua nilai di batch ini memakai tanggal ini.
