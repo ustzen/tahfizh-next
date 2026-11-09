@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, ClipboardCopy, TableProperties, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Table,
   TableBody,
@@ -172,13 +173,12 @@ export function IbadahHarianTable({
           >
             <ChevronLeft className="size-4" />
           </Link>
-          <input
-            type="date"
+          <DateInput
             value={date}
             max={today}
-            onChange={(e) => goTo(e.target.value)}
-            className="h-8 rounded-lg border bg-transparent px-2 text-sm font-semibold"
-            aria-label="Pilih tanggal"
+            onChange={goTo}
+            ariaLabel="Pilih tanggal"
+            className="h-8 w-36 text-sm font-semibold"
           />
           {isToday ? (
             <span
