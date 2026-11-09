@@ -41,6 +41,7 @@ import {
 import type { TahfidzMode } from "@/lib/tahfidz";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -351,15 +352,14 @@ export function TartilJurnalForm({
           <Label htmlFor="tj-tanggal" className="text-rose-600 dark:text-rose-300">
             <span className={LABEL_CLS}><CalendarDays className="size-4" /> Tanggal Penilaian</span>
           </Label>
-          <Input
+          <DateInput
             id="tj-tanggal"
-            type="date"
             required
             className="h-11"
             value={assessedDate}
             max={today}
-            onChange={(e) => setAssessedDate(e.target.value)}
-            aria-label="Tanggal penilaian (sesuai catatan)"
+            onChange={setAssessedDate}
+            ariaLabel="Tanggal penilaian (sesuai catatan)"
           />
           <p className="text-muted-foreground text-[0.7rem]">
             Ubah untuk data lama yang baru ditransfer, atau penilaian yang lupa dicatat.
