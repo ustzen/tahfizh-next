@@ -9,6 +9,7 @@ import { saveTaskAction } from "@/app/actions/v7";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -155,7 +156,7 @@ export function TaskForm(props: Props) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="due">Deadline</Label>
-              <Input id="due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+              <DateInput id="due" value={dueDate} onChange={setDueDate} required />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="desc">Deskripsi (opsional)</Label>
