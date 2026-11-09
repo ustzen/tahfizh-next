@@ -5,6 +5,7 @@ import { FileText, HeartHandshake, ShieldCheck, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -141,10 +142,9 @@ function WaiverForm({ kids, onDone }: { kids: Child[]; onDone: () => void }) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="waiver-date">Tanggal surat keterangan</Label>
-          <Input
+          <DateField
             id="waiver-date"
             name="certificateDate"
-            type="date"
             min={minDate}
             max={today}
             defaultValue={today}
