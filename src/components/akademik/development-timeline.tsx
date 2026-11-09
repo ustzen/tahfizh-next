@@ -6,7 +6,7 @@ import { CalendarDays, ClipboardCheck, GraduationCap, Loader2, ScrollText } from
 import { fetchDevelopmentPageAction, type DevelopmentEvent } from "@/app/actions/development";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Select,
   SelectContent,
@@ -193,19 +193,17 @@ export function DevelopmentTimeline({
               ))}
             </SelectContent>
           </Select>
-          <Input
-            type="date"
+          <DateInput
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={setFrom}
             disabled={Boolean(selectedYear || selectedSem)}
-            aria-label="Dari tanggal"
+            ariaLabel="Dari tanggal"
           />
-          <Input
-            type="date"
+          <DateInput
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={setTo}
             disabled={Boolean(selectedYear || selectedSem)}
-            aria-label="Sampai tanggal"
+            ariaLabel="Sampai tanggal"
           />
         </CardContent>
       </Card>
