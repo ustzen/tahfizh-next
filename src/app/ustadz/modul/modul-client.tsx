@@ -19,6 +19,7 @@ import {
 } from "@/components/akademik/custom-module-shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -159,12 +160,11 @@ export function ModulClient({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="modul-tanggal">Tanggal</Label>
-                <Input
+                <DateInput
                   id="modul-tanggal"
-                  type="date"
                   value={date}
                   max={today}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={setDate}
                 />
               </div>
             </div>
