@@ -16,6 +16,7 @@ import { SUBMISSION_RESULTS, SUBMISSION_RESULT_LABELS } from "@/lib/setoran-shar
 import { NOTE_SLOT_LABELS } from "@/lib/learning-shared";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Select,
   SelectContent,
@@ -336,11 +337,10 @@ export function SetoranDirectForm({
       {/* Tanggal setoran — di bagian atas sebelum Pilih Santri */}
       <div className="space-y-1.5">
         <Label htmlFor="setoran-date">Tanggal Setoran</Label>
-        <Input
+        <DateInput
           id="setoran-date"
-          type="date"
           value={assessedDate}
-          onChange={(e) => setAssessedDate(e.target.value)}
+          onChange={setAssessedDate}
           required
           className="w-full sm:max-w-56"
         />
