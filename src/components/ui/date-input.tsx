@@ -15,6 +15,11 @@ import { cn } from "@/lib/utils";
  * lewat showPicker() (Chrome/Edge 99+, Safari 16+, Firefox 101+).
  * Nilai yang dikirim ke onChange tetap ISO yyyy-mm-dd sehingga URL ?tanggal=
  * dan RPC attendance_save_batch tidak berubah.
+ *
+ * V87 — tambahan: prop `id` / `required` / `placeholder`; mengosongkan isian
+ * lalu keluar fokus mengirim "" (untuk tanggal opsional); ketikan di luar
+ * `min`/`max` ditolak (native hanya membatasi kalender, bukan ketikan);
+ * `DateField` untuk form berbasis `name` (FormData / server action).
  */
 
 function isoToDisplay(iso: string): string {
@@ -51,6 +56,9 @@ export function DateInput({
   disabled,
   ariaLabel,
   className,
+  id,
+  required,
+  placeholder,
 }: {
   /** ISO yyyy-mm-dd. */
   value: string;
@@ -61,7 +69,13 @@ export function DateInput({
   disabled?: boolean;
   ariaLabel?: string;
   className?: string;
+  id?: string;
+  required?: boolean;
+  placeholder?: string;
 }) {
+  /** Di luar batas min/max → tidak diterima. */
+  const inRange = (iso: string) => (!max || iso <= max) && (!min || iso >= min);
+
   const [display, setDisplay] = useState(() => (value ? isoToDisplay(value) : ""));
   const nativeRef = useRef<HTMLInputElement>(null);
 
@@ -80,14 +94,19 @@ export function DateInput({
     setDisplay(next);
     if (digits.length === 8) {
       const iso = displayToIso(next);
-      if (iso) onChange(iso);
+      if (iso && inRange(iso)) onChange(iso);
     }
   }
 
   // Blur dengan isian belum lengkap/invalid → kembalikan tampilan ke nilai aktif.
   function handleBlur() {
+    // Dikosongkan sengaja → kirim "" (tanggal opsional / dihapus).
+    if (display.trim() === "") {
+      if (value !== "") onChange("");
+      return;
+    }
     const iso = displayToIso(display);
-    if (!iso) {
+    if (!iso || !inRange(iso)) {
       setDisplay(value ? isoToDisplay(value) : "");
       return;
     }
@@ -113,7 +132,9 @@ export function DateInput({
       <Input
         type="text"
         inputMode="numeric"
-        placeholder="dd/mm/yyyy"
+        id={id}
+        required={required}
+        placeholder={placeholder ?? "dd/mm/yyyy"}
         value={display}
         onChange={handleChange}
         onBlur={handleBlur}
@@ -150,5 +171,41 @@ export function DateInput({
         />
       </span>
     </span>
+  );
+}
+
+/**
+ * V87 — DateInput untuk form yang membaca nilai lewat `name` (FormData /
+ * server action). Menyimpan ISO yyyy-mm-dd di <input type="hidden"> sehingga
+ * kode server tidak berubah; tampilan tetap dd/mm/yyyy.
+ */
+export function DateField({
+  name,
+  defaultValue = "",
+  ...rest
+}: {
+  name: string;
+  defaultValue?: string;
+  max?: string;
+  min?: string;
+  disabled?: boolean;
+  ariaLabel?: string;
+  className?: string;
+  id?: string;
+  required?: boolean;
+  placeholder?: string;
+}) {
+  const [value, setValue] = useState(defaultValue);
+
+  // Form dipakai ulang (mis. dialog edit berganti data) → ikuti nilai awal baru.
+  useEffect(() => {
+    setValue(defaultValue);
+  }, [defaultValue]);
+
+  return (
+    <>
+      <DateInput value={value} onChange={setValue} {...rest} />
+      <input type="hidden" name={name} value={value} />
+    </>
   );
 }
