@@ -22,6 +22,7 @@ import {
 import { Spinner } from "@/components/loading";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -311,7 +312,7 @@ function StatusDialog({ student, canMutate }: { student: StudentRow; canMutate: 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="effectiveDate">Tanggal efektif</Label>
-              <Input id="effectiveDate" name="effectiveDate" type="date" />
+              <DateField id="effectiveDate" name="effectiveDate" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="reason">Alasan</Label>
@@ -477,7 +478,7 @@ function TransferDialog({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor={`eff-${student.id}`}>Tanggal efektif (#31)</Label>
-              <Input id={`eff-${student.id}`} name="effectiveDate" type="date" />
+              <DateField id={`eff-${student.id}`} name="effectiveDate" />
             </div>
             <div className="space-y-1.5">
               <Label>Semester</Label>
