@@ -7,6 +7,7 @@ import { FilePlus2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -115,11 +116,11 @@ export function NewReportForm({
           </div>
           <div className="space-y-1.5">
             <Label>Periode mulai</Label>
-            <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
+            <DateInput ariaLabel="Periode mulai" value={periodStart} onChange={setPeriodStart} />
           </div>
           <div className="space-y-1.5">
             <Label>Periode selesai</Label>
-            <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
+            <DateInput ariaLabel="Periode selesai" value={periodEnd} onChange={setPeriodEnd} />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Label periode (opsional)</Label>
