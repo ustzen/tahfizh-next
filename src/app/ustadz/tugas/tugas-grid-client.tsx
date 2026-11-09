@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -467,16 +468,15 @@ export function TugasGridClient({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="tugas-assigned">Tanggal Pemberian</Label>
-                <Input
+                <DateInput
                   id="tugas-assigned"
-                  type="date"
                   value={fAssigned}
-                  onChange={(e) => setFAssigned(e.target.value)}
+                  onChange={setFAssigned}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="tugas-due">Tenggat Waktu</Label>
-                <Input id="tugas-due" type="date" value={fDue} onChange={(e) => setFDue(e.target.value)} />
+                <DateInput id="tugas-due" value={fDue} onChange={setFDue} />
               </div>
             </div>
             <div className="space-y-1.5">
