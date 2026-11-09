@@ -13,6 +13,7 @@ import {
 import type { TahfidzMode } from "@/lib/tahfidz";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -170,11 +171,10 @@ export function LearningAssessmentForm({
 
         <div className="space-y-1.5">
           <Label htmlFor="date">Tanggal</Label>
-          <Input
+          <DateInput
             id="date"
-            type="date"
             value={assessedDate}
-            onChange={(e) => setAssessedDate(e.target.value)}
+            onChange={setAssessedDate}
             required
             className="w-full"
           />
