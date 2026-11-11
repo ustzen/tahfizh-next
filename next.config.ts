@@ -21,6 +21,24 @@ const nextConfig: NextConfig = {
       static: 180,
     },
   },
+  // PWA: service worker harus selalu diambil ulang (tidak di-cache lama) agar
+  // pembaruan sampai ke pengguna; manifest memakai MIME yang benar.
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
+        source: "/manifest.webmanifest",
+        headers: [{ key: "Content-Type", value: "application/manifest+json" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
