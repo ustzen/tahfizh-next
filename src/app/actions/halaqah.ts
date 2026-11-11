@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth";
+import { getAttendanceDay, type AttendanceDay } from "@/lib/halaqah";
 import { invalidateAttendance, invalidateHalaqah } from "@/lib/cache";
 import type { AttendanceStatus } from "@/lib/halaqah-shared";
 import type { ActionResult } from "@/app/actions/crud";
@@ -212,4 +213,23 @@ export async function saveAttendanceBatchAction(input: {
 
   invalidateAttendance(input.halaqahId, input.records.map((r) => r.studentId));
   return { success: "Presensi berhasil disimpan.", saved: Number(data ?? 0) };
+}
+
+/**
+ * V87 — Presensi satu hari untuk tampilan cepat (tanpa render ulang halaman).
+ * Dipakai AttendanceSheet saat pindah tanggal: 1 RPC `attendance_day` saja
+ * (hak akses & lingkup tetap dicek di dalam RPC), hasilnya di-cache di klien.
+ */
+export async function getAttendanceDayAction(
+  halaqahId: string,
+  date: string
+): Promise<{ error: string } | { generalNote: string | null; records: AttendanceDay["records"] }> {
+  const profile = await getSessionProfile();
+  if (!profile || profile.role === "WALI_SANTRI") {
+    return { error: "Anda tidak memiliki akses." };
+  }
+  if (!UUID_RE.test(halaqahId)) return { error: "Halaqah tidak valid." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Tanggal tidak valid." };
+  const day = await getAttendanceDay(halaqahId, date);
+  return { generalNote: day.generalNote, records: day.records };
 }
