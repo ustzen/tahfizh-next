@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, useMemo, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, Check, NotebookPen, Users } from "lucide-react";
+import { CalendarDays, Check, Loader2, NotebookPen, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { saveAttendanceBatchAction } from "@/app/actions/halaqah";
+import { getAttendanceDayAction, saveAttendanceBatchAction } from "@/app/actions/halaqah";
 import {
   ATTENDANCE_STATUSES,
   STATUS_META,
@@ -36,7 +36,32 @@ import {
  * H/I/S/A mass buttons mutate CLIENT state only (rule #20 — no request per
  * click); [Simpan] sends the whole class in ONE batch call (rule #21).
  * Target workflow < 10 detik (rule #24).
+ *
+ * V87 — PINDAH TANGGAL CEPAT: ganti tanggal tidak lagi memicu render ulang
+ * halaman di server (auth + daftar halaqah + daftar santri + presensi). Yang
+ * diambil hanya presensi hari itu (1 RPC lewat server action), disimpan di
+ * cache klien, dan hari-hari di sekitarnya di-prefetch — tanggal yang sudah
+ * pernah dibuka tampil seketika. URL tetap ikut berubah (replaceState) agar
+ * bisa dibagikan. Ganti halaqah tetap lewat router karena daftar santrinya
+ * ikut berubah.
  */
+
+type DaySnapshot = { entries: Record<string, AttendanceEntry>; generalNote: string };
+
+/**
+ * Setelah simpan, server menyegarkan halaman dan komponen ini bisa dibuat ulang
+ * (key mengikuti tanggal di URL). Pesan sukses dititipkan di sini supaya tetap
+ * tampil di instance yang baru. Hanya diisi di browser, jadi aman untuk SSR.
+ */
+let lastSaveNotice: { key: string; text: string; at: number } | null = null;
+
+/** Geser tanggal YYYY-MM-DD sebanyak n hari (aritmetika UTC, bebas zona waktu). */
+function shiftISO(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 
 type Option = { id: string; name: string; studentCount: number };
 
@@ -67,7 +92,23 @@ export function AttendanceSheet({
   const [generalNote, setGeneralNote] = useState(initialGeneralNote);
   const [entries, setEntries] = useState<Record<string, AttendanceEntry>>(initialEntries);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  /** V87 — sedang mengambil presensi tanggal yang belum ada di cache. */
+  const [loading, setLoading] = useState(false);
+  const cacheRef = useRef<Map<string, DaySnapshot>>(
+    new Map([
+      [`${initialHalaqahId}|${initialDate}`, { entries: initialEntries, generalNote: initialGeneralNote }],
+    ])
+  );
+  const inflightRef = useRef<Set<string>>(new Set());
+  const reqRef = useRef(0);
+  const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(() => {
+    const n = lastSaveNotice;
+    if (n && n.key === `${initialHalaqahId}|${initialDate}` && Date.now() - n.at < 8000) {
+      lastSaveNotice = null;
+      return { kind: "ok", text: n.text };
+    }
+    return null;
+  });
   // Baris catatan diciutkan secara default (rapat di mobile); dibuka per-santri saat dibutuhkan.
   const [openNote, setOpenNote] = useState<Record<string, boolean>>({});
 
@@ -99,11 +140,83 @@ export function AttendanceSheet({
     });
   }
 
-  function handleDateChange(nextDate: string) {
+  const dayKey = (h: string, d: string) => `${h}|${d}`;
+
+  /** Ambil presensi satu hari (1 RPC), simpan ke cache; dari cache bila sudah ada. */
+  async function loadDay(h: string, d: string): Promise<DaySnapshot | null> {
+    const hit = cacheRef.current.get(dayKey(h, d));
+    if (hit) return hit;
+    const res = await getAttendanceDayAction(h, d);
+    if ("error" in res) return null;
+    const entries: Record<string, AttendanceEntry> = {};
+    for (const s of students) {
+      const saved = res.records[s.id];
+      entries[s.id] = { status: saved?.status ?? null, note: saved?.note ?? "" };
+    }
+    const snap: DaySnapshot = { entries, generalNote: res.generalNote ?? "" };
+    cacheRef.current.set(dayKey(h, d), snap);
+    return snap;
+  }
+
+  /** Muat diam-diam hari sebelum/sesudahnya agar geser tanggal terasa instan. */
+  function prefetchAround(h: string, d: string) {
+    const today = todayISO();
+    for (const off of [-1, 1, -2]) {
+      const nd = shiftISO(d, off);
+      if (nd > today) continue;
+      const key = dayKey(h, nd);
+      if (cacheRef.current.has(key) || inflightRef.current.has(key)) continue;
+      inflightRef.current.add(key);
+      void loadDay(h, nd)
+        .catch(() => null)
+        .finally(() => inflightRef.current.delete(key));
+    }
+  }
+
+  useEffect(() => {
+    prefetchAround(initialHalaqahId, initialDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Samakan URL tanpa render ulang server (tetap bisa dibagikan / di-refresh). */
+  function syncUrl(h: string, d: string) {
+    const params = new URLSearchParams(searchParams?.toString());
+    params.set("tanggal", d);
+    if (halaqahOptions.length > 1) params.set("halaqah", h);
+    window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+  }
+
+  async function handleDateChange(nextDate: string) {
     if (nextDate === date) return;
     setDate(nextDate);
-    resetToNeutral();
-    goTo(halaqahId, nextDate);
+    setOpenNote({});
+    setMessage(null);
+    syncUrl(halaqahId, nextDate);
+
+    const myReq = ++reqRef.current;
+    const hit = cacheRef.current.get(dayKey(halaqahId, nextDate));
+    if (hit) {
+      setEntries(hit.entries);
+      setGeneralNote(hit.generalNote);
+      setLoading(false);
+      prefetchAround(halaqahId, nextDate);
+      return;
+    }
+
+    // Belum di cache: tampil netral + indikator memuat (bukan warisan tanggal lain).
+    setEntries({});
+    setGeneralNote("");
+    setLoading(true);
+    const snap = await loadDay(halaqahId, nextDate).catch(() => null);
+    if (myReq !== reqRef.current) return; // keburu pindah tanggal lagi
+    setLoading(false);
+    if (!snap) {
+      setMessage({ kind: "err", text: "Presensi tanggal ini belum berhasil dimuat. Silakan pilih tanggal lagi." });
+      return;
+    }
+    setEntries(snap.entries);
+    setGeneralNote(snap.generalNote);
+    prefetchAround(halaqahId, nextDate);
   }
 
   function handleHalaqahChange(nextHalaqahId: string) {
@@ -164,6 +277,13 @@ export function AttendanceSheet({
       return;
     }
     setMessage({ kind: "ok", text: res.success ?? "Presensi berhasil disimpan." }); // rule #26
+    lastSaveNotice = {
+      key: dayKey(halaqahId, date),
+      text: res.success ?? "Presensi berhasil disimpan.",
+      at: Date.now(),
+    };
+    // V87 — cache hari ini mengikuti yang baru disimpan.
+    cacheRef.current.set(dayKey(halaqahId, date), { entries: { ...entries }, generalNote });
     router.refresh();
   }
 
@@ -188,7 +308,10 @@ export function AttendanceSheet({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Tanggal</Label>
+            <Label className="flex items-center gap-1.5">
+              Tanggal
+              {loading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label="Memuat" />}
+            </Label>
             <DateInput
               value={date}
               max={todayISO()}
@@ -224,7 +347,7 @@ export function AttendanceSheet({
                 key={s}
                 type="button"
                 onClick={() => setAll(s)}
-                disabled={isPending}
+                disabled={isPending || loading}
                 aria-label={`${STATUS_META[s].label} semua`}
                 className={cn(
                   "flex min-h-[56px] flex-col items-center justify-center rounded-xl border-2 border-white/40 bg-white/15 font-bold text-white backdrop-blur transition hover:bg-white/30 active:scale-95 disabled:opacity-50",
@@ -248,7 +371,7 @@ export function AttendanceSheet({
           Belum ada santri dalam kelompok ini. Tambahkan anggota lewat menu Halaqah.
         </p>
       ) : (
-        <Card className="shadow-card overflow-hidden py-0">
+        <Card className={cn("shadow-card overflow-hidden py-0 transition-opacity", loading && "pointer-events-none opacity-50")}>
           <Table className="table-fixed text-[0.8rem] sm:text-sm">
             <TableHeader>
               <TableRow>
@@ -307,7 +430,7 @@ export function AttendanceSheet({
                             <button
                               type="button"
                               onClick={() => setOne(s.id, st)}
-                              disabled={isPending}
+                              disabled={isPending || loading}
                               aria-pressed={active}
                               aria-label={`${STATUS_META[st].label} — ${s.name}`}
                               className={cn(
@@ -397,7 +520,7 @@ export function AttendanceSheet({
                 <span className="text-muted-foreground/80">Belum: {counts.unset}</span>
               ) : null}
             </div>
-            {isPending ? (
+            {isPending || loading ? (
               <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-muted-foreground" role="status">
                 Memuat presensi untuk tanggal/halaqah terpilih...
               </p>
@@ -414,7 +537,7 @@ export function AttendanceSheet({
             ) : null}
             <Button
               className="w-full bg-primary text-white"
-              disabled={saving || isPending || students.length === 0 || !halaqahId || readOnly}
+              disabled={saving || isPending || loading || students.length === 0 || !halaqahId || readOnly}
               onClick={() => void save()}
             >
               <Check className="mr-1.5 h-4 w-4" />
