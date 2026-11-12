@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowUpRight,
+  AudioLines,
   BookOpen,
   BookOpenCheck,
   BookOpenText,
@@ -41,6 +42,7 @@ export const metadata: Metadata = { title: "Kartu Prestasi" };
 
 const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   TAHFIDZ: BookOpenCheck,
+  TARTIL: AudioLines,
   HADITS: BookOpenText,
   DOA: HandHeart,
   TAJWID: SpellCheck,
@@ -51,6 +53,7 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
 /** Label ubin sesuai mockup ("Doa Harian", bukan "Doa"). */
 const TILE_LABEL: Record<string, string> = {
   TAHFIDZ: "Tahfidz",
+  TARTIL: "Tartil",
   HADITS: "Hadits",
   DOA: "Doa Harian",
   TAJWID: "Tajwid",
@@ -86,6 +89,17 @@ const TILE_STYLE: Record<
     ribbon: "bg-emerald-600",
     bar: "bg-emerald-500",
     track: "bg-emerald-200/70 dark:bg-emerald-500/20",
+  },
+  TARTIL: {
+    tile: "border-teal-200 bg-teal-50 dark:border-teal-500/25 dark:bg-teal-500/10",
+    iconBg: "bg-teal-500",
+    name: "text-teal-700 dark:text-teal-300",
+    count: "text-teal-600 dark:text-teal-300",
+    frac: "text-teal-600 dark:text-teal-300",
+    pill: "bg-teal-500",
+    ribbon: "bg-teal-600",
+    bar: "bg-teal-500",
+    track: "bg-teal-200/70 dark:bg-teal-500/20",
   },
   HADITS: {
     tile: "border-blue-200 bg-blue-50 dark:border-blue-500/25 dark:bg-blue-500/10",
@@ -262,17 +276,17 @@ function RankMedal({ rank }: { rank: number | null }) {
             ? "from-orange-300 to-orange-500 ring-orange-400"
             : "from-sky-300 to-sky-500 ring-sky-400";
   return (
-    <div className="relative mx-auto size-20 shrink-0 lg:size-28">
+    <div className="relative mx-auto size-20 shrink-0 xl:size-28">
       {/* Pita medali */}
-      <span aria-hidden className="absolute top-[58%] left-1/2 h-9 w-5 -translate-x-[135%] rotate-[20deg] rounded-b-md bg-sky-600 lg:h-11 lg:w-6" />
-      <span aria-hidden className="absolute top-[58%] left-1/2 h-9 w-5 -translate-x-[-35%] rotate-[-20deg] rounded-b-md bg-sky-500 lg:h-11 lg:w-6" />
+      <span aria-hidden className="absolute top-[58%] left-1/2 h-9 w-5 -translate-x-[135%] rotate-[20deg] rounded-b-md bg-sky-600 xl:h-11 xl:w-6" />
+      <span aria-hidden className="absolute top-[58%] left-1/2 h-9 w-5 -translate-x-[-35%] rotate-[-20deg] rounded-b-md bg-sky-500 xl:h-11 xl:w-6" />
       <div
         className={cn(
           "shadow-card-lg relative z-10 flex size-full items-center justify-center rounded-full bg-gradient-to-br ring-4",
           face
         )}
       >
-        <span className="tabular text-3xl font-black text-white drop-shadow-sm lg:text-5xl">
+        <span className="tabular text-3xl font-black text-white drop-shadow-sm xl:text-5xl">
           {rank === null ? "–" : rank}
         </span>
       </div>
@@ -374,9 +388,28 @@ function PrestasiFrame({
     };
   };
 
-  // 4 ubin mockup selalu tampil; Tajwid & Kehadiran muncul saat ada datanya.
+  // Tartil tidak punya target/penyebut: tampilkan jumlah penilaian, persen =
+  // rata-rata nilai (null bila belum ada nilai).
+  const tartilStat = c.moduleStats?.TARTIL ?? EMPTY_MODULE_STAT;
+  const tartilTile = {
+    key: "TARTIL",
+    count: tartilStat.count,
+    frac: tartilStat.count > 0 ? `${tartilStat.count} dinilai` : null,
+    pct: tartilStat.avgScore !== null ? Math.round(tartilStat.avgScore) : null,
+    title:
+      tartilStat.count === 0
+        ? "Tartil · belum ada penilaian"
+        : `Tartil · ${tartilStat.count} penilaian${
+            tartilStat.avgScore !== null
+              ? ` · rata-rata ${tartilStat.avgScore.toLocaleString("id-ID", { maximumFractionDigits: 1 })}`
+              : ""
+          }`,
+  };
+
+  // 5 ubin selalu tampil; Tajwid & Kehadiran muncul saat ada datanya.
   const tiles = [
     tileOf("TAHFIDZ", c.moduleStats?.TAHFIDZ ?? EMPTY_MODULE_STAT),
+    tartilTile,
     tileOf("HADITS", c.moduleStats?.HADITS ?? EMPTY_MODULE_STAT),
     tileOf("DOA", c.moduleStats?.DOA ?? EMPTY_MODULE_STAT),
     tileOf("TUGAS", c.moduleStats?.TUGAS ?? EMPTY_MODULE_STAT),
@@ -497,7 +530,7 @@ function PrestasiFrame({
       </div>
 
       {/* ================= PENCAPAIAN SAYA + PERINGKAT ================= */}
-      <div className="mt-4 grid gap-4 px-4 pb-2 sm:px-6 lg:grid-cols-[1fr_300px]">
+      <div className="mt-4 grid gap-4 px-4 pb-2 sm:px-6 xl:grid-cols-[1fr_300px]">
         {/* Pencapaian Saya */}
         <div className="shadow-card rounded-2xl border px-4 py-4 sm:px-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -512,7 +545,9 @@ function PrestasiFrame({
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+          {/* 1 kolom di HP (ubin menyamping butuh lebar), 2 kolom di tablet,
+              4 kolom (ubin tegak) di layar lebar — 2 kolom di HP membuat teks terpotong. */}
+          <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
             {tiles.map((t) => (
               <AchievementTile key={t.key} tileKey={t.key} count={t.count} frac={t.frac} pct={t.pct} title={t.title} />
             ))}
@@ -554,10 +589,10 @@ function PrestasiFrame({
           </div>
 
           {/* Mobile: medali kiri + teks kanan; Desktop: tengah bertumpuk */}
-          <div className="mt-3 flex flex-1 flex-row items-center gap-4 lg:flex-col lg:justify-center lg:gap-3 lg:text-center">
+          <div className="mt-3 flex flex-1 flex-row items-center gap-4 xl:flex-col xl:justify-center xl:gap-3 xl:text-center">
             <RankMedal rank={rank} />
-            <div className="min-w-0 flex-1 lg:flex-none">
-              <p className="text-role-strong text-lg font-extrabold tracking-tight lg:mt-2">
+            <div className="min-w-0 flex-1 xl:flex-none">
+              <p className="text-role-strong text-lg font-extrabold tracking-tight xl:mt-2">
                 {rank === null ? "Belum ada peringkat" : `Peringkat ${rank}`}
               </p>
               <p className="text-muted-foreground text-sm">
