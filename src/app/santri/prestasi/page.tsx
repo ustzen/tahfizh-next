@@ -23,6 +23,9 @@ import { signAvatarPath } from "@/lib/avatar";
 import { MosqueGlyph } from "@/components/dashboard/mosque-glyph";
 import { requireRole } from "@/lib/auth";
 import { getPrestasiCards, getHalaqahRank, getMeterTotals, getSantriTargetProgress } from "@/lib/santri-pantauan";
+import { getSantriTartilRiwayat } from "@/lib/santri-tartil-riwayat";
+import { TartilRiwayatDialog } from "@/components/santri/tartil-riwayat-dialog";
+import type { TartilRiwayatItem } from "@/lib/santri-tartil-riwayat-shared";
 import { cn } from "@/lib/utils";
 import {
   EMPTY_MODULE_STAT,
@@ -363,12 +366,14 @@ function PrestasiFrame({
   rankInfo,
   avatarUrl,
   isPlaceholder,
+  tartilRiwayat,
 }: {
   c: PrestasiCard;
   meters: PersenMeter[];
   rankInfo: { rank: number | null; totalRanked: number; avgScore: number | null; halaqahName: string | null } | undefined;
   avatarUrl: string | null;
   isPlaceholder: boolean;
+  tartilRiwayat: TartilRiwayatItem[];
 }) {
   const initial = c.studentName.trim().charAt(0).toUpperCase() || "?";
   const nisTampil = cleanNis(c.nis, c.businessCode);
@@ -548,9 +553,24 @@ function PrestasiFrame({
           {/* 1 kolom di HP (ubin menyamping butuh lebar), 2 kolom di tablet,
               4 kolom (ubin tegak) di layar lebar — 2 kolom di HP membuat teks terpotong. */}
           <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-            {tiles.map((t) => (
-              <AchievementTile key={t.key} tileKey={t.key} count={t.count} frac={t.frac} pct={t.pct} title={t.title} />
-            ))}
+            {tiles.map((t) => {
+              const tile = (
+                <AchievementTile key={t.key} tileKey={t.key} count={t.count} frac={t.frac} pct={t.pct} title={t.title} />
+              );
+              // Ubin Tartil bisa diklik → daftar nilai Tartil santri (tanggal + nilai).
+              return t.key === "TARTIL" && !isPlaceholder ? (
+                <TartilRiwayatDialog
+                  key={t.key}
+                  studentName={c.studentName}
+                  halaqahName={c.halaqahName}
+                  items={tartilRiwayat}
+                >
+                  {tile}
+                </TartilRiwayatDialog>
+              ) : (
+                tile
+              );
+            })}
           </div>
 
           {/* Lencana pencapaian */}
@@ -675,11 +695,12 @@ function PrestasiFrame({
  */
 export default async function SantriPrestasiPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri/prestasi");
-  const [data, targets, meterTotals, ranks] = await Promise.all([
+  const [data, targets, meterTotals, ranks, tartilRiwayat] = await Promise.all([
     getPrestasiCards(),
     getSantriTargetProgress(),
     getMeterTotals(),
     getHalaqahRank(),
+    getSantriTartilRiwayat(),
   ]);
 
   // V49 — foto santri: path storage dari profil akun di-sign per render.
@@ -727,6 +748,7 @@ export default async function SantriPrestasiPage() {
             rankInfo={rankInfo}
             avatarUrl={avatarUrls.get(c.studentId) ?? null}
             isPlaceholder={c.studentId === "placeholder"}
+            tartilRiwayat={tartilRiwayat.get(c.studentId) ?? []}
           />
         );
       })}
