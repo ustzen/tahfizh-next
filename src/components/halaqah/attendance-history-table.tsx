@@ -1,5 +1,6 @@
 "use client";
 
+import { TmBadge } from "@/components/tm-badge";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 
@@ -32,6 +33,7 @@ export function AttendanceHistoryTable({
   pageSize,
   periode,
   bulan,
+  tmByDate = {},
 }: {
   halaqahId: string;
   basePath: string;
@@ -42,6 +44,8 @@ export function AttendanceHistoryTable({
   /** Konteks filter agar pagination tidak menghilangkan periode terpilih. */
   periode?: string;
   bulan?: number;
+  /** TM — peta tanggal sesi → nomor TM halaqah ini. */
+  tmByDate?: Record<string, number>;
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const hasPrev = page > 0;
@@ -84,7 +88,8 @@ export function AttendanceHistoryTable({
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="px-4">Tanggal</TableHead>
+                  <TableHead className="px-4">TM</TableHead>
+                  <TableHead>Tanggal</TableHead>
                   <TableHead className="text-center">Hadir</TableHead>
                   <TableHead className="text-center">Izin</TableHead>
                   <TableHead className="text-center">Sakit</TableHead>
@@ -95,7 +100,10 @@ export function AttendanceHistoryTable({
               <TableBody>
                 {rows.map((r) => (
                   <TableRow key={r.date}>
-                    <TableCell className="px-4 font-medium">
+                    <TableCell className="px-4">
+                      <TmBadge no={tmByDate[r.date]} />
+                    </TableCell>
+                    <TableCell className="font-medium">
                       <Link
                         href={`/ustadz/presensi?halaqah=${halaqahId}&tanggal=${r.date}`}
                         className="hover:text-role hover:underline"
