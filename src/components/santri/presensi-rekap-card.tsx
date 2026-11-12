@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { bulanId, persen, tanggalId, type PresensiRekap } from "@/lib/santri-pantauan-shared";
+import { TmBadge } from "@/components/tm-badge";
 
 type Status = "HADIR" | "IZIN" | "SAKIT" | "ALPA";
 
@@ -244,25 +245,42 @@ export function PresensiRekapCard({ rekap }: { rekap: PresensiRekap }) {
         {detail.length === 0 ? (
           <p className="text-muted-foreground mt-2 text-sm">Belum ada presensi pada bulan ini.</p>
         ) : (
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {detail.map((x, i) => {
-              const c = STATUS_VIEW[x.status as Status] ?? STATUS_VIEW.HADIR;
-              const Icon = c.Icon;
-              return (
-                <li
-                  key={`${x.date}-${i}`}
-                  title={x.note ?? undefined}
-                  className={cn("rounded-xl border px-3 py-1.5 text-center", c.chip)}
-                >
-                  <p className="text-[0.72rem] font-medium text-slate-500">{tanggalId(x.date)}</p>
-                  <p className={cn("flex items-center justify-center gap-1 text-xs font-bold", c.tone)}>
-                    <Icon className="size-3.5" strokeWidth={3} />
-                    {c.label}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="mt-3 overflow-hidden rounded-2xl border border-sky-100">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-sky-50 text-left text-xs font-bold text-sky-800">
+                  <th className="px-3 py-2.5">TM</th>
+                  <th className="px-3 py-2.5">Tanggal</th>
+                  <th className="px-3 py-2.5">Status</th>
+                  <th className="hidden px-3 py-2.5 sm:table-cell">Catatan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.map((x, i) => {
+                  const c = STATUS_VIEW[x.status as Status] ?? STATUS_VIEW.HADIR;
+                  const Icon = c.Icon;
+                  return (
+                    <tr key={`${x.date}-${i}`} className="border-t border-sky-100 align-top even:bg-slate-50/70">
+                      <td className="px-3 py-2.5">
+                        <TmBadge no={x.tm} />
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-slate-700">
+                        {tanggalId(x.date)}
+                        {x.note ? <span className="mt-0.5 block text-xs text-slate-500 sm:hidden">{x.note}</span> : null}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold", c.chip, c.tone)}>
+                          <Icon className="size-3.5" strokeWidth={3} />
+                          {c.label}
+                        </span>
+                      </td>
+                      <td className="hidden px-3 py-2.5 text-xs text-slate-500 sm:table-cell">{x.note ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
