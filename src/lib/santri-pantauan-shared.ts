@@ -125,9 +125,9 @@ export type PresensiRekap = {
     sakit: number;
     alpa: number;
   }[];
-  recent: { date: string; status: string; note: string | null; halaqahName: string | null }[];
+  recent: { date: string; status: string; note: string | null; halaqahName: string | null; tm?: number | null }[];
   /** V64 — seluruh catatan presensi dalam periode (terbaru dulu) untuk pemilih bulan. */
-  records?: { date: string; status: string; note: string | null; halaqahName: string | null }[];
+  records?: { date: string; status: string; note: string | null; halaqahName: string | null; tm?: number | null }[];
 };
 
 export type TargetProgress = {
