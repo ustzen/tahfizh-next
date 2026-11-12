@@ -685,6 +685,51 @@ export function ReportBuilder({
                   </div>
                 )}
 
+                {/* V88 — pilihan modul bawaan yang dicetak di Tabel Nilai (urutan tetap
+                    Tartil, Tahfidz, Hadits, Doa, lalu modul lain). */}
+                {selected.type === "SCORE_TABLE" && (
+                  <div className="space-y-1.5 border-t pt-2">
+                    <Label className="text-xs text-muted-foreground">Materi di tabel nilai</Label>
+                    <div className="space-y-1">
+                      {(
+                        [
+                          ["TARTIL", "Tartil Al-Qur’an"],
+                          ["TAHFIDZ", "Tahfidz Al-Qur’an"],
+                          ["HADITS", "Hadits Pilihan"],
+                          ["DOA", "Doa Harian"],
+                          ["SETORAN", "Setoran"],
+                          ["TAJWID", "Tajwid"],
+                          ["TUGAS", "Tugas"],
+                        ] as const
+                      ).map(([key, label]) => {
+                        const sel: string[] = Array.isArray(selected.props?.modules)
+                          ? (selected.props!.modules as string[]).map((x) => String(x).toUpperCase())
+                          : ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID", "TUGAS"];
+                        const ORDER = ["TARTIL", "TAHFIDZ", "HADITS", "DOA", "SETORAN", "TAJWID", "TUGAS"];
+                        return (
+                          <label
+                            key={key}
+                            className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-xs hover:bg-muted"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={sel.includes(key)}
+                              onChange={(e) => {
+                                const set = new Set(sel);
+                                if (e.target.checked) set.add(key);
+                                else set.delete(key);
+                                updateProps(selected.id, { modules: ORDER.filter((k) => set.has(k)) });
+                              }}
+                              className="size-3.5 accent-blue-600"
+                            />
+                            <span className="truncate">{label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* V59 — pilihan modul kustom mana yang dicetak di Tabel Nilai.
                     Kosong (belum diatur) = semua modul graded + in_raport. */}
                 {selected.type === "SCORE_TABLE" && customModules.length > 0 && (
