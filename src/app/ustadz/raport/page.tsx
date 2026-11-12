@@ -1,16 +1,14 @@
-import { PageHeader, SectionTitle } from "@/components/dashboard/section";
+import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getReportTemplateGallery, getTeacherReportList } from "@/lib/report";
-import { TeacherReportList } from "@/components/report/teacher-report-list";
-import { TemplateGallery } from "@/components/report/template-gallery";
-import { BookUser } from "lucide-react";
+import { TeacherRaportHub } from "@/components/report/teacher-raport-hub";
 
 export const metadata = { title: "Raport" };
 
 /**
- * TAHFIZH V72 — Guru (rombak total): melihat contoh raport, menyunting
- * template lembaga, dan menetapkan raport utama; daftar raport santri
- * halaqahnya ada di bawah. Hanya penataan ulang visual.
+ * TAHFIZH V88 — Guru: halaman raport disederhanakan menjadi dua tab
+ * (Template Raport, Raport Santri). Template dasar dari developer ada tiga
+ * (1, 2, 3 kolom); guru menyalin lalu mengubahnya untuk lembaganya.
  */
 export default async function UstadzRaportPage() {
   await requireRole(["USTADZ"], "/ustadz/raport");
@@ -20,22 +18,12 @@ export default async function UstadzRaportPage() {
   ]);
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
       <PageHeader
         title="Raport"
-        description="Bentuk raport lembaga dan raport santri halaqah Anda — nilai diambil otomatis dari data pembelajaran."
+        description="Atur bentuk raport lembaga, lalu buka raport santri halaqah Anda."
       />
-
-      <TemplateGallery templates={templates} basePath="/ustadz/raport" role="USTADZ" />
-
-      <section className="space-y-3">
-        <SectionTitle
-          icon={<BookUser />}
-          title="Raport Santri Halaqah"
-          description="Klik “Lihat Raport” untuk membuka tampilan cetak; finalisasi oleh Admin lembaga."
-        />
-        <TeacherReportList reports={reports} />
-      </section>
+      <TeacherRaportHub templates={templates} reports={reports} />
     </div>
   );
 }
