@@ -5,6 +5,7 @@ import { AudioLines, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { TmBadge } from "@/components/tm-badge";
 import {
   nilaiPredikat,
   nilaiText,
@@ -190,7 +191,7 @@ export function TartilRiwayatDialog({
                       <table className="w-full border-collapse text-sm">
                         <thead>
                           <tr className="bg-teal-50 text-left text-xs font-bold tracking-wide text-teal-800 dark:bg-teal-500/10 dark:text-teal-200">
-                            <th className="px-3.5 py-3">No</th>
+                            <th className="px-3.5 py-3">TM</th>
                             <th className="px-3.5 py-3">Tanggal</th>
                             <th className="px-3.5 py-3">Materi</th>
                             <th className="px-3.5 py-3">Halaman</th>
@@ -201,9 +202,9 @@ export function TartilRiwayatDialog({
                           </tr>
                         </thead>
                         <tbody>
-                          {tampil.map((i, idx) => (
+                          {tampil.map((i) => (
                             <tr key={i.id} className="even:bg-muted/40 border-t align-top">
-                              <td className="tabular px-3.5 py-3">{mulai + idx + 1}</td>
+                              <td className="px-3.5 py-3"><TmBadge no={i.tm} /></td>
                               <td className="px-3.5 py-3 whitespace-nowrap">{tglPanjang(i.assessedAt)}</td>
                               <td className="px-3.5 py-3">{materiText(i)}</td>
                               <td className="tabular px-3.5 py-3">{halText(i)}</td>
@@ -231,7 +232,8 @@ export function TartilRiwayatDialog({
                           <p className="text-muted-foreground text-xs">{tglBulan(i.assessedAt)}</p>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold">
+                          <p className="flex flex-wrap items-center gap-1.5 text-sm font-bold">
+                            {i.tm ? <TmBadge no={i.tm} /> : null}
                             {materiText(i)}
                             {i.pagesLabel ? ` · Hal. ${halText(i)}` : ""}
                           </p>
