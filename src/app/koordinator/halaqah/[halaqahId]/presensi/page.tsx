@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getAttendanceDay, getHalaqahDetail } from "@/lib/halaqah";
 import { getTerminology } from "@/lib/terminology";
+import { getTmSessionDates } from "@/lib/tm";
 import { HalaqahTabs } from "@/components/halaqah/halaqah-tabs";
 import { AttendanceSheet } from "@/app/ustadz/presensi/attendance-sheet";
 import { todayISO, type AttendanceEntry } from "@/lib/halaqah-shared";
@@ -25,7 +26,7 @@ export default async function KoordinatorHalaqahPresensiPage({
   if (!detail) notFound();
 
   const date = sp.tanggal && /^\d{4}-\d{2}-\d{2}$/.test(sp.tanggal) ? sp.tanggal : todayISO();
-  const day = await getAttendanceDay(halaqahId, date);
+  const [day, sessionDates] = await Promise.all([getAttendanceDay(halaqahId, date), getTmSessionDates(halaqahId)]);
   const initialEntries: Record<string, AttendanceEntry> = {};
   for (const s of detail.students) {
     const saved = day.records[s.id];
@@ -43,6 +44,7 @@ export default async function KoordinatorHalaqahPresensiPage({
           { id: detail.halaqah.id, name: detail.halaqah.name, studentCount: detail.studentCount },
         ]}
         initialHalaqahId={halaqahId}
+        sessionDates={sessionDates}
         initialDate={date}
         initialGeneralNote={day.generalNote ?? ""}
         students={detail.students}
