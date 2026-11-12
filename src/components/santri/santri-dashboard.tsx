@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useMemo } from "react";
 import {
   ArrowRight,
+  AudioLines,
   BookOpen,
   BookOpenCheck,
   BookOpenText,
+  CalendarCheck,
   CalendarCheck2,
   ChevronRight,
   Clock3,
@@ -105,6 +107,24 @@ const STAT_STYLES: Record<string, StatStyle> = {
     subText: "text-rose-600/80 dark:text-rose-300/80",
     bar: "bg-rose-500",
     track: "bg-rose-200/70 dark:bg-rose-500/25",
+  },
+  TARTIL: {
+    tile: "border-violet-100 bg-violet-50 dark:border-violet-500/20 dark:bg-violet-500/10",
+    iconBg: "bg-violet-500",
+    labelText: "text-violet-900 dark:text-violet-200",
+    valueText: "text-violet-600 dark:text-violet-300",
+    subText: "text-violet-600/80 dark:text-violet-300/80",
+    bar: "bg-violet-500",
+    track: "bg-violet-200/70 dark:bg-violet-500/25",
+  },
+  PRESENSI: {
+    tile: "border-teal-100 bg-teal-50 dark:border-teal-500/20 dark:bg-teal-500/10",
+    iconBg: "bg-teal-500",
+    labelText: "text-teal-900 dark:text-teal-200",
+    valueText: "text-teal-600 dark:text-teal-300",
+    subText: "text-teal-600/80 dark:text-teal-300/80",
+    bar: "bg-teal-500",
+    track: "bg-teal-200/70 dark:bg-teal-500/25",
   },
   TUGAS: {
     tile: "border-blue-100 bg-blue-50 dark:border-blue-500/20 dark:bg-blue-500/10",
@@ -233,6 +253,20 @@ export function SantriDashboard(props: SantriDashboardProps) {
   const tugasTotalV = meterTotals?.tugasTotal ?? prestasi?.moduleStats?.TUGAS?.total ?? 0;
   const tugasDoneV = prestasi?.moduleStats?.TUGAS?.count ?? 0;
 
+  // Tartil: tidak punya penyebut (jilid tak ditargetkan) → jumlah penilaian + rata-rata nilai.
+  const tartilStat = prestasi?.moduleStats?.TARTIL;
+  const tartilCount = tartilStat?.count ?? 0;
+  const tartilAvg = tartilStat?.avgScore ?? null;
+  const tartilSub =
+    tartilCount > 0 && tartilAvg !== null
+      ? `rata-rata ${tartilAvg.toLocaleString("id-ID", { maximumFractionDigits: 1 })}`
+      : `${tartilCount} dinilai`;
+
+  // Presensi: hadir / total pertemuan (rekap 6 bulan; fallback ringkasan kartu prestasi).
+  const presensiSum = presensi?.summary ?? prestasi?.presensi ?? null;
+  const presensiHadir = presensiSum?.hadir ?? 0;
+  const presensiTotal = presensiSum?.total ?? 0;
+
   const aktivitasTerbaru = aktivitas.slice(0, 5);
 
   /** value besar + sub "d/t (p%)" — bila tak ada penyebut, tampilkan jumlah penilaian. */
@@ -287,8 +321,8 @@ export function SantriDashboard(props: SantriDashboardProps) {
         <MosqueArt className="absolute -right-2 top-1/2 w-36 -translate-y-1/2 opacity-80 sm:w-44" />
       </div>
 
-      {/* ============ 4 KARTU STATISTIK ============ */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* ============ 6 KARTU STATISTIK ============ */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard
           href="/santri/target"
           icon={BookOpen}
@@ -297,6 +331,15 @@ export function SantriDashboard(props: SantriDashboardProps) {
           value={statValue(hafalanDone, hafalanTotal)}
           sub={statSub(hafalanDone, hafalanTotal)}
           pct={statPct(hafalanDone, hafalanTotal)}
+        />
+        <StatCard
+          href="/santri/prestasi"
+          icon={AudioLines}
+          style={STAT_STYLES.TARTIL}
+          label="Tartil"
+          value={`${tartilCount}`}
+          sub={tartilSub}
+          pct={tartilAvg !== null ? Math.round(tartilAvg) : 0}
         />
         <StatCard
           href="/santri/prestasi"
@@ -324,6 +367,15 @@ export function SantriDashboard(props: SantriDashboardProps) {
           value={statValue(tugasDoneV, tugasTotalV)}
           sub={statSub(tugasDoneV, tugasTotalV)}
           pct={statPct(tugasDoneV, tugasTotalV)}
+        />
+        <StatCard
+          href="/santri/presensi"
+          icon={CalendarCheck}
+          style={STAT_STYLES.PRESENSI}
+          label="Presensi"
+          value={`${Math.min(presensiHadir, presensiTotal || presensiHadir)}`}
+          sub={presensiTotal > 0 ? statSub(presensiHadir, presensiTotal) : "belum ada data"}
+          pct={statPct(presensiHadir, presensiTotal)}
         />
       </div>
 
