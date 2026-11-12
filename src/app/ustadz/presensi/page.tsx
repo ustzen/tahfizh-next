@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/dashboard/section";
 import { requireRole } from "@/lib/auth";
 import { getTeacherHalaqahList, getHalaqahDetail, getAttendanceDay } from "@/lib/halaqah";
 import { AttendanceSheet } from "./attendance-sheet";
+import { getTmSessionDates } from "@/lib/tm";
 import { todayISO, type AttendanceEntry } from "@/lib/halaqah-shared";
 
 export const metadata = { title: "Presensi" };
@@ -33,11 +34,14 @@ export default async function UstadzPresensiPage({
   let students: { id: string; name: string; code: string; gender: "L" | "P" }[] = [];
   let initialEntries: Record<string, AttendanceEntry> = {};
   let generalNote = "";
+  let sessionDates: string[] = [];
   if (selectedId) {
-    const [detail, day] = await Promise.all([
+    const [detail, day, dates] = await Promise.all([
       getHalaqahDetail(selectedId),
       getAttendanceDay(selectedId, date),
+      getTmSessionDates(selectedId),
     ]);
+    sessionDates = dates;
     students = detail?.students ?? [];
     for (const s of students) {
       const saved = day.records[s.id];
@@ -64,6 +68,7 @@ export default async function UstadzPresensiPage({
           key={`${selectedId}-${date}`}
           halaqahOptions={options}
           initialHalaqahId={selectedId}
+          sessionDates={sessionDates}
           initialDate={date}
           initialGeneralNote={generalNote}
           students={students}
