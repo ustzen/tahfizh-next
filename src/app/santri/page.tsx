@@ -12,6 +12,7 @@ import {
   getSantriTargetProgress,
   getMeterTotals,
   getPantauanFeed,
+  getHalaqahRank,
 } from "@/lib/santri-pantauan";
 
 export const metadata = { title: "Dashboard Santri" };
@@ -46,7 +47,7 @@ function hariIniJakarta(): string {
 export default async function SantriDashboardPage() {
   const profile = await requireRole(["WALI_SANTRI"], "/santri");
 
-  const [savedQuickMenu, iconOverrides, prestasiCards, presensiRekap, santriTargets, meterTotalsMap, display, aktivitasFeed] =
+  const [savedQuickMenu, iconOverrides, prestasiCards, presensiRekap, santriTargets, meterTotalsMap, display, aktivitasFeed, ranks] =
     await Promise.all([
       getDashboardQuickMenuOrder(profile.id),
       getMenuIconOverrides(),
@@ -56,6 +57,7 @@ export default async function SantriDashboardPage() {
       getMeterTotals(),
       getDisplayProfile(),
       getPantauanFeed(null, 8),
+      getHalaqahRank(),
     ]);
 
   const visibleQuickMenu = resolveQuickMenu(SANTRI_QUICK_MENU, savedQuickMenu, SANTRI_QUICK_MENU_DEFAULT_KEYS);
@@ -63,6 +65,7 @@ export default async function SantriDashboardPage() {
 
   const prestasi = prestasiCards[0] ?? null;
   const meterTotals = meterTotalsMap.get(prestasi?.studentId ?? "") ?? undefined;
+  const rank = ranks.get(prestasi?.studentId ?? "") ?? null;
 
   return (
     <SantriDashboard
@@ -73,6 +76,7 @@ export default async function SantriDashboardPage() {
       presensi={presensiRekap[0] ?? null}
       targets={santriTargets.filter((t) => t.studentId === prestasi?.studentId)}
       meterTotals={meterTotals}
+      rank={rank}
       aktivitas={aktivitasFeed}
       quickMenu={visibleQuickMenu}
       quickMenuDefaults={defaultQuickMenu}
