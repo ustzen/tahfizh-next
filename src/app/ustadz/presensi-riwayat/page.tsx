@@ -7,6 +7,8 @@ import {
   PAGE_SIZE_PRESENSI,
 } from "@/lib/halaqah";
 import { getActiveYear, getSemesters } from "@/lib/akademik";
+import { getTmSessionDates } from "@/lib/tm";
+import { tmByDateMap } from "@/lib/tm-shared";
 import { AttendanceHistoryTable } from "@/components/halaqah/attendance-history-table";
 import { AttendanceLeaderboard } from "@/components/halaqah/attendance-leaderboard";
 import { AttendancePeriodBar, type PresensiPeriode } from "@/components/halaqah/attendance-period-bar";
@@ -77,12 +79,13 @@ export default async function UstadzPresensiRiwayatPage({
 
   const { from, to } = periodeRange();
 
-  const [history, leaderboard] = selectedId
+  const [history, leaderboard, tmDates] = selectedId
     ? await Promise.all([
         getAttendanceHistoryPage(selectedId, page),
         getAttendanceLeaderboard(selectedId, from, to),
+        getTmSessionDates(selectedId),
       ])
-    : [{ rows: [], total: 0 }, { rajin: [], alpa: [], unavailable: false }];
+    : [{ rows: [], total: 0 }, { rajin: [], alpa: [], unavailable: false }, [] as string[]];
 
   return (
     <div className="space-y-6">
@@ -118,6 +121,7 @@ export default async function UstadzPresensiRiwayatPage({
             pageSize={PAGE_SIZE_PRESENSI}
             periode={periode}
             bulan={bulan}
+            tmByDate={tmByDateMap(tmDates)}
           />
         </>
       )}
