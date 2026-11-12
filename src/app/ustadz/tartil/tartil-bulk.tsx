@@ -38,6 +38,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
+import { TmBadge } from "@/components/tm-badge";
+import { getTmOnDateAction, type TmOnDate } from "@/app/actions/tm";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -201,6 +203,25 @@ export function TartilBulkForm({
   useEffect(() => {
     void fetchOnDate(assessedDate);
   }, [assessedDate, fetchOnDate]);
+
+  // TM (Tatap Muka) — nomor pertemuan halaqah pada tanggal penilaian terpilih.
+  const [tmInfo, setTmInfo] = useState<TmOnDate>(null);
+  useEffect(() => {
+    let batal = false;
+    getTmOnDateAction(
+      students.map((s) => s.studentId),
+      assessedDate
+    )
+      .then((r) => {
+        if (!batal) setTmInfo(r);
+      })
+      .catch(() => {
+        if (!batal) setTmInfo(null);
+      });
+    return () => {
+      batal = true;
+    };
+  }, [assessedDate, students]);
 
   /** Semua entri per santri pada tanggal terpilih (terbaru dulu — urutan RPC). */
   const entriesByStudent = useMemo(() => {
@@ -577,6 +598,12 @@ export function TartilBulkForm({
             }}
             ariaLabel="Tanggal penilaian (sesuai catatan kertas)"
           />
+          {tmInfo && (
+            <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-teal-800 dark:text-teal-300">
+              <TmBadge no={tmInfo.no} />
+              {tmInfo.beda ? "(beda halaqah, nomor terkecil)" : tmInfo.ada ? "pertemuan ke-" + tmInfo.no : "belum ada presensi tanggal ini"}
+            </p>
+          )}
           <p className="text-muted-foreground text-[0.7rem]">
             Ubah untuk data kertas lama — semua nilai di batch ini memakai tanggal ini.
           </p>
