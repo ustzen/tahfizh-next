@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Clock3,
   HandHeart,
-  Landmark,
   ListChecks,
   ScrollText,
   Sparkles,
@@ -31,7 +30,7 @@ import type {
   PrestasiCard,
   TargetProgress,
 } from "@/lib/santri-pantauan-shared";
-import { persen, targetScopeLabel } from "@/lib/santri-pantauan-shared";
+import { persen } from "@/lib/santri-pantauan-shared";
 import type { MenuIconOverride } from "@/lib/menu-icons";
 import type { CustomModuleItem } from "@/lib/custom-module";
 
@@ -137,23 +136,6 @@ const STAT_STYLES: Record<string, StatStyle> = {
   },
 };
 
-/** Ilangan lingkaran ring (conic-gradient) — ringan tanpa library. */
-function RingProgress({ pct, size = 96 }: { pct: number; size?: number }) {
-  const p = Math.max(0, Math.min(100, pct));
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <div
-        className="absolute inset-0 rounded-full"
-        style={{ background: `conic-gradient(#2563EB ${p}%, #DBEAFE ${p}%)` }}
-        aria-hidden
-      />
-      <div className="absolute inset-[9px] flex items-center justify-center rounded-full bg-white dark:bg-card">
-        <span className="text-xl font-extrabold tabular-nums text-[#1D5FAA] dark:text-sky-300">{p}%</span>
-      </div>
-    </div>
-  );
-}
-
 /** Ilustrasi masjid dekoratif (mockup: kubah biru + menara putih). */
 function MosqueArt({ className }: { className?: string }) {
   return (
@@ -225,8 +207,6 @@ export function SantriDashboard(props: SantriDashboardProps) {
     quickMenu,
     quickMenuDefaults,
     iconOverrides,
-    lembagaNama,
-    lembagaKode,
   } = props;
 
   const targetTahfidz = useMemo(
@@ -235,7 +215,6 @@ export function SantriDashboard(props: SantriDashboardProps) {
   );
   const hafalanDone = targetTahfidz ? Math.min(targetTahfidz.capaian, targetTahfidz.targetValue) : (prestasi?.surahSelesai ?? 0);
   const hafalanTotal = targetTahfidz ? targetTahfidz.targetValue : (prestasi?.surahTotal ?? 0);
-  const hafalanPct = hafalanTotal > 0 ? persen(hafalanDone, hafalanTotal) : 0;
 
   // Capaian per modul: target guru bila ada, fallback penilaian vs total materi.
   const haditsTarget = targets.find((t) => t.category === "HADITS" && t.targetValue > 0);
@@ -266,6 +245,32 @@ export function SantriDashboard(props: SantriDashboardProps) {
   const presensiSum = presensi?.summary ?? prestasi?.presensi ?? null;
   const presensiHadir = presensiSum?.hadir ?? 0;
   const presensiTotal = presensiSum?.total ?? 0;
+
+  /** Terakhir dihafal: penilaian terbaru modul; cadangan = item target terakhir yang tercapai. */
+  const lastOf = (cat: string): string | null => {
+    const fromAssess = prestasi?.moduleStats?.[cat]?.lastTitle;
+    if (fromAssess) return fromAssess;
+    const t = targets.find((x) => x.category === cat);
+    const done = t?.itemStatus?.filter((i) => i.done) ?? [];
+    return done.length > 0 ? done[done.length - 1].name : null;
+  };
+  /** Berikutnya: item pertama target guru yang belum tercapai (null bila tak ada target). */
+  const nextOf = (cat: string): string | null => {
+    const t = targets.find((x) => x.category === cat && x.targetValue > 0);
+    if (!t) return null;
+    if (t.itemStatus && t.itemStatus.length > 0) {
+      return t.itemStatus.find((i) => !i.done)?.name ?? "Semua target tercapai";
+    }
+    const lines = (t.items ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return null;
+    return lines[t.capaian] ?? "Semua target tercapai";
+  };
+
+  const hafalanRows = [
+    { key: "TAHFIDZ", label: "Tahfidz Al-Qur'an", icon: BookOpen, done: hafalanDone, total: hafalanTotal, unit: "surat" },
+    { key: "HADITS", label: "Hadits", icon: ScrollText, done: haditsDone, total: haditsTotal, unit: "hadits" },
+    { key: "DOA", label: "Doa Harian", icon: HandHeart, done: doaDone, total: doaTotal, unit: "doa" },
+  ].map((r) => ({ ...r, last: lastOf(r.key), next: nextOf(r.key) }));
 
   const aktivitasTerbaru = aktivitas.slice(0, 5);
 
@@ -379,9 +384,9 @@ export function SantriDashboard(props: SantriDashboardProps) {
         />
       </div>
 
-      {/* ============ PROGRESS HAFALAN (ring + bar) ============ */}
+      {/* ============ PROGRESS HAFALAN: 3 bagian (Tahfidz, Hadits, Doa) ============ */}
       <div className="rounded-2xl border border-white/70 bg-white p-4 shadow-card dark:border-slate-500/20 dark:bg-card sm:p-5">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-1 flex items-center justify-between">
           <p className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100">
             <span className="flex size-9 items-center justify-center rounded-xl bg-blue-500 text-white">
               <TrendingUp className="size-5" />
@@ -393,29 +398,49 @@ export function SantriDashboard(props: SantriDashboardProps) {
           </Link>
         </div>
 
-        <div className="flex flex-wrap items-center gap-5">
-          <RingProgress pct={hafalanPct} />
-          <div className="min-w-0 flex-1">
-            <p className="text-lg font-extrabold text-[#1D5FAA] dark:text-sky-300">
-              {targetTahfidz ? `Target ${hafalanTotal} Surat` : "Hafalan Saya"}
-            </p>
-            <p className="truncate text-sm font-semibold text-slate-600 dark:text-slate-300">
-              {targetTahfidz?.items ? targetTahfidz.items.split("\n")[0] : "Sesuai penilaian ustadz/ustadzah"}
-            </p>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              {targetTahfidz ? targetScopeLabel(targetTahfidz.scope) : `${prestasi?.surahTotalKatalog ?? hafalanTotal} surah aktif di lembaga`}
-            </p>
-            <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-slate-500/20">
-              <div
-                className="h-full rounded-full bg-[#2563EB]"
-                style={{ width: `${hafalanPct > 0 ? Math.max(3, hafalanPct) : 0}%` }}
-              />
-            </div>
-            <p className="mt-1.5 text-right text-xs font-bold text-[#1D5FAA] dark:text-sky-300">
-              {hafalanDone} / {hafalanTotal} Surat
-            </p>
-          </div>
-        </div>
+        <ul className="divide-y divide-slate-100 dark:divide-slate-500/10">
+          {hafalanRows.map((r) => {
+            const st = STAT_STYLES[r.key];
+            const Icon = r.icon;
+            const p = statPct(r.done, r.total);
+            return (
+              <li key={r.key} className="flex gap-3 py-3.5 last:pb-0">
+                <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-white ${st.iconBg}`}>
+                  <Icon className="size-4.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                    <span className={`truncate text-sm font-bold ${st.labelText}`}>{r.label}</span>
+                    <span className="shrink-0 text-xs font-bold text-slate-700 dark:text-slate-200">
+                      {r.total > 0 ? `${Math.min(r.done, r.total)}/${r.total} ${r.unit} · ${p}%` : `${r.done} dinilai`}
+                    </span>
+                  </div>
+                  <div className={`h-1.5 overflow-hidden rounded-full ${st.track}`} aria-hidden>
+                    <div className={`h-full rounded-full ${st.bar}`} style={{ width: `${Math.min(100, p)}%` }} />
+                  </div>
+                  <div className="mt-2.5 grid grid-cols-2 gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[0.65rem] font-semibold tracking-wide text-slate-600 uppercase dark:text-slate-400">
+                        Terakhir
+                      </p>
+                      <p className="truncate text-[0.8rem] font-bold text-slate-800 dark:text-slate-100">
+                        {r.last ?? "Belum ada"}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[0.65rem] font-semibold tracking-wide text-slate-600 uppercase dark:text-slate-400">
+                        Berikutnya
+                      </p>
+                      <p className="truncate text-[0.8rem] font-bold text-slate-800 dark:text-slate-100">
+                        {r.next ?? "Belum ada target"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       {/* ============ BANNER MOTIVASI ============ */}
@@ -511,24 +536,6 @@ export function SantriDashboard(props: SantriDashboardProps) {
 
         {/* ---- Kolom kanan: lembaga + kutipan ---- */}
         <div className="space-y-4">
-          <div className="rounded-2xl border border-white/70 bg-white p-4 shadow-card dark:border-slate-500/20 dark:bg-card sm:p-5">
-            <p className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300">
-                <Landmark className="size-4.5" />
-              </span>
-              Informasi Lembaga
-            </p>
-            <div className="mt-4 flex items-start gap-3.5 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-500/20 dark:bg-transparent">
-              <span className="bg-role flex size-11 shrink-0 items-center justify-center rounded-xl text-white">
-                <Landmark className="size-5.5" />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate font-bold text-slate-800 dark:text-slate-100">{lembagaNama ?? "TAHFIZH"}</p>
-                <p className="text-muted-foreground text-sm">Kode lembaga: {lembagaKode ?? "—"}</p>
-              </div>
-            </div>
-          </div>
-
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#38BDF8] px-6 py-6 text-white">
             <Sparkles className="absolute top-4 right-4 size-6 text-white/40" />
             <p className="max-w-[220px] text-lg leading-snug font-bold">
