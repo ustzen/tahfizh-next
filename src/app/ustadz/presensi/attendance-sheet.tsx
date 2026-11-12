@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { TmBadge } from "@/components/tm-badge";
+import { tmFromDates } from "@/lib/tm-shared";
 import { getAttendanceDayAction, saveAttendanceBatchAction } from "@/app/actions/halaqah";
 import {
   ATTENDANCE_STATUSES,
@@ -73,6 +75,7 @@ export function AttendanceSheet({
   students,
   initialEntries,
   readOnly = false,
+  sessionDates = [],
 }: {
   halaqahOptions: Option[];
   initialHalaqahId: string;
@@ -82,6 +85,8 @@ export function AttendanceSheet({
   initialEntries: Record<string, AttendanceEntry>;
   /** Koordinator/admin read-only view (rule #5/#46): lihat tanpa mengubah. */
   readOnly?: boolean;
+  /** TM — tanggal sesi presensi halaqah ini (YYYY-MM-DD); nomor TM dihitung dari urutannya. */
+  sessionDates?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -92,6 +97,9 @@ export function AttendanceSheet({
   const [generalNote, setGeneralNote] = useState(initialGeneralNote);
   const [entries, setEntries] = useState<Record<string, AttendanceEntry>>(initialEntries);
   const [saving, setSaving] = useState(false);
+  /** TM — tanggal yang baru disimpan di layar ini (sebelum data server menyusul). */
+  const [savedDates, setSavedDates] = useState<string[]>([]);
+  const tm = tmFromDates([...sessionDates, ...savedDates], date);
   /** V87 — sedang mengambil presensi tanggal yang belum ada di cache. */
   const [loading, setLoading] = useState(false);
   const cacheRef = useRef<Map<string, DaySnapshot>>(
@@ -276,6 +284,7 @@ export function AttendanceSheet({
       setMessage({ kind: "err", text: res.error });
       return;
     }
+    setSavedDates((d) => (d.includes(date) ? d : [...d, date]));
     setMessage({ kind: "ok", text: res.success ?? "Presensi berhasil disimpan." }); // rule #26
     lastSaveNotice = {
       key: dayKey(halaqahId, date),
@@ -319,6 +328,10 @@ export function AttendanceSheet({
               disabled={isPending}
               ariaLabel="Tanggal presensi"
             />
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-teal-800 dark:text-teal-300">
+              <TmBadge no={tm.no} />
+              {tm.exists ? "pertemuan ke-" + tm.no : "pertemuan baru (belum disimpan)"}
+            </p>
           </div>
         </CardContent>
       </Card>
