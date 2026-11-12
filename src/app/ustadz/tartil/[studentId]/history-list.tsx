@@ -19,6 +19,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { fmtDMY } from "@/lib/date-format";
+import { TmBadge } from "@/components/tm-badge";
+import { wibDate } from "@/lib/tm-shared";
 
 type HistoryItem = {
   id: string;
@@ -43,7 +45,14 @@ function scoreText(item: HistoryItem) {
   return "✓";
 }
 
-export function TartilHistoryList({ items }: { items: HistoryItem[] }) {
+export function TartilHistoryList({
+  items,
+  tmByDate = {},
+}: {
+  items: HistoryItem[];
+  /** TM — peta tanggal (WIB) → nomor TM santri ini. */
+  tmByDate?: Record<string, number>;
+}) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -74,6 +83,7 @@ export function TartilHistoryList({ items }: { items: HistoryItem[] }) {
               <span className="bg-gradient-brand inline-flex items-center rounded-lg px-2 py-0.5 text-[0.7rem] font-bold text-white shadow-card">
                 {scoreText(h)}
               </span>
+              <TmBadge no={tmByDate[wibDate(h.assessedAt)]} />
               <span className="text-muted-foreground text-xs">{formatDate(h.assessedAt)}</span>
               {h.teacherName && (
                 <span className="text-muted-foreground hidden text-xs sm:inline">· {h.teacherName}</span>
