@@ -280,34 +280,57 @@ export function ReportComponentContent({ comp, ctx, data, logoUrl, watermarkUrl 
       const customSel = Array.isArray(comp.props?.customModules)
         ? (comp.props.customModules as string[]).filter((x) => typeof x === "string")
         : null;
+      // V88 — props.modules (mis. ["TARTIL","TAHFIDZ","HADITS","DOA"]) memilih
+      // modul bawaan yang dicetak, sesuai urutan daftar. Tanpa props.modules
+      // (raport lama) semua modul tampil dengan urutan lama.
+      const DEFAULT_ORDER = ["TAHFIDZ", "TARTIL", "SETORAN", "HADITS", "DOA", "TAJWID", "TUGAS"];
+      const modSel = Array.isArray(comp.props?.modules)
+        ? (comp.props.modules as unknown[])
+            .filter((x): x is string => typeof x === "string")
+            .map((x) => x.toUpperCase())
+        : null;
+      const order = modSel ? modSel.filter((k) => DEFAULT_ORDER.includes(k)) : DEFAULT_ORDER;
       const rows: Row[] = [];
       const t = scores.tahfidz;
-      if (t && (t.count ?? 0) > 0)
-        rows.push({
-          key: "tahfidz",
-          materi: MODULE_LABELS.TAHFIDZ,
-          nilai: scoreText(mode, t.avgValue, t.lastLabel),
-          ket: `${t.count}/${t.activeTotal ?? 0} surat`,
-        });
       const tr = scores.tartil;
-      if (tr && (tr.count ?? 0) > 0)
-        rows.push({ key: "tartil", materi: MODULE_LABELS.TARTIL, nilai: scoreText(mode, tr.avgValue, tr.lastLabel), ket: `${tr.count} penilaian` });
       const se = scores.setoran;
-      if (se && (se.total ?? 0) > 0)
-        rows.push({ key: "setoran", materi: MODULE_LABELS.SETORAN, nilai: "✓", ket: `${se.total} setoran (${se.lulus ?? 0} lulus)` });
-      for (const [key, mod] of [["hadits", MODULE_LABELS.HADITS], ["doa", MODULE_LABELS.DOA], ["tajwid", MODULE_LABELS.TAJWID]] as const) {
-        const m = scores[key];
-        if (m && (m.total ?? 0) > 0)
-          rows.push({ key, materi: mod, nilai: scoreText(mode, m.avgValue, m.lastLabel), ket: `${m.count}/${m.total} materi` });
-      }
       const tk = scores.tugas;
-      if (tk && (tk.total ?? 0) > 0)
-        rows.push({ key: "tugas", materi: MODULE_LABELS.TUGAS, nilai: scoreText(mode, tk.avgValue, null), ket: `${tk.dinilai}/${tk.total} dinilai` });
+      const build: Record<string, () => Row | null> = {
+        TAHFIDZ: () =>
+          t && (t.count ?? 0) > 0
+            ? { key: "tahfidz", materi: MODULE_LABELS.TAHFIDZ, nilai: scoreText(mode, t.avgValue, t.lastLabel), ket: `${t.count}/${t.activeTotal ?? 0} surat` }
+            : null,
+        TARTIL: () =>
+          tr && (tr.count ?? 0) > 0
+            ? { key: "tartil", materi: MODULE_LABELS.TARTIL, nilai: scoreText(mode, tr.avgValue, tr.lastLabel), ket: `${tr.count} penilaian` }
+            : null,
+        SETORAN: () =>
+          se && (se.total ?? 0) > 0
+            ? { key: "setoran", materi: MODULE_LABELS.SETORAN, nilai: "✓", ket: `${se.total} setoran (${se.lulus ?? 0} lulus)` }
+            : null,
+        HADITS: () => countedRow("hadits", MODULE_LABELS.HADITS),
+        DOA: () => countedRow("doa", MODULE_LABELS.DOA),
+        TAJWID: () => countedRow("tajwid", MODULE_LABELS.TAJWID),
+        TUGAS: () =>
+          tk && (tk.total ?? 0) > 0
+            ? { key: "tugas", materi: MODULE_LABELS.TUGAS, nilai: scoreText(mode, tk.avgValue, null), ket: `${tk.dinilai}/${tk.total} dinilai` }
+            : null,
+      };
+      function countedRow(key: "hadits" | "doa" | "tajwid", materi: string): Row | null {
+        const m = scores[key];
+        return m && (m.total ?? 0) > 0
+          ? { key, materi, nilai: scoreText(mode, m.avgValue, m.lastLabel), ket: `${m.count}/${m.total} materi` }
+          : null;
+      }
+      for (const k of order) {
+        const r = build[k]?.();
+        if (r) rows.push(r);
+      }
       // V59 — modul kustom lembaga (rata-rata nilai dalam periode). Dipilih
       // via id (tahan rename); props kosong = semua modul graded+in_raport.
       const customRows = (scores.custom ?? []).filter(
         (c) =>
-          (customSel === null || customSel.includes(c.id)) &&
+          (customSel === null ? modSel === null : customSel.includes(c.id)) &&
           (c.count ?? 0) > 0
       );
       for (const c of customRows) {
