@@ -8,6 +8,8 @@ export type TartilRiwayatItem = {
   studentId: string;
   /** ISO timestamp penilaian. */
   assessedAt: string;
+  /** Nomor TM (Tatap Muka) pada tanggal penilaian; null bila tidak ada sesi presensi hari itu. */
+  tm: number | null;
   materialName: string;
   jilid: string | null;
   /** Label halaman apa adanya: "5" atau "3-5". */
@@ -23,6 +25,7 @@ export type TartilRiwayatRow = {
   r_student_id: string;
   r_id: string;
   r_assessed_at: string;
+  r_tm: number | null;
   r_material: string;
   r_jilid: string | null;
   r_pages: string | null;
@@ -40,6 +43,7 @@ export function mapTartilRiwayat(r: TartilRiwayatRow): TartilRiwayatItem {
     id: r.r_id,
     studentId: r.r_student_id,
     assessedAt: r.r_assessed_at,
+    tm: r.r_tm ?? null,
     materialName: r.r_material,
     jilid: r.r_jilid,
     pagesLabel: r.r_pages,
