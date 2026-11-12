@@ -24,6 +24,7 @@ import {
 import { QuickMenuGrid, QuickMenuEditorButton } from "@/components/dashboard/quick-menu-editor";
 import type { QuickMenuItem } from "@/lib/quick-menu";
 import type {
+  HalaqahRank,
   MeterTotals,
   PantauanItem,
   PresensiRekap,
@@ -47,6 +48,8 @@ export type SantriDashboardProps = {
   presensi: PresensiRekap | null;
   targets: TargetProgress[];
   meterTotals: MeterTotals | undefined;
+  /** Peringkat santri di halaqah (santri_halaqah_rank); null = belum tersedia. */
+  rank: HalaqahRank | null;
   aktivitas: PantauanItem[];
   quickMenu: QuickMenuItem[];
   quickMenuDefaults: QuickMenuItem[];
@@ -203,6 +206,7 @@ export function SantriDashboard(props: SantriDashboardProps) {
     presensi,
     targets,
     meterTotals,
+    rank,
     aktivitas,
     quickMenu,
     quickMenuDefaults,
@@ -271,6 +275,18 @@ export function SantriDashboard(props: SantriDashboardProps) {
     { key: "HADITS", label: "Hadits", icon: ScrollText, done: haditsDone, total: haditsTotal, unit: "hadits" },
     { key: "DOA", label: "Doa Harian", icon: HandHeart, done: doaDone, total: doaTotal, unit: "doa" },
   ].map((r) => ({ ...r, last: lastOf(r.key), next: nextOf(r.key) }));
+
+  const rankNo = rank?.rank ?? null;
+  const rankFace =
+    rankNo === null
+      ? "from-slate-200 to-slate-300 text-slate-600 ring-slate-300"
+      : rankNo === 1
+        ? "from-amber-300 to-amber-500 text-white ring-amber-400"
+        : rankNo === 2
+          ? "from-slate-300 to-slate-400 text-white ring-slate-300"
+          : rankNo === 3
+            ? "from-orange-300 to-orange-500 text-white ring-orange-400"
+            : "from-sky-300 to-sky-500 text-white ring-sky-400";
 
   const aktivitasTerbaru = aktivitas.slice(0, 5);
 
@@ -383,6 +399,40 @@ export function SantriDashboard(props: SantriDashboardProps) {
           pct={statPct(presensiHadir, presensiTotal)}
         />
       </div>
+
+      {/* ============ PERINGKAT ============ */}
+      <Link
+        href="/santri/prestasi"
+        className="flex items-center gap-4 rounded-2xl border border-white/70 bg-white p-4 shadow-card transition-transform active:scale-[0.99] dark:border-slate-500/20 dark:bg-card sm:p-5"
+      >
+        <span
+          className={`flex size-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-3xl font-black tabular-nums ring-4 ${rankFace}`}
+          aria-hidden
+        >
+          {rankNo ?? "–"}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-semibold tracking-wide text-slate-600 uppercase dark:text-slate-400">
+            Peringkat
+          </span>
+          <span className="block text-lg font-extrabold text-[#1D5FAA] dark:text-sky-300">
+            {rankNo === null ? "Belum ada peringkat" : `Peringkat ${rankNo}`}
+          </span>
+          <span className="text-muted-foreground block truncate text-sm">
+            {rankNo === null
+              ? "Menunggu nilai dari ustadz"
+              : `${rank?.totalRanked ? `dari ${rank.totalRanked} santri` : "di halaqah"}${
+                  rank?.halaqahName ? ` · ${rank.halaqahName}` : ""
+                }`}
+          </span>
+          {rank?.avgScore !== null && rank?.avgScore !== undefined && (
+            <span className="mt-0.5 block text-xs font-bold text-slate-700 dark:text-slate-200">
+              Rata-rata nilai {rank.avgScore.toLocaleString("id-ID", { maximumFractionDigits: 1 })}
+            </span>
+          )}
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-slate-400" aria-hidden />
+      </Link>
 
       {/* ============ PROGRESS HAFALAN: 3 bagian (Tahfidz, Hadits, Doa) ============ */}
       <div className="rounded-2xl border border-white/70 bg-white p-4 shadow-card dark:border-slate-500/20 dark:bg-card sm:p-5">
