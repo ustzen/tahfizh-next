@@ -9,6 +9,8 @@ import {
   getActiveTartilConfig,
 } from "@/lib/tartil";
 import { getStudentRowForTeacher } from "@/lib/tartil-detail";
+import { getTmForStudentDates } from "@/lib/tm";
+import { wibDate } from "@/lib/tm-shared";
 import { getTerminology } from "@/lib/terminology";
 import { PageHeader } from "@/components/dashboard/section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -107,6 +109,7 @@ export default async function StudentTartilPage({
           </CardHeader>
           <CardContent>
             <TartilHistoryList
+              tmByDate={await getTmForStudentDates(studentId, entries.map((e) => wibDate(e.assessedAt)))}
               items={entries.map((e) => ({
                 id: e.id,
                 materialName: e.materialName,
